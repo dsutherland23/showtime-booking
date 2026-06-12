@@ -1,0 +1,796 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+@source "../components/ui/3d-card.tsx";
+@source "../app/page.tsx";
+
+/* ============================================================
+   SHOWTIME BOOKING — Apple-Inspired Design System
+   Clean · Precise · Effortless · Premium
+   ============================================================ */
+
+/*
+  Apple's typography secret: -apple-system resolves to SF Pro on macOS/iOS,
+  Segoe UI on Windows. We layer "Inter" as a web fallback for non-Apple devices.
+*/
+
+/* ── Design Tokens ────────────────────────────────────────── */
+:root {
+  /* Apple's signature backgrounds */
+  --bg-primary:    #f5f5f7;   /* Apple's off-white — exact match to apple.com */
+  --bg-secondary:  #ffffff;
+  --bg-tertiary:   #f5f5f7;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #fafafa;
+
+  /* Apple Blue accent system */
+  --accent:        #0071e3;   /* Apple's exact blue */
+  --accent-hover:  #0077ed;
+  --accent-dark:   #004fc4;
+  --accent-light:  #e8f0fe;
+  --accent-gradient: linear-gradient(180deg, #42a1ec 0%, #0071e3 100%);
+
+  /* Compatibility aliases so existing portal code still works */
+  --gold-primary:         #0071e3;
+  --gold-hover:           #0077ed;
+  --gold-dark:            #004fc4;
+  --gold-light:           #e8f0fe;
+  --gold-gradient:        linear-gradient(180deg, #42a1ec 0%, #0071e3 100%);
+  --gold-gradient-subtle: linear-gradient(180deg, rgba(0,113,227,0.04) 0%, rgba(0,113,227,0.02) 100%);
+  --gold-text-gradient:   linear-gradient(180deg, #1d1d1f 0%, #0071e3 100%);
+
+  /* Apple typography colors */
+  --text-primary:   #1d1d1f;   /* Apple's near-black — NOT #000 */
+  --text-secondary: #6e6e73;   /* Apple's secondary gray */
+  --text-muted:     #86868b;   /* Apple's tertiary gray */
+  --text-inverse:   #ffffff;
+  --text-link:      #0071e3;
+
+  /* Borders — Apple uses very subtle separators */
+  --border-color:       rgba(0, 0, 0, 0.08);
+  --border-color-hover: rgba(0, 113, 227, 0.4);
+  --border-strong:      rgba(0, 0, 0, 0.12);
+
+  /* Glows */
+  --glow-gold:        0 4px 24px rgba(0, 113, 227, 0.15);
+  --glow-gold-strong: 0 8px 32px rgba(0, 113, 227, 0.25);
+  --glow-sm:          0 2px 12px rgba(0, 113, 227, 0.1);
+
+  /* Status */
+  --color-success: #34c759;   /* Apple system green */
+  --color-warning: #ff9500;   /* Apple system orange */
+  --color-error:   #ff3b30;   /* Apple system red */
+  --color-info:    #007aff;   /* Apple system blue */
+
+  /* Typography — Apple system stack first, Inter as web fallback */
+  --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text',    'Inter', 'Helvetica Neue', Arial, sans-serif;
+
+  /* Spacing */
+  --spacing-xs:  0.25rem;
+  --spacing-sm:  0.5rem;
+  --spacing-md:  1rem;
+  --spacing-lg:  1.5rem;
+  --spacing-xl:  2.5rem;
+  --spacing-xxl: 6rem;
+
+  /* Border Radii — Apple's signature rounded corners */
+  --radius-sm:  6px;
+  --radius-md:  12px;
+  --radius-lg:  18px;
+  --radius-xl:  24px;
+  --radius-2xl: 32px;
+  --radius-pill: 980px;   /* Apple's pill radius */
+
+  /* Shadows — Apple's precise, clean layering */
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md:  0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg:  0 12px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-xl:  0 24px 60px rgba(0, 0, 0, 0.10), 0 8px 20px rgba(0, 0, 0, 0.05);
+
+  /* Transitions — Apple's spring-feel easing */
+  --transition-fast:   0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-normal: 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-slow:   0.5s  cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --spring:            0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Reset ────────────────────────────────────────────────── */
+@layer base {
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  background-color: var(--bg-primary);
+  color-scheme: light;
+  /* Apple's signature font rendering */
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.47059;   /* Apple's exact body line-height ratio */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  letter-spacing: -0.022em;   /* Apple's body letter-spacing */
+}
+
+/* ── Scrollbar — macOS style ──────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
+
+/* ── Selection — solid Apple blue ────────────────────────── */
+::selection {
+  background: #0071e3;
+  color: #ffffff;
+}
+
+/* ── Scroll Reveal System ─────────────────────────────────── */
+/*
+  Usage: add class="reveal" to any element.
+  Add data-delay="120ms" for stagger offset.
+  The ScrollRevealInit component adds .visible when in viewport.
+*/
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity   0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger helper — wrap grid in .reveal-stagger, children auto-delay */
+.reveal-stagger.visible > *:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger.visible > *:nth-child(2) { transition-delay: 90ms; }
+.reveal-stagger.visible > *:nth-child(3) { transition-delay: 180ms; }
+.reveal-stagger.visible > *:nth-child(4) { transition-delay: 270ms; }
+
+/* Fade-only variant (no translate) */
+.reveal-fade {
+  opacity: 0;
+  transition: opacity 0.65s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.reveal-fade.visible { opacity: 1; }
+
+/* Scale-up variant */
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity   0.65s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ── Typography — Apple Scale ─────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.08;   /* Apple's tight heading line-height */
+}
+
+/* Apple uses font-weight 700 for most display type */
+h1 {
+  font-size: clamp(3rem, 2rem + 5vw, 5.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+h2 {
+  font-size: clamp(2rem, 1.4rem + 3vw, 3.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+h3 {
+  font-size: clamp(1.5rem, 1.1rem + 1.5vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+p {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  font-size: 1.0625rem;   /* Apple's 17px body */
+  line-height: 1.47059;
+  letter-spacing: -0.022em;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--text-link);
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
+}
+
+a:hover { opacity: 0.8; }
+
+/* ── Form Elements — Apple Human Interface Guideline Style ── */
+input, textarea {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;   /* 15px — Apple's input size */
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  line-height: 1.4;
+  -webkit-appearance: none;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.2);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Apple-style select — clean with custom chevron */
+select {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 2.4rem 0.75rem 1rem;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  appearance: none;
+  -webkit-appearance: none;
+  /* Apple SF Symbols-style chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 12px;
+}
+
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.2);
+}
+
+/* Modern base-select for Chrome 135+ */
+@supports (appearance: base-select) {
+  select {
+    appearance: base-select;
+    padding: 0.75rem 1rem;
+    background-image: none;
+  }
+
+  select, select::picker(select) { appearance: base-select; }
+
+  select::picker(select) {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  select option {
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  select option:hover {
+    background: rgba(0, 113, 227, 0.08);
+    color: var(--accent);
+  }
+
+  select option:checked {
+    background: var(--accent);
+    color: #ffffff;
+  }
+}
+
+/* ── Focus Indicators — Apple VoiceOver style ─────────────── */
+button:focus-visible, a:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(0, 113, 227, 0.6);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: 1200px;   /* Apple.com's 1200px max width */
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+@media (min-width: 768px) { .container { padding: 0 2.5rem; } }
+
+.grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--spacing-lg); }
+@media (min-width: 768px) { .grid-2 { grid-template-columns: repeat(2, 1fr); } }
+
+.grid-3 { display: grid; grid-template-columns: 1fr; gap: var(--spacing-lg); }
+@media (min-width: 768px)  { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+
+.grid-4 { display: grid; grid-template-columns: 1fr; gap: var(--spacing-lg); }
+@media (min-width: 640px)  { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1200px) { .grid-4 { grid-template-columns: repeat(4, 1fr); } }
+
+/* ── Apple-style Cards ────────────────────────────────────── */
+.luxury-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+  /* Apple's exact card shadow */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+.luxury-card:hover {
+  transform: translateY(-3px) scale(1.005);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* No decorative before/after — Apple keeps surfaces clean */
+.luxury-card::before, .luxury-card::after { display: none; }
+
+/* ── Glassmorphism — Apple's frosted glass ────────────────── */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* ── Buttons — Apple HIG Compliant ───────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;   /* 15px */
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  padding: 0.65rem 1.5rem;
+  border-radius: var(--radius-pill);   /* Apple's pill buttons */
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  border: none;
+  white-space: nowrap;
+  text-decoration: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Apple's primary blue button — exact gradient */
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 400;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  opacity: 0.88;
+}
+
+.btn-primary:active { transform: scale(0.98); }
+
+/* Apple's secondary — pill outline */
+.btn-secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 113, 227, 0.06);
+  opacity: 1;
+}
+
+/* Apple's tertiary — gray pill */
+.btn-tertiary {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+  border: none;
+}
+
+.btn-tertiary:hover {
+  background: rgba(0, 0, 0, 0.1);
+  opacity: 1;
+}
+
+/* ── Section Headers — Apple centered editorial style ─────── */
+.section-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.section-header p {
+  margin: 0.8rem auto 0;
+  font-size: 1.0625rem;
+  max-width: 56ch;
+  color: var(--text-secondary);
+}
+
+/* Apple-style gradient text — used for emphasis */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #42a1ec 0%, #0071e3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gold-text-gradient {
+  background: linear-gradient(180deg, #1d1d1f 0%, #0071e3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Apple-style eyebrow label */
+.gold-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 0.75rem;
+  border-radius: 0;
+  /* Apple doesn't badge — it just uses colored labels */
+}
+
+/* ── Background utility ───────────────────────────────────── */
+.luxury-bg {
+  position: relative;
+  background-color: var(--bg-primary);
+}
+
+/* ── Animations — Apple Spring ────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade { animation: fadeIn 0.45s ease both; }
+
+/* ── App Layout ───────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+}
+
+/* Hide the old accent top bar */
+.top-gold-bar { display: none; }
+
+/* ── Navigation — Apple.com style ────────────────────────── */
+.global-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  /* Apple's exact nav separator */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  transition: background var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 52px;   /* Apple.com's exact nav height */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) { .nav-container { padding: 0 2.5rem; } }
+
+/* Apple logo style — compact wordmark */
+.logo-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: var(--text-primary);
+  background-clip: unset;
+}
+
+.logo-subtext {
+  font-family: var(--font-body);
+  font-size: 0.48rem;
+  letter-spacing: 0.22em;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Nav links — Apple's minimal nav style */
+.nav-menu {
+  display: none;
+  align-items: center;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) { .nav-menu { display: flex; } }
+
+.nav-link {
+  font-size: 0.8125rem;   /* 13px — Apple nav size */
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  padding: 0.25rem 0;
+  position: relative;
+  opacity: 0.85;
+  transition: opacity var(--transition-fast);
+  text-transform: none;   /* Apple does NOT uppercase nav */
+}
+
+.nav-link::after { display: none; }   /* No underline hover */
+
+.nav-link:hover { opacity: 1; color: var(--text-primary); }
+
+.ai-link {
+  color: var(--accent);
+  opacity: 1;
+  font-weight: 400;
+}
+
+.ai-link:hover { opacity: 0.8; color: var(--accent); }
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.portal-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-sm-padding {
+  padding: 0.42rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.main-content-wrapper {
+  flex-grow: 1;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Footer — Apple.com dark footer ──────────────────────── */
+.global-footer {
+  background-color: #f5f5f7;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding: var(--spacing-xl) 0 var(--spacing-lg);
+  margin-top: var(--spacing-xxl);
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .footer-container { grid-template-columns: 2fr repeat(3, 1fr); padding: 0 2.5rem; }
+}
+
+.footer-brand-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Footer logo keeps dark text */
+.footer-brand-section .logo-text {
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: var(--text-primary);
+  background-clip: unset;
+  color: var(--text-primary);
+}
+
+.footer-brand-section .logo-subtext { color: var(--text-muted); }
+
+.footer-bio {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 34ch;
+}
+
+.footer-links-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.footer-links-col h4 {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;   /* 11px — Apple footer heading */
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.footer-links-col a {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.footer-links-col a:hover { color: var(--text-primary); opacity: 1; }
+
+.contact-item {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  max-width: none;
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 1.5rem auto 0;
+  padding: 1.25rem 1.5rem 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  text-align: left;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Form utilities ───────────────────────────────────────── */
+.text-right { text-align: right; }
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-group label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.form-group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 768px) {
+  .form-group-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.full-width-field { grid-column: 1 / -1; }
+
+.portal-panel-wrapper { margin-top: var(--spacing-lg); }
+
+.tab-slide-panel { animation: fadeIn 0.28s ease both; }
+
+/* ── Nav portal link — Apple nav CTA style ────────────────── */
+.nav-portal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--accent);
+  border: 1px solid rgba(0, 113, 227, 0.35);
+  padding: 0.38rem 0.85rem;
+  border-radius: var(--radius-pill);
+  transition: all var(--transition-fast);
+  background: transparent;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.nav-portal-link:hover {
+  background: rgba(0, 113, 227, 0.06);
+  border-color: var(--accent);
+  opacity: 1;
+  color: var(--accent);
+}
+}
