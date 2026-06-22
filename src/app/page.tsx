@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
 import { ArrowRight, Star, Music, Award, ShieldAlert, Sparkles, MapPin, Users, HelpCircle } from 'lucide-react';
-import { InteractiveTravelCard } from '@/components/ui/3d-card';
+import { FlowArt, FlowSection } from '@/components/ui/story-scroll';
 import { DottedSurface } from '@/components/ui/dotted-surface';
 import { HeroSection } from '@/components/ui/3d-hero-section-boxes';
 
@@ -114,58 +114,259 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 4. SERVICES — Apple spec strip ── */}
-      <section className="section-pad">
-        <div className="container">
-          <div className="section-header reveal">
+      {/* ── 4. SERVICES — GSAP Story Scroll ── */}
+      <section id="services-flow" className="relative w-full bg-[#07050e]">
+        <div className="container py-16">
+          <div className="section-header reveal text-center max-w-2xl mx-auto mb-4">
             <p className="section-eyebrow">Platform</p>
-            <h2>Everything you need.</h2>
-            <p>We manage the complexities of live bookings, visas, tour routing, and production logistics.</p>
-          </div>
-          <div className="grid-4 reveal-stagger">
-            {[
-              { 
-                title: 'Talent Booking', 
-                subtitle: 'Structured deposit schedules & dynamic agreements', 
-                imageUrl: '/images/artist_dancehall.jpg',
-                actionText: 'Reserve Artist',
-                href: '/book'
-              },
-              { 
-                title: 'Tour Logistics', 
-                subtitle: 'Route planning & transport across 35+ countries', 
-                imageUrl: '/images/hero_ambient.jpg',
-                actionText: 'Explore Roster',
-                href: '/talent'
-              },
-              { 
-                title: 'Visa & Permits', 
-                subtitle: 'US O-Visas, UK COS & European declarations', 
-                imageUrl: '/images/artist_dj.jpg',
-                actionText: 'Verify Compliance',
-                href: '/contact'
-              },
-              { 
-                title: 'Event Production', 
-                subtitle: 'Backline A/V & rider verification by professionals', 
-                imageUrl: '/images/concert_stage.jpg',
-                actionText: 'Verify Riders',
-                href: '/services'
-              },
-            ].map((s, i) => (
-              <div key={i} className="reveal" style={{ perspective: '1000px' }}>
-                <InteractiveTravelCard
-                  title={s.title}
-                  subtitle={s.subtitle}
-                  imageUrl={s.imageUrl}
-                  actionText={s.actionText}
-                  href={s.href}
-                  onActionClick={() => router.push(s.href)}
-                />
-              </div>
-            ))}
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-4">Everything you need.</h2>
+            <p className="text-white/60 text-base md:text-lg">
+              We manage the complexities of live bookings, visas, tour routing, and production logistics.
+            </p>
           </div>
         </div>
+
+        <FlowArt aria-label="Services Story Scroll">
+          {/* Section 01: Talent Booking */}
+          <FlowSection aria-label="Talent Booking" style={{ backgroundColor: '#0f0a1d', color: '#fff' }} className="border-t border-white/5">
+            <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">01 &mdash; Talent Booking</p>
+                <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Booking</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                  <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
+                    Reserve <br />
+                    <span className="text-[#d4af37]">Elite</span> Talent.
+                  </h3>
+                  <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
+                    Structured deposit schedules &amp; dynamic performance agreements. We connect festivals and promoters directly with the legendary names of Caribbean reggae, dancehall, and live sounds.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Contracting</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Automated Escrow &amp; Deposit Management</p>
+                    </div>
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Guarantees</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Rider Compliance &amp; Date Holds</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
+                    <Link href="/book" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full hover:scale-105 transition duration-300 flex items-center gap-2" style={{ background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)', color: '#07050e' }}>
+                      Reserve Artist <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-2xl group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src="/images/artist_dancehall.jpg" 
+                      alt="Talent Booking" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4">
+                      <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Live Performance</p>
+                      <p className="text-sm font-bold text-white">Dancehall &amp; Reggae Headliners</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4 flex justify-between items-center text-xs text-white/40">
+                <span>SHOWTIME booking portal</span>
+                <span>Est. 2026</span>
+              </div>
+            </div>
+          </FlowSection>
+
+          {/* Section 02: Tour Logistics */}
+          <FlowSection aria-label="Tour Logistics" style={{ backgroundColor: '#070f1a', color: '#fff' }} className="border-t border-white/5">
+            <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a855f7]">02 &mdash; Tour Logistics</p>
+                <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Operations</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                  <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
+                    Global <br />
+                    <span className="text-[#a855f7]">Tour</span> Logistics.
+                  </h3>
+                  <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
+                    Route planning, flight bookings, and transport coordination across 35+ countries. From itinerary optimization to private ground transport, we keep your tour moving on schedule.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Routing</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Multi-City &amp; Multi-Leg Flight Booking</p>
+                    </div>
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Ground Transport</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Coordinated VIP Sprinters &amp; Chauffeurs</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
+                    <Link href="/talent" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#a855f7] hover:text-[#a855f7] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
+                      Explore Roster <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-2xl group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src="/images/hero_ambient.jpg" 
+                      alt="Tour Logistics" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4">
+                      <p className="text-xs text-[#a855f7] font-bold tracking-widest uppercase">Operations</p>
+                      <p className="text-sm font-bold text-white">35+ Countries Toured</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4 flex justify-between items-center text-xs text-white/40">
+                <span>SHOWTIME logistics hub</span>
+                <span>Est. 2026</span>
+              </div>
+            </div>
+          </FlowSection>
+
+          {/* Section 03: Visa & Permits */}
+          <FlowSection aria-label="Visa & Permits" style={{ backgroundColor: '#130413', color: '#fff' }} className="border-t border-white/5">
+            <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">03 &mdash; Visa &amp; Permits</p>
+                <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Compliance</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                  <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
+                    Visa &amp; <br />
+                    <span className="text-[#d4af37]">Permit</span> Compliance.
+                  </h3>
+                  <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
+                    US O-Visas, UK Certificates of Sponsorship (COS), Schengen declarations, and work permits handled by dedicated compliance managers to guarantee border clearance.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">O-1 &amp; COS</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Sponsorship Filing &amp; Petition Support</p>
+                    </div>
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Border Clearance</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Dual Citizenship &amp; Permit Verification</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
+                    <Link href="/contact" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#d4af37] hover:text-[#d4af37] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
+                      Verify Compliance <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-2xl group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src="/images/artist_dj.jpg" 
+                      alt="Visa &amp; Permits" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4">
+                      <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Compliance</p>
+                      <p className="text-sm font-bold text-white">Hassle-Free Border Clearances</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4 flex justify-between items-center text-xs text-white/40">
+                <span>SHOWTIME legal &amp; advisory</span>
+                <span>Est. 2026</span>
+              </div>
+            </div>
+          </FlowSection>
+
+          {/* Section 04: Event Production */}
+          <FlowSection aria-label="Event Production" style={{ backgroundColor: '#0b1614', color: '#fff' }} className="border-t border-white/5">
+            <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a855f7]">04 &mdash; Event Production</p>
+                <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Audio-Visual</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                  <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
+                    Live Stage <br />
+                    <span className="text-[#a855f7]">Production</span> A/V.
+                  </h3>
+                  <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
+                    Sound system riders, live sound engineers, backline setups, and audio-visual layouts verified by industry professionals. We ensure the stage is perfect for every performance.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">A/V Backline</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Sound System, Lighting &amp; FX Rigging</p>
+                    </div>
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Rider Verification</h4>
+                      <p className="text-xs md:text-sm font-medium text-white/90">Hospitality &amp; Technical Compliance Auditing</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
+                    <Link href="/services" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#a855f7] hover:text-[#a855f7] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
+                      Verify Riders <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-2xl group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src="/images/concert_stage.jpg" 
+                      alt="Event Production" 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4">
+                      <p className="text-xs text-[#a855f7] font-bold tracking-widest uppercase">Stage A/V</p>
+                      <p className="text-sm font-bold text-white">Full backline rider compliance</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4 flex justify-between items-center text-xs text-white/40">
+                <span>SHOWTIME audio-visual staging</span>
+                <span>Est. 2026</span>
+              </div>
+            </div>
+          </FlowSection>
+        </FlowArt>
       </section>
 
       {/* ── 5. EVENTS SHOWCASE — Apple split layout ── */}
