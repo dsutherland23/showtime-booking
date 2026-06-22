@@ -14,52 +14,52 @@
 */
 
 /* ── Design Tokens ────────────────────────────────────────── */
-:root {
-  /* Apple's signature backgrounds */
-  --bg-primary:    #f5f5f7;   /* Apple's off-white — exact match to apple.com */
-  --bg-secondary:  #ffffff;
-  --bg-tertiary:   #f5f5f7;
-  --bg-card:       #ffffff;
-  --bg-card-hover: #fafafa;
+:root, .dark {
+  /* Premium Dark backgrounds */
+  --bg-primary:    #07050e;   /* Deep charcoal black with subtle purple undertone */
+  --bg-secondary:  #0c0a17;   /* Rich dark slate */
+  --bg-tertiary:   #110e20;   /* Slightly lighter dark background */
+  --bg-card:       rgba(255, 255, 255, 0.03); /* Frosted glass */
+  --bg-card-hover: rgba(255, 255, 255, 0.06);
 
-  /* Apple Blue accent system */
-  --accent:        #0071e3;   /* Apple's exact blue */
-  --accent-hover:  #0077ed;
-  --accent-dark:   #004fc4;
-  --accent-light:  #e8f0fe;
-  --accent-gradient: linear-gradient(180deg, #42a1ec 0%, #0071e3 100%);
+  /* Gold & Violet accent system */
+  --accent:        #d4af37;   /* Premium Gold */
+  --accent-hover:  #f3cf65;
+  --accent-dark:   #aa841c;
+  --accent-light:  rgba(212, 175, 55, 0.1);
+  --accent-gradient: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
 
   /* Compatibility aliases so existing portal code still works */
-  --gold-primary:         #0071e3;
-  --gold-hover:           #0077ed;
-  --gold-dark:            #004fc4;
-  --gold-light:           #e8f0fe;
-  --gold-gradient:        linear-gradient(180deg, #42a1ec 0%, #0071e3 100%);
-  --gold-gradient-subtle: linear-gradient(180deg, rgba(0,113,227,0.04) 0%, rgba(0,113,227,0.02) 100%);
-  --gold-text-gradient:   linear-gradient(180deg, #1d1d1f 0%, #0071e3 100%);
+  --gold-primary:         #d4af37;
+  --gold-hover:           #f3cf65;
+  --gold-dark:            #aa841c;
+  --gold-light:           rgba(212, 175, 55, 0.1);
+  --gold-gradient:        linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
+  --gold-gradient-subtle: linear-gradient(180deg, rgba(212, 175, 55, 0.04) 0%, rgba(212, 175, 55, 0.01) 100%);
+  --gold-text-gradient:   linear-gradient(135deg, #ffffff 0%, #d4af37 100%);
 
-  /* Apple typography colors */
-  --text-primary:   #1d1d1f;   /* Apple's near-black — NOT #000 */
-  --text-secondary: #6e6e73;   /* Apple's secondary gray */
-  --text-muted:     #86868b;   /* Apple's tertiary gray */
-  --text-inverse:   #ffffff;
-  --text-link:      #0071e3;
+  /* Typography colors */
+  --text-primary:   #f5f5f7;   /* Clean off-white */
+  --text-secondary: #a1a1aa;   /* Zinc-400 silver gray */
+  --text-muted:     #71717a;   /* Zinc-500 gray */
+  --text-inverse:   #07050e;
+  --text-link:      #f3cf65;   /* Gold link */
 
-  /* Borders — Apple uses very subtle separators */
-  --border-color:       rgba(0, 0, 0, 0.08);
-  --border-color-hover: rgba(0, 113, 227, 0.4);
-  --border-strong:      rgba(0, 0, 0, 0.12);
+  /* Borders */
+  --border-color:       rgba(255, 255, 255, 0.08);
+  --border-color-hover: rgba(212, 175, 55, 0.4);
+  --border-strong:      rgba(255, 255, 255, 0.15);
 
   /* Glows */
-  --glow-gold:        0 4px 24px rgba(0, 113, 227, 0.15);
-  --glow-gold-strong: 0 8px 32px rgba(0, 113, 227, 0.25);
-  --glow-sm:          0 2px 12px rgba(0, 113, 227, 0.1);
+  --glow-gold:        0 4px 24px rgba(212, 175, 55, 0.15);
+  --glow-gold-strong: 0 8px 32px rgba(212, 175, 55, 0.25);
+  --glow-sm:          0 2px 12px rgba(212, 175, 55, 0.1);
 
   /* Status */
-  --color-success: #34c759;   /* Apple system green */
-  --color-warning: #ff9500;   /* Apple system orange */
-  --color-error:   #ff3b30;   /* Apple system red */
-  --color-info:    #007aff;   /* Apple system blue */
+  --color-success: #30d158;   /* Apple dark system green */
+  --color-warning: #ff9f0a;   /* Apple dark system orange */
+  --color-error:   #ff453a;   /* Apple dark system red */
+  --color-info:    #64d2ff;   /* Apple dark system blue */
 
   /* Typography — Apple system stack first, Inter as web fallback */
   --font-heading: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial, sans-serif;
@@ -73,21 +73,21 @@
   --spacing-xl:  2.5rem;
   --spacing-xxl: 6rem;
 
-  /* Border Radii — Apple's signature rounded corners */
+  /* Border Radii */
   --radius-sm:  6px;
   --radius-md:  12px;
   --radius-lg:  18px;
   --radius-xl:  24px;
   --radius-2xl: 32px;
-  --radius-pill: 980px;   /* Apple's pill radius */
+  --radius-pill: 980px;
 
-  /* Shadows — Apple's precise, clean layering */
-  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-md:  0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg:  0 12px 40px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.04);
-  --shadow-xl:  0 24px 60px rgba(0, 0, 0, 0.10), 0 8px 20px rgba(0, 0, 0, 0.05);
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md:  0 4px 20px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg:  0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-xl:  0 24px 60px rgba(0, 0, 0, 0.6), 0 8px 20px rgba(0, 0, 0, 0.4);
 
-  /* Transitions — Apple's spring-feel easing */
+  /* Transitions */
   --transition-fast:   0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --transition-normal: 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --transition-slow:   0.5s  cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -106,7 +106,7 @@ html {
   font-size: 16px;
   scroll-behavior: smooth;
   background-color: var(--bg-primary);
-  color-scheme: light;
+  color-scheme: dark;
   /* Apple's signature font rendering */
   text-rendering: optimizeLegibility;
   -webkit-text-size-adjust: 100%;
@@ -127,15 +127,15 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.35); }
 
-/* ── Selection — solid Apple blue ────────────────────────── */
+/* ── Selection ────────────────────────────────────────────── */
 ::selection {
-  background: #0071e3;
-  color: #ffffff;
+  background: var(--accent);
+  color: #07050e;
 }
 
 /* ── Scroll Reveal System ─────────────────────────────────── */
@@ -371,17 +371,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   padding: var(--spacing-lg);
   position: relative;
   overflow: hidden;
-  /* Apple's exact card shadow */
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition:
     transform var(--transition-normal),
-    box-shadow var(--transition-normal);
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
 }
 
 .luxury-card:hover {
-  transform: translateY(-3px) scale(1.005);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 20px rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.35);
 }
 
 /* No decorative before/after — Apple keeps surfaces clean */
@@ -389,10 +390,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* ── Glassmorphism — Apple's frosted glass ────────────────── */
 .glassmorphism {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(12, 10, 23, 0.72);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ── Buttons — Apple HIG Compliant ───────────────────────── */
@@ -416,41 +417,48 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   user-select: none;
 }
 
-/* Apple's primary blue button — exact gradient */
+/* Apple's primary gold button — exact gradient */
 .btn-primary {
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 400;
+  background: var(--accent-gradient);
+  color: #07050e;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
-  opacity: 0.88;
+  background: linear-gradient(135deg, #ffde7a 0%, #e5bd44 100%);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  opacity: 1;
 }
 
 .btn-primary:active { transform: scale(0.98); }
 
 /* Apple's secondary — pill outline */
 .btn-secondary {
-  background: transparent;
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f5f5f7;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
 }
 
 .btn-secondary:hover {
-  background: rgba(0, 113, 227, 0.06);
+  background: rgba(212, 175, 55, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.1);
   opacity: 1;
 }
 
 /* Apple's tertiary — gray pill */
 .btn-tertiary {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--text-primary);
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f5f7;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .btn-tertiary:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
   opacity: 1;
 }
 
@@ -469,14 +477,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* Apple-style gradient text — used for emphasis */
 .gold-gradient-text {
-  background: linear-gradient(135deg, #42a1ec 0%, #0071e3 100%);
+  background: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .gold-text-gradient {
-  background: linear-gradient(180deg, #1d1d1f 0%, #0071e3 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #d4af37 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -497,7 +505,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   padding: 0;
   margin-bottom: 0.75rem;
   border-radius: 0;
-  /* Apple doesn't badge — it just uses colored labels */
 }
 
 /* ── Background utility ───────────────────────────────────── */
@@ -648,8 +655,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* ── Footer — Apple.com dark footer ──────────────────────── */
 .global-footer {
-  background-color: #f5f5f7;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
   padding: var(--spacing-xl) 0 var(--spacing-lg);
   margin-top: var(--spacing-xxl);
 }
@@ -673,7 +680,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   gap: 0.85rem;
 }
 
-/* Footer logo keeps dark text */
+/* Footer logo keeps primary text color */
 .footer-brand-section .logo-text {
   background: none;
   -webkit-background-clip: unset;
@@ -713,7 +720,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   transition: color var(--transition-fast);
 }
 
-.footer-links-col a:hover { color: var(--text-primary); opacity: 1; }
+.footer-links-col a:hover { color: var(--accent); opacity: 1; }
 
 .contact-item {
   font-size: 0.8125rem;
@@ -725,7 +732,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   max-width: 1200px;
   margin: 1.5rem auto 0;
   padding: 1.25rem 1.5rem 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--border-color);
   text-align: left;
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -768,6 +775,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 .tab-slide-panel { animation: fadeIn 0.28s ease both; }
 
+/* ── Logo Image Filter ────────────────────────────────────── */
+.logo-image {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1); /* Renders dark logo as white */
+  transition: filter var(--transition-fast);
+}
+
+.logo-image:hover {
+  filter: brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(10deg); /* Luminous Gold highlight on hover */
+}
+
 /* ── Nav portal link — Apple nav CTA style ────────────────── */
 .nav-portal-link {
   display: inline-flex;
@@ -777,7 +797,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   font-size: 0.8125rem;
   font-weight: 400;
   color: var(--accent);
-  border: 1px solid rgba(0, 113, 227, 0.35);
+  border: 1px solid rgba(212, 175, 55, 0.35);
   padding: 0.38rem 0.85rem;
   border-radius: var(--radius-pill);
   transition: all var(--transition-fast);
@@ -788,9 +808,97 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 
 .nav-portal-link:hover {
-  background: rgba(0, 113, 227, 0.06);
+  background: rgba(212, 175, 55, 0.08);
   border-color: var(--accent);
   opacity: 1;
   color: var(--accent);
+}
+
+/* Mobile menu trigger button */
+.mobile-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (min-width: 1024px) {
+  .mobile-menu-toggle {
+    display: none;
+  }
+}
+
+/* Mobile navigation drawer overlay */
+.mobile-nav-overlay {
+  position: fixed;
+  top: 52px; /* Right below header */
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - 52px);
+  background: rgba(7, 5, 14, 0.98);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  padding: 3rem 2rem;
+  gap: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.mobile-nav-overlay.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.mobile-nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.mobile-nav-link {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: -0.03em;
+  opacity: 0.85;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.mobile-nav-link:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.mobile-nav-link.ai-link {
+  color: var(--accent);
+}
+
+.mobile-nav-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 }

@@ -40,14 +40,18 @@ const portalLinkStyle = `
   }
 `;
 
-export const PortalLinks: React.FC = () => {
+interface PortalLinksProps {
+  onClick?: () => void;
+}
+
+export const PortalLinks: React.FC<PortalLinksProps> = ({ onClick }) => {
   const { user } = useAuth();
 
   if (!user) return null;
 
   if (user.role === 'Super Admin' || user.role === 'Booking Agent') {
     return (
-      <Link href="/dashboard" className="nav-portal-link">
+      <Link href="/dashboard" className="nav-portal-link" onClick={onClick}>
         <LayoutDashboard className="w-4 h-4" />
         <span>Agent CRM</span>
         <style jsx>{portalLinkStyle}</style>
@@ -57,7 +61,7 @@ export const PortalLinks: React.FC = () => {
 
   if (user.role === 'Client') {
     return (
-      <Link href="/portal/client" className="nav-portal-link">
+      <Link href="/portal/client" className="nav-portal-link" onClick={onClick}>
         <UserCheck className="w-4 h-4" />
         <span>Client Hub</span>
         <style jsx>{portalLinkStyle}</style>
@@ -67,7 +71,7 @@ export const PortalLinks: React.FC = () => {
 
   if (user.role === 'Artist' || user.role === 'Artist Manager') {
     return (
-      <Link href="/portal/artist" className="nav-portal-link">
+      <Link href="/portal/artist" className="nav-portal-link" onClick={onClick}>
         <Star className="w-4 h-4" />
         <span>Artist Portal</span>
         <style jsx>{portalLinkStyle}</style>

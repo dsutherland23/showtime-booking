@@ -314,16 +314,17 @@ export default function AIAssistant() {
         }
 
         .chat-sidebar-capabilities {
+          display: none;
           background: rgba(0,0,0,0.2);
           border-bottom: 1px solid var(--border-color);
           padding: var(--spacing-lg);
-          display: flex;
           flex-direction: column;
           gap: 1rem;
         }
 
         @media (min-width: 992px) {
           .chat-sidebar-capabilities {
+            display: flex;
             border-bottom: none;
             border-right: 1px solid var(--border-color);
           }
@@ -471,6 +472,23 @@ export default function AIAssistant() {
           gap: 12px;
           padding: 8px 12px;
           border-radius: var(--radius-md);
+          flex-wrap: wrap;
+        }
+
+        @media (max-width: 576px) {
+          .rec-artist-small-card {
+            gap: 8px;
+          }
+          .rec-details {
+            width: calc(100% - 60px);
+          }
+          .rec-artist-small-card .btn-tiny {
+            flex-grow: 1;
+            text-align: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            padding: 0.5rem 0.75rem;
+          }
         }
 
         .rec-avatar {

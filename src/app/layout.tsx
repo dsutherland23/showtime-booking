@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
           <div className="app-layout">
             {/* Scroll-reveal initializer (client-only, returns null) */}
@@ -47,12 +47,7 @@ export default function RootLayout({
                       src="/images/logo.png" 
                       alt="Showtime Services" 
                       className="logo-image" 
-                      style={{ 
-                        height: '26px', 
-                        width: 'auto', 
-                        objectFit: 'contain',
-                        mixBlendMode: 'multiply'
-                      }} 
+                      style={{ height: '26px' }}
                     />
                   </Link>
                   <p className="footer-bio">

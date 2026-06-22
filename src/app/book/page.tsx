@@ -497,6 +497,12 @@ const BookTalentContent = () => {
           letter-spacing: 0.05em;
         }
 
+        @media (max-width: 640px) {
+          .node-label {
+            display: none;
+          }
+        }
+
         .step-node.active .node-label {
           color: var(--gold-primary);
         }
@@ -510,6 +516,12 @@ const BookTalentContent = () => {
           height: 1px;
           background: var(--border-color);
           margin-bottom: 24px; /* aligned with center of circles */
+        }
+
+        @media (max-width: 640px) {
+          .step-line {
+            margin-bottom: 0;
+          }
         }
 
         /* Form styling */

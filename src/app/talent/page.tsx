@@ -256,8 +256,16 @@ const TalentDirectoryContent = () => {
 
         .select-filters-group {
           display: flex;
+          flex-direction: column;
           gap: 1rem;
           width: 100%;
+        }
+
+        @media (min-width: 480px) {
+          .select-filters-group {
+            flex-direction: row;
+            width: auto;
+          }
         }
 
         @media (min-width: 768px) {
@@ -268,7 +276,13 @@ const TalentDirectoryContent = () => {
 
         .filter-item {
           position: relative;
-          width: 50%;
+          width: 100%;
+        }
+
+        @media (min-width: 480px) {
+          .filter-item {
+            width: 50%;
+          }
         }
 
         @media (min-width: 768px) {
@@ -407,10 +421,17 @@ const TalentDirectoryContent = () => {
         }
 
         .artist-actions {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+          display: flex;
+          flex-direction: column;
           gap: 0.75rem;
           margin-top: 14px;
+        }
+
+        @media (min-width: 1200px) {
+          .artist-actions {
+            display: grid;
+            grid-template-columns: 1.15fr 1fr;
+          }
         }
 
         .btn-full {
