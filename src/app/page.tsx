@@ -146,11 +146,11 @@ export default function Home() {
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
-                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl talent-badge">
                       <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Contracting</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Automated Escrow &amp; Deposit Management</p>
                     </div>
-                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
+                    <div className="border border-white/10 bg-white/5 p-4 rounded-xl talent-badge">
                       <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Guarantees</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Rider Compliance &amp; Date Holds</p>
                     </div>
@@ -164,14 +164,14 @@ export default function Home() {
                 </div>
 
                 <div className="lg:col-span-5 flex justify-center">
-                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-2xl group">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-[#d4af37]/30 shadow-[0_0_20px_rgba(212,175,55,0.1)] shadow-2xl group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src="/images/artist_dancehall.jpg" 
                       alt="Talent Booking" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent animate-pulse" style={{ animationDuration: '4s' }} />
                     <div className="absolute bottom-4 left-4">
                       <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Live Performance</p>
                       <p className="text-sm font-bold text-white">Dancehall &amp; Reggae Headliners</p>
@@ -207,11 +207,11 @@ export default function Home() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Routing</h4>
+                      <h4 className="text-[11px] font-bold text-[#a855f7] uppercase tracking-wider mb-1">Routing</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Multi-City &amp; Multi-Leg Flight Booking</p>
                     </div>
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Ground Transport</h4>
+                      <h4 className="text-[11px] font-bold text-[#a855f7] uppercase tracking-wider mb-1">Ground Transport</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Coordinated VIP Sprinters &amp; Chauffeurs</p>
                     </div>
                   </div>
@@ -232,7 +232,35 @@ export default function Home() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                    <div className="absolute bottom-4 left-4">
+                    
+                    {/* SVG Flight Path Overlay */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 400 300" fill="none">
+                      <path 
+                        d="M 50,250 Q 200,50 350,250" 
+                        stroke="rgba(168, 85, 247, 0.15)" 
+                        strokeWidth="3" 
+                        strokeDasharray="6,6" 
+                      />
+                      <path 
+                        className="flight-path-draw"
+                        d="M 50,250 Q 200,50 350,250" 
+                        stroke="#a855f7" 
+                        strokeWidth="3.5" 
+                        strokeDasharray="1000"
+                        strokeDashoffset="1000"
+                        strokeLinecap="round"
+                      />
+                      <circle 
+                        className="flight-dot" 
+                        cx="350" 
+                        cy="250" 
+                        r="5" 
+                        fill="#a855f7" 
+                        filter="drop-shadow(0 0 6px #a855f7)"
+                      />
+                    </svg>
+
+                    <div className="absolute bottom-4 left-4 z-20">
                       <p className="text-xs text-[#a855f7] font-bold tracking-widest uppercase">Operations</p>
                       <p className="text-sm font-bold text-white">35+ Countries Toured</p>
                     </div>
@@ -267,11 +295,11 @@ export default function Home() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">O-1 &amp; COS</h4>
+                      <h4 className="text-[11px] font-bold text-[#d4af37] uppercase tracking-wider mb-1">O-1 &amp; COS</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Sponsorship Filing &amp; Petition Support</p>
                     </div>
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Border Clearance</h4>
+                      <h4 className="text-[11px] font-bold text-[#d4af37] uppercase tracking-wider mb-1">Border Clearance</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Dual Citizenship &amp; Permit Verification</p>
                     </div>
                   </div>
@@ -292,7 +320,15 @@ export default function Home() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                    <div className="absolute bottom-4 left-4">
+                    
+                    {/* Passport Stamp Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                      <div className="visa-stamp border-[5px] border-[#d4af37] text-[#d4af37] font-black text-2xl md:text-3xl uppercase tracking-widest px-4 py-1.5 rounded-xl rotate-[-12deg] scale-[2.5] opacity-0 bg-black/45 backdrop-blur-[1px] shadow-[0_0_15px_rgba(212,175,55,0.35)]">
+                        Approved
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 z-20">
                       <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Compliance</p>
                       <p className="text-sm font-bold text-white">Hassle-Free Border Clearances</p>
                     </div>
@@ -327,11 +363,11 @@ export default function Home() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">A/V Backline</h4>
+                      <h4 className="text-[11px] font-bold text-[#a855f7] uppercase tracking-wider mb-1">A/V Backline</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Sound System, Lighting &amp; FX Rigging</p>
                     </div>
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1">Rider Verification</h4>
+                      <h4 className="text-[11px] font-bold text-[#a855f7] uppercase tracking-wider mb-1">Rider Verification</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Hospitality &amp; Technical Compliance Auditing</p>
                     </div>
                   </div>
@@ -352,7 +388,20 @@ export default function Home() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                    <div className="absolute bottom-4 left-4">
+                    
+                    {/* Spotlight Sweep overlay */}
+                    <div className="spotlight-sweep absolute inset-0 bg-gradient-to-r from-transparent via-[#a855f7]/15 to-transparent -translate-x-full pointer-events-none mix-blend-screen" />
+                    
+                    {/* Equalizer overlay */}
+                    <div className="absolute bottom-4 right-4 flex items-end gap-1 h-8 pointer-events-none z-10 bg-black/60 px-2 py-1.5 rounded-lg border border-white/10">
+                      <span className="w-1 bg-[#a855f7] rounded-t eq-bar" style={{ height: '20%' }} />
+                      <span className="w-1 bg-[#a855f7] rounded-t eq-bar" style={{ height: '20%' }} />
+                      <span className="w-1 bg-[#a855f7] rounded-t eq-bar" style={{ height: '20%' }} />
+                      <span className="w-1 bg-[#a855f7] rounded-t eq-bar" style={{ height: '20%' }} />
+                      <span className="w-1 bg-[#a855f7] rounded-t eq-bar" style={{ height: '20%' }} />
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 z-20">
                       <p className="text-xs text-[#a855f7] font-bold tracking-widest uppercase">Stage A/V</p>
                       <p className="text-sm font-bold text-white">Full backline rider compliance</p>
                     </div>

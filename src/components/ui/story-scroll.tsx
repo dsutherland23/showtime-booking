@@ -86,21 +86,58 @@ export const FlowArt: React.FC<FlowArtProps> = ({
           const inner = section.querySelector<HTMLElement>('.flow-art-container');
           if (!inner) return;
 
+          // Card entrance animations
           if (i > 0) {
-            gsap.set(inner, { rotation: 30, transformOrigin: 'bottom left' });
-            const tween = gsap.to(inner, {
-              rotation: 0,
-              ease: 'none',
-              scrollTrigger: {
-                trigger: section,
-                start: 'top bottom',
-                end: 'top 25%',
-                scrub: true,
-              },
-            });
-            if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);
+            if (i === 1) {
+              // Tour Logistics: slide from right
+              gsap.set(inner, { xPercent: 100, rotation: -8, transformOrigin: 'bottom right' });
+              const tween = gsap.to(inner, {
+                xPercent: 0,
+                rotation: 0,
+                ease: 'power1.out',
+                scrollTrigger: {
+                  trigger: section,
+                  start: 'top bottom',
+                  end: 'top 15%',
+                  scrub: true,
+                },
+              });
+              if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);
+            } else if (i === 2) {
+              // Visa & Permits: slide from left
+              gsap.set(inner, { xPercent: -100, rotation: 8, transformOrigin: 'bottom left' });
+              const tween = gsap.to(inner, {
+                xPercent: 0,
+                rotation: 0,
+                ease: 'power1.out',
+                scrollTrigger: {
+                  trigger: section,
+                  start: 'top bottom',
+                  end: 'top 15%',
+                  scrub: true,
+                },
+              });
+              if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);
+            } else if (i === 3) {
+              // Event Production: zoom/fade from bottom
+              gsap.set(inner, { yPercent: 40, scale: 0.85, opacity: 0, transformOrigin: 'center center' });
+              const tween = gsap.to(inner, {
+                yPercent: 0,
+                scale: 1,
+                opacity: 1,
+                ease: 'power2.out',
+                scrollTrigger: {
+                  trigger: section,
+                  start: 'top bottom',
+                  end: 'top 15%',
+                  scrub: true,
+                },
+              });
+              if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);
+            }
           }
 
+          // Card pinning
           if (i < sections.length - 1) {
             triggers.push(
               ScrollTrigger.create({
@@ -112,6 +149,91 @@ export const FlowArt: React.FC<FlowArtProps> = ({
               }),
             );
           }
+
+          // Active micro-animations trigger
+          const microTrigger = ScrollTrigger.create({
+            trigger: section,
+            start: "top 35%",
+            end: "bottom 35%",
+            onEnter: () => {
+              if (i === 0) {
+                // Talent Booking: stagger badges
+                gsap.fromTo(section.querySelectorAll('.talent-badge'), 
+                  { y: 30, opacity: 0 },
+                  { y: 0, opacity: 1, duration: 0.6, stagger: 0.15, ease: "power2.out" }
+                );
+              } else if (i === 1) {
+                // Tour Logistics: flight path draw
+                const path = section.querySelector('.flight-path-draw');
+                if (path) {
+                  gsap.fromTo(path, 
+                    { strokeDashoffset: 1000 },
+                    { strokeDashoffset: 0, duration: 1.5, ease: "power2.inOut" }
+                  );
+                }
+                const dot = section.querySelector('.flight-dot');
+                if (dot) {
+                  gsap.fromTo(dot, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, delay: 1.2, duration: 0.4, ease: "back.out(2)" });
+                }
+              } else if (i === 2) {
+                // Visa & Permits: approved stamp slam
+                const stamp = section.querySelector('.visa-stamp');
+                if (stamp) {
+                  gsap.fromTo(stamp, 
+                    { scale: 3.5, opacity: 0, rotation: 45 },
+                    { scale: 1.0, opacity: 1, rotation: -12, duration: 0.5, ease: "back.out(1.4)" }
+                  );
+                }
+              } else if (i === 3) {
+                // Event Production: equalizer animation
+                const bars = section.querySelectorAll('.eq-bar');
+                bars.forEach((bar, index) => {
+                  gsap.to(bar, {
+                    height: `${Math.random() * 70 + 30}%`,
+                    duration: 0.4 + Math.random() * 0.4,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "power1.inOut",
+                    delay: index * 0.08
+                  });
+                });
+                // spotlight sweep
+                const sweep = section.querySelector('.spotlight-sweep');
+                if (sweep) {
+                  gsap.fromTo(sweep, 
+                    { xPercent: -100 },
+                    { xPercent: 100, duration: 3.5, repeat: -1, yoyo: true, ease: "power1.inOut" }
+                  );
+                }
+              }
+            },
+            onLeaveBack: () => {
+              if (i === 0) {
+                const badges = section.querySelectorAll('.talent-badge');
+                gsap.killTweensOf(badges);
+                gsap.set(badges, { opacity: 0, y: 30 });
+              } else if (i === 1) {
+                const path = section.querySelector('.flight-path-draw');
+                const dot = section.querySelector('.flight-dot');
+                if (path) gsap.killTweensOf(path);
+                if (dot) gsap.killTweensOf(dot);
+                gsap.set(path, { strokeDashoffset: 1000 });
+                gsap.set(dot, { scale: 0, opacity: 0 });
+              } else if (i === 2) {
+                const stamp = section.querySelector('.visa-stamp');
+                if (stamp) gsap.killTweensOf(stamp);
+                gsap.set(stamp, { opacity: 0, scale: 3.5 });
+              } else if (i === 3) {
+                const bars = section.querySelectorAll('.eq-bar');
+                const sweep = section.querySelector('.spotlight-sweep');
+                gsap.killTweensOf(bars);
+                if (sweep) gsap.killTweensOf(sweep);
+                gsap.set(bars, { height: '20%' });
+                if (sweep) gsap.set(sweep, { xPercent: -100 });
+              }
+            }
+          });
+          triggers.push(microTrigger);
         });
         
         ScrollTrigger.refresh();
