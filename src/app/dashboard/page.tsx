@@ -356,6 +356,30 @@ export default function AdminPortal() {
     details: ''
   });
 
+  // Broadcast Campaign Form state
+  const [broadcastForm, setBroadcastForm] = useState({
+    name: '',
+    subject: '',
+    segment: 'All Past Customers (12,504)',
+    content: ''
+  });
+
+  // Settings states
+  const [primaryDomain, setPrimaryDomain] = useState('showtimeservices.com');
+  const [systemCurrency, setSystemCurrency] = useState('USD ($)');
+
+  // Analytics states
+  const [analyticsSubTab, setAnalyticsSubTab] = useState<'traffic' | 'funnel'>('traffic');
+  const [activeVisitors, setActiveVisitors] = useState(28);
+  const [liveActivities, setLiveActivities] = useState<string[]>([
+    "Visitor from Montego Bay viewed Koffee profile",
+    "Promo code EARLYBIRD10 applied to checkout cart",
+    "User from New York, US selected General Admission tier",
+    "Guest verified availability calendar for Beres Hammond",
+    "Visitor from London, UK landing on homepage cta banner"
+  ]);
+  const [trafficChartPeriod, setTrafficChartPeriod] = useState<'7d' | '30d' | '12m'>('30d');
+
   // Load portal statistics
   const loadPortalData = async () => {
     try {
@@ -402,6 +426,48 @@ export default function AdminPortal() {
   useEffect(() => {
     loadPortalData();
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDomain = localStorage.getItem('st_settings_domain');
+      if (savedDomain) setPrimaryDomain(savedDomain);
+      const savedCurrency = localStorage.getItem('st_settings_currency');
+      if (savedCurrency) setSystemCurrency(savedCurrency);
+    }
+  }, []);
+
+  // Web analytics activity simulator
+  useEffect(() => {
+    const RANDOM_EVENTS = [
+      "Visitor from Kingston viewed Shenseea profile",
+      "Ticket purchase checkout initiated by Guest",
+      "Promo code SUMFEST2026 verified",
+      "New event inquiry generated for David Rodigan",
+      "Visitor from Toronto, CA landing on ticket booking portal",
+      "Checkout completed for General Admission - $85",
+      "Checkout completed for VIP Deck Pass - $250",
+      "User verified availability calendar for Chronixx",
+      "Guest downloaded hospitality rider for Koffee"
+    ];
+
+    const interval = setInterval(() => {
+      // Jitter active visitor count
+      setActiveVisitors(prev => {
+        const delta = Math.floor(Math.random() * 5) - 2; // -2 to 2
+        return Math.max(15, Math.min(60, prev + delta));
+      });
+
+      // Push random visitor event
+      setLiveActivities(prev => {
+        const randEvent = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const newEvent = `[${timestamp}] ${randEvent}`;
+        return [newEvent, ...prev.slice(0, 9)];
+      });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Open sliding panel and prepare state
   const openCrudPanel = (type: typeof panelType, mode: 'create' | 'edit', itemId: string | null = null) => {
@@ -780,6 +846,33 @@ export default function AdminPortal() {
     } catch (err) {
       console.error(err);
       alert('Failed to delete record.');
+    }
+  };
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastForm.name || !broadcastForm.subject || !broadcastForm.content) {
+      alert("Please fill in Campaign Name, Subject Line, and Broadcast Copy.");
+      return;
+    }
+    try {
+      await db.createCampaign({
+        name: broadcastForm.name,
+        type: (marketingType.charAt(0).toUpperCase() + marketingType.slice(1)) as any,
+        subject: broadcastForm.subject,
+        segment: broadcastForm.segment,
+        content: broadcastForm.content
+      });
+      alert("Broadcast campaign sent successfully!");
+      setBroadcastForm({
+        name: '',
+        subject: '',
+        segment: 'All Past Customers (12,504)',
+        content: ''
+      });
+      await loadPortalData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send broadcast campaign.");
     }
   };
 
@@ -1440,44 +1533,73 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Ticketing Operations</h2>
                   <p className="text-white/50 text-sm">Issue promo codes, check QR tickets, and design dynamic tier pricing.</p>
                 </div>
+                <div className="flex gap-2">
+                  <button className="btn bg-white/5 border border-white/10 hover:bg-white/10 px-4 py-2 rounded-full font-semibold text-xs transition flex items-center gap-1.5" onClick={() => openCrudPanel('ticket', 'create')}>
+                    <Plus className="w-3.5 h-3.5" /> Add Ticket Tier
+                  </button>
+                  <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1.5 text-xs" onClick={() => openCrudPanel('promo', 'create')}>
+                    <Plus className="w-3.5 h-3.5" /> Add Promo Code
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* Promo Code builder */}
+                {/* Promo Codes list */}
                 <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                  <h3 className="font-bold text-lg border-b border-white/5 pb-2 text-[#d4af37]">Promo Codes</h3>
-                  <div className="flex flex-col gap-3">
-                    <div className="field-group">
-                      <label>Promo Code Title</label>
-                      <input type="text" placeholder="e.g. SUMFEST2026" className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" />
-                    </div>
-                    <div className="field-group">
-                      <label>Discount Value (%)</label>
-                      <input type="number" placeholder="20" className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" />
-                    </div>
-                    <button className="btn bg-[#d4af37] text-[#07050e] font-bold py-2 rounded-lg text-sm mt-2" onClick={() => alert("Promo code published!")}>
-                      Create Promo Code
-                    </button>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h3 className="font-bold text-lg text-[#d4af37]">Promo Codes</h3>
+                  </div>
+                  <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto">
+                    {promoCodes.map((promo) => (
+                      <div key={promo.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <strong className="text-sm font-mono text-white">{promo.code}</strong>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${promo.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {promo.active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-white/50">
+                          <span>Discount: <strong className="text-white">{promo.discount}%</strong></span>
+                          <span>Expires: {promo.expiry}</span>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-white/5 pt-2 mt-1">
+                          <button className="text-[10px] text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('promo', 'edit', promo.id)}>
+                            <FileEdit className="w-3 h-3" /> Edit
+                          </button>
+                          <button className="text-[10px] text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('promo', promo.id)}>
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Ticket pricing categories list */}
                 <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
                   <h3 className="font-bold text-lg border-b border-white/5 pb-2 text-[#a855f7]">Available Tiers</h3>
-                  <div className="flex flex-col gap-3">
-                    {[
-                      { name: 'General Admission', price: '$85', desc: 'Standard field gate access' },
-                      { name: 'VIP Deck Pass', price: '$250', desc: 'Raised platform, private bar' },
-                      { name: 'VVIP Backstage', price: '$850', desc: 'Meet & greet, backline hospitality' },
-                      { name: 'Ultra VVIP Table package', price: '$3,500', desc: 'Dressed cabana table for 8' }
-                    ].map((tier, idx) => (
-                      <div key={idx} className="p-3 bg-white/5 border border-white/5 rounded-xl flex justify-between items-center gap-3">
-                        <div>
-                          <strong className="block text-sm text-white">{tier.name}</strong>
-                          <span className="text-[10px] text-white/50">{tier.desc}</span>
+                  <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto">
+                    {ticketTiers.map((tier) => (
+                      <div key={tier.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <strong className="block text-sm text-white">{tier.name}</strong>
+                            <span className="text-[10px] text-white/50">{tier.desc}</span>
+                          </div>
+                          <span className="text-sm font-bold text-[#d4af37]">${tier.price}</span>
                         </div>
-                        <span className="text-sm font-bold text-[#d4af37]">{tier.price}</span>
+                        <div className="flex justify-between items-center text-[10px] text-white/50 border-t border-white/5 pt-2">
+                          <span>Capacity: {tier.capacity}</span>
+                          <div className="flex gap-2">
+                            <button className="text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('ticket', 'edit', tier.id)}>
+                              <FileEdit className="w-3 h-3" /> Edit
+                            </button>
+                            <button className="text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('ticket', tier.id)}>
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1507,6 +1629,12 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Order Management &amp; Fraud</h2>
                   <p className="text-white/50 text-sm">Monitor purchases, review fraud risks, and issue refunds.</p>
                 </div>
+                <button 
+                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
+                  onClick={() => openCrudPanel('order', 'create')}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Order
+                </button>
               </div>
 
               {/* Order Search & Grid table */}
@@ -1530,32 +1658,47 @@ export default function AdminPortal() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {invoices.map((inv, idx) => (
-                        <tr key={inv.id} className="text-white/80">
-                          <td className="py-3.5 font-mono text-xs">{inv.id}</td>
-                          <td className="py-3.5">Sarah Silverman (Agent)</td>
-                          <td className="py-3.5 text-[#d4af37]">Chronixx</td>
-                          <td className="py-3.5 font-bold">${inv.amount.toLocaleString()}</td>
-                          <td className="py-3.5">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${inv.status === 'Paid' ? 'bg-emerald-500/25 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                              {inv.status}
-                            </span>
-                          </td>
-                          <td className="py-3.5">
-                            <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Low (0.02%)
-                            </span>
-                          </td>
-                          <td className="py-3.5 text-right flex justify-end gap-2">
-                            <button className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-3 py-1 rounded text-xs transition" onClick={() => alert("Ticket receipt resent via Email.")}>
-                              Resend Ticket
-                            </button>
-                            <button className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1 rounded text-xs transition" onClick={() => alert("Refund transaction initiated.")}>
-                              Refund Order
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {invoices.map((inv) => {
+                        const booking = bookings.find(b => b.id === inv.booking_id);
+                        const clientName = booking ? booking.client_name : 'Walk-in Customer';
+                        const artistName = booking ? booking.artist_name : 'Festival Admission';
+                        return (
+                          <tr key={inv.id} className="text-white/80">
+                            <td className="py-3.5 font-mono text-xs">{inv.id}</td>
+                            <td className="py-3.5">{clientName}</td>
+                            <td className="py-3.5 text-[#d4af37]">{artistName}</td>
+                            <td className="py-3.5 font-bold">${inv.amount.toLocaleString()}</td>
+                            <td className="py-3.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                inv.status === 'Paid' ? 'bg-emerald-500/25 text-emerald-400' : 
+                                inv.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' :
+                                'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {inv.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5">
+                              <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Low (0.02%)
+                              </span>
+                            </td>
+                            <td className="py-3.5 text-right flex justify-end gap-2">
+                              <button 
+                                className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-2.5 py-1 rounded text-xs transition flex items-center gap-1"
+                                onClick={() => openCrudPanel('order', 'edit', inv.id)}
+                              >
+                                <FileEdit className="w-3.5 h-3.5 text-[#d4af37]" /> Edit
+                              </button>
+                              <button 
+                                className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs transition flex items-center gap-1"
+                                onClick={() => handleDelete('order', inv.id)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1665,6 +1808,12 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Visual Block Website Builder</h2>
                   <p className="text-white/50 text-sm">Drag component layouts, preview frame modes, and roll back versions.</p>
                 </div>
+                <button 
+                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
+                  onClick={() => openCrudPanel('section', 'create')}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Section Block
+                </button>
               </div>
 
               {/* Viewport frames preview controls */}
@@ -1699,17 +1848,92 @@ export default function AdminPortal() {
                   }`}>
                     {/* Simulated website frame header bar */}
                     <div className="bg-[#0c0a17] px-4 py-2 border-b border-white/5 flex items-center justify-between">
-                      <span className="text-[10px] text-white/40">https://showtimeservices.com</span>
+                      <span className="text-[10px] text-white/40 font-mono">https://showtimeservices.com</span>
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     </div>
 
                     {/* Simulated website content body */}
-                    <div className={`p-8 min-h-[300px] transition ${previewTheme === 'dark' ? 'bg-[#07050e] text-white' : 'bg-slate-50 text-slate-900'}`}>
-                      <div className="border border-dashed border-white/20 p-6 rounded-lg text-center flex flex-col gap-3">
-                        <span className="text-[10px] uppercase font-bold text-[#d4af37]">{cmsSections.announcement}</span>
-                        <h1 className="text-2xl md:text-3xl font-extrabold">{cmsSections.heroTitle}</h1>
-                        <p className="text-xs opacity-60">Visual component block preview area.</p>
-                      </div>
+                    <div className={`p-4 md:p-6 min-h-[400px] flex flex-col gap-4 transition ${previewTheme === 'dark' ? 'bg-[#07050e] text-white' : 'bg-slate-50 text-slate-900'}`}>
+                      {websiteSections.map(sec => (
+                        <div 
+                          key={sec.id} 
+                          className={`relative group border rounded-xl p-4 transition-all duration-300 ${
+                            sec.active 
+                              ? 'border-white/10 bg-white/5 hover:border-[#d4af37]/50' 
+                              : 'border-white/5 bg-white/5 opacity-50'
+                          }`}
+                        >
+                          {/* Hover Action Overlay */}
+                          <div className="absolute inset-0 bg-black/80 rounded-xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-3 z-10">
+                            <span className="absolute top-2 left-3 text-[10px] font-mono uppercase text-[#d4af37] font-semibold">{sec.type} Block</span>
+                            <button 
+                              onClick={() => openCrudPanel('section', 'edit', sec.id)}
+                              className="btn bg-[#d4af37] text-[#07050e] font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-1 hover:scale-105 transition"
+                            >
+                              <FileEdit className="w-3.5 h-3.5" /> Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDelete('section', sec.id)}
+                              className="btn bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 text-xs px-3 py-1.5 rounded-full flex items-center gap-1 hover:scale-105 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          </div>
+
+                          {/* Block Contents based on block type */}
+                          {sec.type === 'announcement' && (
+                            <div className="text-center py-2">
+                              <span className="text-xs uppercase font-extrabold tracking-wider text-[#d4af37]">{sec.title}</span>
+                              {sec.content && <p className="text-[10px] opacity-75 mt-1">{sec.content}</p>}
+                            </div>
+                          )}
+
+                          {sec.type === 'hero' && (
+                            <div className="flex flex-col md:flex-row items-center gap-4 py-4 text-left">
+                              <div className="flex-1 flex flex-col gap-2">
+                                <h1 className="text-xl md:text-2xl font-black leading-tight">{sec.title}</h1>
+                                {sec.subtitle && <p className="text-xs opacity-75">{sec.subtitle}</p>}
+                                {sec.content && <p className="text-[10px] opacity-50 leading-relaxed">{sec.content}</p>}
+                                {sec.buttonText && (
+                                  <button className="bg-[#d4af37] text-[#07050e] font-extrabold text-[10px] uppercase tracking-wide px-4 py-1.5 rounded-full w-fit mt-1">
+                                    {sec.buttonText}
+                                  </button>
+                                )}
+                              </div>
+                              {sec.image_url && (
+                                <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={sec.image_url} alt="Hero block image" className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {sec.type === 'cta' && (
+                            <div className="bg-gradient-to-r from-[#d4af37]/10 to-transparent p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 text-left">
+                              <div className="flex flex-col gap-1">
+                                <h2 className="text-base md:text-lg font-extrabold text-[#d4af37]">{sec.title}</h2>
+                                {sec.subtitle && <p className="text-xs opacity-75">{sec.subtitle}</p>}
+                              </div>
+                              {sec.buttonText && (
+                                <button className="bg-white/10 hover:bg-[#d4af37] hover:text-[#07050e] border border-[#d4af37]/20 text-[#d4af37] font-extrabold text-xs px-4 py-2 rounded-full transition shrink-0">
+                                  {sec.buttonText}
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Fallback general block for other types */}
+                          {sec.type !== 'announcement' && sec.type !== 'hero' && sec.type !== 'cta' && (
+                            <div className="py-2 text-left">
+                              <h3 className="text-sm font-bold text-[#d4af37]">{sec.title}</h3>
+                              {sec.subtitle && <p className="text-xs opacity-75 mt-1">{sec.subtitle}</p>}
+                              {sec.content && <p className="text-xs opacity-60 mt-1">{sec.content}</p>}
+                            </div>
+                          )}
+
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1747,29 +1971,56 @@ export default function AdminPortal() {
 
                   <div className="flex flex-col gap-4">
                     <div className="field-group flex flex-col gap-2">
+                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Campaign Name</label>
+                      <input 
+                        type="text" 
+                        value={broadcastForm.name}
+                        onChange={e => setBroadcastForm({ ...broadcastForm, name: e.target.value })}
+                        placeholder="e.g. Koffee Tour Announcement" 
+                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
+                      />
+                    </div>
+
+                    <div className="field-group flex flex-col gap-2">
                       <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Campaign Subject Line</label>
-                      <input type="text" placeholder="e.g. Special Offer: 20% Off Reggae Sumfest VIP passes" className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white" />
+                      <input 
+                        type="text" 
+                        value={broadcastForm.subject}
+                        onChange={e => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
+                        placeholder="e.g. Special Offer: 20% Off Reggae Sumfest VIP passes" 
+                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
+                      />
                     </div>
 
                     <div className="field-group flex flex-col gap-2">
                       <label className="text-xs text-white/50 font-bold uppercase tracking-wider">User Audience Segment</label>
-                      <select className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white">
-                        <option>All Past Customers (12,504)</option>
-                        <option>VIP Ticket Buyers Only (2,100)</option>
-                        <option>Jamaica-Based Customers (6,400)</option>
+                      <select 
+                        value={broadcastForm.segment}
+                        onChange={e => setBroadcastForm({ ...broadcastForm, segment: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition"
+                      >
+                        <option value="All Past Customers (12,504)">All Past Customers (12,504)</option>
+                        <option value="VIP Ticket Buyers Only (2,100)">VIP Ticket Buyers Only (2,100)</option>
+                        <option value="Jamaica-Based Customers (6,400)">Jamaica-Based Customers (6,400)</option>
                       </select>
                     </div>
 
                     <div className="field-group flex flex-col gap-2">
                       <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Broadcast Copy</label>
-                      <textarea rows={4} placeholder="Draft your email or push message here..." className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white" />
+                      <textarea 
+                        rows={4} 
+                        value={broadcastForm.content}
+                        onChange={e => setBroadcastForm({ ...broadcastForm, content: e.target.value })}
+                        placeholder="Draft your email or push message here..." 
+                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
+                      />
                     </div>
 
                     <div className="flex justify-end gap-3 mt-4">
                       <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2 rounded-full text-sm font-semibold transition" onClick={() => alert("A/B campaign drafted.")}>
                         Schedule A/B Test
                       </button>
-                      <button className="btn bg-[#d4af37] text-[#07050e] font-bold px-8 py-2 rounded-full hover:scale-105 transition" onClick={() => alert("Broadcast campaign sent to selected audience!")}>
+                      <button className="btn bg-[#d4af37] text-[#07050e] font-bold px-8 py-2 rounded-full hover:scale-105 transition" onClick={handleSendBroadcast}>
                         Send Instant Broadcast
                       </button>
                     </div>
@@ -1778,19 +2029,40 @@ export default function AdminPortal() {
 
                 {/* Right: Campaigns History */}
                 <div className="lg:col-span-4 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                  <h3 className="font-bold text-lg border-b border-white/5 pb-2">Active Campaigns</h3>
-                  <div className="flex flex-col gap-3">
-                    {[
-                      { name: 'Koffee Sumfest Promotion', type: 'Email', openRate: '34.2%' },
-                      { name: 'Shenseea Ticket Release Alert', type: 'SMS', openRate: '98%' },
-                      { name: 'Coachella Lineup Push Alert', type: 'Push', openRate: '15.4%' }
-                    ].map((camp, idx) => (
-                      <div key={idx} className="p-3 bg-white/5 border border-white/5 rounded-xl flex justify-between items-center">
-                        <div>
-                          <strong className="block text-sm text-white">{camp.name}</strong>
-                          <span className="text-xs text-white/50">{camp.type} Broadcast</span>
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h3 className="font-bold text-lg">Active Campaigns</h3>
+                    <button 
+                      onClick={() => openCrudPanel('campaign', 'create')}
+                      className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5"
+                    >
+                      <Plus className="w-3 h-3" /> Add Custom
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-3 max-h-[480px] overflow-y-auto pr-1">
+                    {campaigns.map((camp) => (
+                      <div key={camp.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex justify-between items-center group relative">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <strong className="block text-sm text-white truncate">{camp.name}</strong>
+                          <span className="text-xs text-white/55">{camp.type} Broadcast</span>
                         </div>
-                        <span className="text-xs font-bold text-emerald-500">{camp.openRate} open</span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className="text-xs font-bold text-emerald-500">{camp.openRate || '0%'} open</span>
+                          {/* Edit/Delete Actions */}
+                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition duration-200">
+                            <button 
+                              onClick={() => openCrudPanel('campaign', 'edit', camp.id)}
+                              className="text-[10px] text-[#d4af37] hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDelete('campaign', camp.id)}
+                              className="text-[10px] text-red-400 hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1807,23 +2079,35 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Advertising Placements &amp; Analytics</h2>
                   <p className="text-white/50 text-sm">Review banner placements, track impressions, CTR (Click-Through Rates), and ad revenue.</p>
                 </div>
+                <button 
+                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
+                  onClick={() => openCrudPanel('ad', 'create')}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Ad Placement
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {[
-                  { name: 'Homepage Hero Placement', impressions: '142,500', clickRate: '2.4% CTR', revenue: '$3,420' },
-                  { name: 'Search Results Banner', impressions: '84,300', clickRate: '1.8% CTR', revenue: '$1,510' },
-                  { name: 'Email Footer Banner', impressions: '24,000', clickRate: '4.2% CTR', revenue: '$1,008' }
-                ].map((placement, idx) => (
-                  <div key={idx} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {adPlacements.map((placement) => (
+                  <div key={placement.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl relative group">
                     <div className="border-b border-white/5 pb-2">
                       <strong className="block text-lg text-white">{placement.name}</strong>
-                      <span className="text-xs text-white/50">Active Placement</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit inline-block mt-1 ${placement.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {placement.active ? 'Active' : 'Inactive'}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+
+                    {placement.image_url && (
+                      <div className="w-full h-32 rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={placement.image_url} alt={placement.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs bg-white/5 p-3 rounded-xl">
                       <div>
                         <span className="block text-white/40 text-[10px]">Impressions</span>
-                        <strong className="block text-white mt-1">{placement.impressions}</strong>
+                        <strong className="block text-white mt-1">{placement.impressions.toLocaleString()}</strong>
                       </div>
                       <div>
                         <span className="block text-white/40 text-[10px]">Clicks</span>
@@ -1831,12 +2115,24 @@ export default function AdminPortal() {
                       </div>
                       <div>
                         <span className="block text-white/40 text-[10px]">Ad Revenue</span>
-                        <strong className="block text-white mt-1">{placement.revenue}</strong>
+                        <strong className="block text-white mt-1">${placement.revenue.toLocaleString()}</strong>
                       </div>
                     </div>
-                    <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 py-1.5 rounded-lg text-xs font-semibold transition mt-2">
-                      Edit Banner Media
-                    </button>
+
+                    <div className="flex gap-2 mt-2">
+                      <button 
+                        onClick={() => openCrudPanel('ad', 'edit', placement.id)}
+                        className="btn bg-white/5 hover:bg-white/10 border border-white/10 py-1.5 rounded-lg text-xs font-semibold transition flex-1 flex items-center justify-center gap-1"
+                      >
+                        <FileEdit className="w-3.5 h-3.5" /> Edit Placement
+                      </button>
+                      <button 
+                        onClick={() => handleDelete('ad', placement.id)}
+                        className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-1.5 rounded-lg text-xs font-semibold transition flex-1 flex items-center justify-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1846,54 +2142,292 @@ export default function AdminPortal() {
           {/* TAB 12: ANALYTICS */}
           {activeTab === 'analytics' && (
             <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+              
+              {/* Header with Live Visitor Pulse */}
+              <div className="flex justify-between items-start flex-wrap gap-4 border-b border-white/5 pb-4">
                 <div>
                   <h2 className="text-3xl font-extrabold tracking-tight">Sales &amp; Traffic Analytics</h2>
                   <p className="text-white/50 text-sm">Visualize traffic conversions, tickets sale stats, and revenue growth graphs.</p>
                 </div>
-              </div>
-
-              {/* Simulated analytics SVG chart */}
-              <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-lg">Event Ticket Revenue (30 Days)</h3>
-                  <span className="text-xs font-bold text-[#d4af37] bg-[#d4af37]/15 border border-[#d4af37]/20 px-3 py-1 rounded-full uppercase">
-                    Live Updates Active
-                  </span>
-                </div>
-
-                {/* SVG Visual Graphic Chart */}
-                <div className="w-full h-64 bg-black/40 border border-white/5 rounded-xl p-4 relative flex items-end">
-                  <svg className="w-full h-full text-[#d4af37]" viewBox="0 0 400 150">
-                    {/* SVG Chart paths */}
-                    <path 
-                      d="M 0 120 Q 50 100 100 80 T 200 40 T 300 90 T 400 10" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="3.5"
-                    />
-                    <path 
-                      d="M 0 120 Q 50 100 100 80 T 200 40 T 300 90 T 400 10 L 400 150 L 0 150 Z" 
-                      fill="rgba(212, 175, 55, 0.05)" 
-                    />
-                  </svg>
-                  
-                  {/* Chart Label lines */}
-                  <div className="absolute inset-0 flex justify-between p-4 pointer-events-none text-[10px] text-white/30">
-                    <div className="flex flex-col justify-between">
-                      <span>$100k</span>
-                      <span>$50k</span>
-                      <span>$0k</span>
-                    </div>
-                    <div className="flex items-end gap-12">
-                      <span>Week 1</span>
-                      <span>Week 2</span>
-                      <span>Week 3</span>
-                      <span>Week 4</span>
-                    </div>
+                
+                {/* Real-time visitor panel */}
+                <div className="bg-[#0c0a17] border border-[#d4af37]/35 px-5 py-3 rounded-2xl flex items-center gap-4 shadow-lg">
+                  <div className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-white/40 font-bold uppercase tracking-wider">Live Visitors</span>
+                    <strong className="text-xl font-bold text-white font-mono">{activeVisitors}</strong>
+                    <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">Active on Site</span>
                   </div>
                 </div>
               </div>
+
+              {/* KPI cards grid with sparklines */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* KPI Card 1: Sessions */}
+                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Sessions</span>
+                      <strong className="text-2xl font-bold text-white mt-1 block">48,250</strong>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
+                      ▲ +14.2%
+                    </span>
+                  </div>
+                  {/* Inline Sparkline SVG */}
+                  <div className="w-full h-10 mt-2">
+                    <svg className="w-full h-full text-emerald-400" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path d="M 0 25 Q 15 20 30 22 T 60 10 T 90 5 L 100 2" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <path d="M 0 25 Q 15 20 30 22 T 60 10 T 90 5 L 100 2 L 100 30 L 0 30 Z" fill="rgba(52, 211, 153, 0.05)" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* KPI Card 2: Goal Conversions */}
+                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Conversions</span>
+                      <strong className="text-2xl font-bold text-[#d4af37] mt-1 block">3.65%</strong>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
+                      ▲ +0.8%
+                    </span>
+                  </div>
+                  {/* Inline Sparkline SVG */}
+                  <div className="w-full h-10 mt-2">
+                    <svg className="w-full h-full text-[#d4af37]" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path d="M 0 20 Q 20 28 40 18 T 80 5 L 100 3" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <path d="M 0 20 Q 20 28 40 18 T 80 5 L 100 3 L 100 30 L 0 30 Z" fill="rgba(212, 175, 55, 0.05)" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* KPI Card 3: Bounce Rate */}
+                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Bounce Rate</span>
+                      <strong className="text-2xl font-bold text-white mt-1 block">34.8%</strong>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
+                      ▼ -2.1%
+                    </span>
+                  </div>
+                  {/* Inline Sparkline SVG */}
+                  <div className="w-full h-10 mt-2">
+                    <svg className="w-full h-full text-indigo-400" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path d="M 0 5 Q 30 25 50 15 T 80 28 L 100 25" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <path d="M 0 5 Q 30 25 50 15 T 80 28 L 100 25 L 100 30 L 0 30 Z" fill="rgba(129, 140, 248, 0.05)" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* KPI Card 4: Avg Session Duration */}
+                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Session Duration</span>
+                      <strong className="text-2xl font-bold text-[#a855f7] mt-1 block">3m 12s</strong>
+                    </div>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
+                      ▲ +18s
+                    </span>
+                  </div>
+                  {/* Inline Sparkline SVG */}
+                  <div className="w-full h-10 mt-2">
+                    <svg className="w-full h-full text-purple-400" viewBox="0 0 100 30" preserveAspectRatio="none">
+                      <path d="M 0 22 Q 25 10 50 20 T 75 8 L 100 4" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <path d="M 0 22 Q 25 10 50 20 T 75 8 L 100 4 L 100 30 L 0 30 Z" fill="rgba(168, 85, 247, 0.05)" />
+                    </svg>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Main Analytics Row: Interactive Graph & Geography */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* Traffic / Conversion Charts Block */}
+                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-6">
+                  
+                  {/* Chart header & controls */}
+                  <div className="flex justify-between items-center border-b border-white/5 pb-4 flex-wrap gap-3">
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setAnalyticsSubTab('traffic')}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${analyticsSubTab === 'traffic' ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                      >
+                        Web Traffic (Sessions)
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setAnalyticsSubTab('funnel')}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${analyticsSubTab === 'funnel' ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                      >
+                        Checkout Funnel (Conversion)
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1">
+                      {['7d', '30d', '12m'].map((period) => (
+                        <button 
+                          key={period} 
+                          type="button"
+                          onClick={() => setTrafficChartPeriod(period as any)}
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase transition ${trafficChartPeriod === period ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'}`}
+                        >
+                          {period}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dynamic SVG chart panel */}
+                  <div className="relative bg-black/40 rounded-xl border border-white/5 p-4 flex items-end justify-center min-h-[260px] overflow-hidden">
+                    {analyticsSubTab === 'traffic' ? (
+                      <div className="w-full h-full flex flex-col justify-between">
+                        <div className="h-44 w-full flex items-end relative">
+                          {/* Animated gradient area SVG */}
+                          <svg className="w-full h-full text-[#d4af37]" viewBox="0 0 500 150" preserveAspectRatio="none">
+                            <defs>
+                              <linearGradient id="gradient-gold" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#d4af37" stopOpacity="0.25" />
+                                <stop offset="100%" stopColor="#d4af37" stopOpacity="0.0" />
+                              </linearGradient>
+                            </defs>
+                            <path 
+                              d="M 0 130 C 50 120 80 80 120 70 C 180 55 220 110 280 85 C 340 60 380 30 420 40 C 460 50 480 20 500 15 L 500 150 L 0 150 Z" 
+                              fill="url(#gradient-gold)" 
+                            />
+                            <path 
+                              d="M 0 130 C 50 120 80 80 120 70 C 180 55 220 110 280 85 C 340 60 380 30 420 40 C 460 50 480 20 500 15" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="3"
+                            />
+                          </svg>
+                          {/* Overlay lines for grid */}
+                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 border-b border-white/10">
+                            <hr className="border-white/10 w-full" />
+                            <hr className="border-white/10 w-full" />
+                            <hr className="border-white/10 w-full" />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-white/30 pt-3 border-t border-white/5">
+                          <span>01 Jun</span>
+                          <span>08 Jun</span>
+                          <span>15 Jun</span>
+                          <span>22 Jun</span>
+                          <span>29 Jun</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full flex flex-col gap-4 py-2">
+                        {/* Simulated Checkout Funnel progress bars */}
+                        {[
+                          { step: '1. Landing Page Views', count: '48,250 users', pct: 100, color: 'bg-[#d4af37]' },
+                          { step: '2. Artist Profile Inspect', count: '18,520 users', pct: 38.3, color: 'bg-[#a855f7]' },
+                          { step: '3. Cart Addition', count: '4,280 users', pct: 8.8, color: 'bg-indigo-500' },
+                          { step: '4. Paid Checkout Complete', count: '1,760 users', pct: 3.65, color: 'bg-emerald-500' }
+                        ].map((funnelStep, idx) => (
+                          <div key={idx} className="flex flex-col gap-1.5">
+                            <div className="flex justify-between text-xs font-semibold">
+                              <span>{funnelStep.step}</span>
+                              <span className="text-white/50">{funnelStep.count} ({funnelStep.pct}%)</span>
+                            </div>
+                            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                              <div className={`h-full ${funnelStep.color} rounded-full transition-all duration-1000`} style={{ width: `${funnelStep.pct}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Geographical & Device Split */}
+                <div className="lg:col-span-4 flex flex-col gap-6">
+                  
+                  {/* Geo Distribution */}
+                  <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col gap-4">
+                    <h3 className="font-bold text-base text-[#d4af37] border-b border-white/5 pb-2">Geographics</h3>
+                    <div className="flex flex-col gap-3.5 text-xs">
+                      {[
+                        { country: 'Jamaica (HQ)', share: '45%', pct: 45 },
+                        { country: 'United States', share: '28%', pct: 28 },
+                        { country: 'United Kingdom', share: '15%', pct: 15 },
+                        { country: 'Canada', share: '8%', pct: 8 },
+                        { country: 'Rest of World', share: '4%', pct: 4 }
+                      ].map((geo, idx) => (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-white/80">{geo.country}</span>
+                            <span className="text-[#d4af37] font-bold">{geo.share}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-[#d4af37] to-[#a855f7] rounded-full" style={{ width: `${geo.pct}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Device Mix */}
+                  <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col gap-4">
+                    <h3 className="font-bold text-base text-[#a855f7] border-b border-white/5 pb-2">Device Distribution</h3>
+                    <div className="flex gap-4 items-center justify-between">
+                      {/* Segmented meter bar */}
+                      <div className="w-full flex h-5 rounded-lg overflow-hidden border border-white/5 text-[9px] font-bold text-center">
+                        <div className="bg-[#d4af37] text-[#07050e] flex items-center justify-center transition-all duration-300" style={{ width: '55%' }} title="Desktop: 55%">55%</div>
+                        <div className="bg-[#a855f7] text-white flex items-center justify-center transition-all duration-300" style={{ width: '40%' }} title="Mobile: 40%">40%</div>
+                        <div className="bg-white/10 text-white/60 flex items-center justify-center transition-all duration-300" style={{ width: '5%' }} title="Tablet: 5%">5%</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-white/40">
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#d4af37] rounded-sm" /> Desktop</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#a855f7] rounded-sm" /> Mobile</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-white/10 rounded-sm" /> Tablet</span>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Event Stream / Web activity ticker logs */}
+              <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
+                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d4af37] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#d4af37]"></span>
+                    </span>
+                    <h3 className="font-extrabold text-lg text-white">Live Website Event Feed</h3>
+                  </div>
+                  <span className="text-[10px] text-white/40 font-mono tracking-widest uppercase">Simulator active</span>
+                </div>
+                {/* Event terminal screen */}
+                <div className="bg-black/60 border border-white/5 rounded-2xl p-5 font-mono text-xs text-white/80 min-h-[160px] flex flex-col gap-2.5 max-h-60 overflow-y-auto">
+                  {liveActivities.map((log, idx) => {
+                    let color = 'text-white/70';
+                    if (log.includes('checkout') || log.includes('Checkout')) color = 'text-emerald-400 font-semibold';
+                    else if (log.includes('applied') || log.includes('verified')) color = 'text-[#d4af37]';
+                    else if (log.includes('viewed') || log.includes('inspect')) color = 'text-sky-400';
+                    return (
+                      <div key={idx} className={`animate-fade ${color}`}>
+                        {log}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
           )}
 
@@ -2083,50 +2617,56 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">API &amp; Platform Integrations</h2>
                   <p className="text-white/50 text-sm">Maintain third-party API keys, communication pipelines, and pixels.</p>
                 </div>
+                <button 
+                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
+                  onClick={() => openCrudPanel('integration', 'create')}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Integration
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Payments integrations */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-[#d4af37] border-b border-white/5 pb-2">Payment Gateways</h3>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">Stripe Payment Gateway</span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-bold">Connected</span>
+                {integrations.map((item) => (
+                  <div key={item.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl relative group">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <span className="text-sm font-semibold text-white">{item.name}</span>
+                      <span className={`text-[10px] border px-2 py-0.5 rounded uppercase font-bold ${
+                        item.status === 'Connected' 
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                          : 'bg-white/5 text-white/40 border-white/10'
+                      }`}>
+                        {item.status}
+                      </span>
                     </div>
                     <div className="field-group flex flex-col gap-1">
-                      <label className="text-[10px] text-white/40 uppercase">Stripe Public Key</label>
+                      <label className="text-[10px] text-white/40 uppercase">{item.provider} API Token / Key</label>
                       <input 
                         type="text" 
-                        value={apiKeys.stripe}
-                        onChange={e => setApiKeys({ ...apiKeys, stripe: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white" 
+                        value={item.api_key}
+                        onChange={async (e) => {
+                          const updatedVal = e.target.value;
+                          setIntegrations(prev => prev.map(i => i.id === item.id ? { ...i, api_key: updatedVal } : i));
+                          await db.updateIntegration(item.id, { api_key: updatedVal });
+                        }}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white font-mono" 
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* Comms integrations */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-[#a855f7] border-b border-white/5 pb-2">Communications Pipelines</h3>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">Twilio SMS Business API</span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-bold">Connected</span>
-                    </div>
-                    <div className="field-group flex flex-col gap-1">
-                      <label className="text-[10px] text-white/40 uppercase">Twilio Account SID</label>
-                      <input 
-                        type="text" 
-                        value={apiKeys.twilio}
-                        onChange={e => setApiKeys({ ...apiKeys, twilio: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white" 
-                      />
+                    <div className="flex justify-end gap-2 mt-2 opacity-0 group-hover:opacity-100 transition duration-200">
+                      <button 
+                        onClick={() => openCrudPanel('integration', 'edit', item.id)}
+                        className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5"
+                      >
+                        <FileEdit className="w-3 h-3" /> Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete('integration', item.id)}
+                        className="text-xs text-red-400 hover:underline flex items-center gap-0.5"
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
                     </div>
                   </div>
-                </div>
-
+                ))}
               </div>
             </div>
           )}
@@ -2148,15 +2688,32 @@ export default function AdminPortal() {
                   <h3 className="font-bold text-lg text-[#d4af37] border-b border-white/5 pb-2">Global Domain Settings</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50">Primary Domain</label>
-                      <input type="text" defaultValue="showtimeservices.com" className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" />
+                      <label className="text-xs text-white/50 font-semibold">Primary Domain</label>
+                      <input 
+                        type="text" 
+                        value={primaryDomain}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setPrimaryDomain(val);
+                          localStorage.setItem('st_settings_domain', val);
+                        }}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
+                      />
                     </div>
                     <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50">System Currency</label>
-                      <select className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white">
-                        <option>USD ($)</option>
-                        <option>JMD ($)</option>
-                        <option>GBP (£)</option>
+                      <label className="text-xs text-white/50 font-semibold">System Currency</label>
+                      <select 
+                        value={systemCurrency}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSystemCurrency(val);
+                          localStorage.setItem('st_settings_currency', val);
+                        }}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition"
+                      >
+                        <option value="USD ($)">USD ($)</option>
+                        <option value="JMD ($)">JMD ($)</option>
+                        <option value="GBP (£)">GBP (£)</option>
                       </select>
                     </div>
                   </div>
