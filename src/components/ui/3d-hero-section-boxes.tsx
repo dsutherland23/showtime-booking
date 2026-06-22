@@ -1,11 +1,22 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Spline from '@splinetool/react-spline';
 import { Sparkles } from 'lucide-react';
 
 function HeroSplineBackground() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <div style={{
       position: 'relative',
@@ -14,14 +25,23 @@ function HeroSplineBackground() {
       pointerEvents: 'auto',
       overflow: 'hidden',
     }}>
-      <Spline
-        style={{
-          width: '100%',
-          height: '100vh',
-          pointerEvents: 'auto',
-        }}
-        scene="https://prod.spline.design/dJqTIQ-tE3ULUPMi/scene.splinecode"
-      />
+      {isDesktop ? (
+        <Spline
+          style={{
+            width: '100%',
+            height: '100vh',
+            pointerEvents: 'auto',
+          }}
+          scene="https://prod.spline.design/dJqTIQ-tE3ULUPMi/scene.splinecode"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-[#07050e] overflow-hidden">
+          {/* Animated gold ambient glow */}
+          <div className="absolute top-[20%] left-[10%] w-[250px] h-[250px] rounded-full bg-[#d4af37]/10 blur-[100px] animate-pulse" style={{ animationDuration: '6s' }} />
+          {/* Animated purple ambient glow */}
+          <div className="absolute bottom-[30%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#a855f7]/8 blur-[110px] animate-pulse" style={{ animationDuration: '8s' }} />
+        </div>
+      )}
       <div
         style={{
           position: 'absolute',

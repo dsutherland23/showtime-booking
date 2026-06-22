@@ -5,6 +5,7 @@ import { RoleSwitcher } from '@/components/RoleSwitcher';
 import { NavHeader } from '@/components/NavHeader';
 import { ScrollRevealInit } from '@/components/ScrollRevealInit';
 import { ThemeProvider } from 'next-themes';
+import { SmoothScroll } from '@/components/SmoothScroll';
 import Link from 'next/link';
 import React from 'react';
 
@@ -35,7 +36,9 @@ export default function RootLayout({
             <NavHeader />
 
             {/* Main Content */}
-            <main className="main-content-wrapper">{children}</main>
+            <SmoothScroll>
+              <main className="main-content-wrapper">{children}</main>
+            </SmoothScroll>
 
             {/* Footer */}
             <footer className="global-footer">

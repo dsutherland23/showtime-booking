@@ -42,7 +42,7 @@ export default function Home() {
       <HeroSection />
 
       {/* ── 2. CATEGORIES — Apple product grid ── */}
-      <section className="section-pad">
+      <section className="section-pad border-t border-white/5 bg-[#07050e]">
         <div className="container">
           <div className="section-header reveal">
             <p className="section-eyebrow">Roster</p>
@@ -79,7 +79,7 @@ export default function Home() {
       </section>
 
       {/* ── 3. FEATURED ARTISTS — Apple card row ── */}
-      <section className="section-pad alt-bg">
+      <section className="section-pad alt-bg border-t border-b border-white/5 bg-[#0c0a17]">
         <div className="container">
           <div className="section-header reveal">
             <p className="section-eyebrow">Spotlight</p>
@@ -115,7 +115,7 @@ export default function Home() {
       </section>
 
       {/* ── 4. SERVICES — GSAP Story Scroll ── */}
-      <section id="services-flow" className="relative w-full bg-[#07050e]">
+      <section id="services-flow" className="relative w-full bg-[#07050e] border-b border-white/5">
         <div className="container py-16">
           <div className="section-header reveal text-center max-w-2xl mx-auto mb-4">
             <p className="section-eyebrow">Platform</p>
@@ -136,7 +136,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
-                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Reserve <br />
                     <span className="text-[#d4af37]">Elite</span> Talent.
@@ -196,7 +196,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
-                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Global <br />
                     <span className="text-[#a855f7]">Tour</span> Logistics.
@@ -256,7 +256,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
-                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Visa &amp; <br />
                     <span className="text-[#d4af37]">Permit</span> Compliance.
@@ -316,7 +316,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
-                <div className="lg:col-span-7 flex flex-col items-start gap-4">
+                <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Live Stage <br />
                     <span className="text-[#a855f7]">Production</span> A/V.
@@ -370,7 +370,7 @@ export default function Home() {
       </section>
 
       {/* ── 5. EVENTS SHOWCASE — Apple split layout ── */}
-      <section className="section-pad alt-bg">
+      <section className="section-pad alt-bg border-b border-white/5 bg-[#0c0a17]">
         <div className="container">
           <div className="events-split">
             <div className="events-text reveal">
