@@ -124,6 +124,82 @@ export interface Notification {
   created_at: string;
 }
 
+export interface Venue {
+  id: string;
+  name: string;
+  capacity: string;
+  location: string;
+  description?: string;
+  parking?: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  tier: string;
+  notes: string;
+}
+
+export interface TicketTier {
+  id: string;
+  name: string;
+  price: number;
+  desc: string;
+  capacity: number;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  discount: number;
+  active: boolean;
+  expiry: string;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  type: 'Email' | 'SMS' | 'Push';
+  subject: string;
+  segment: string;
+  content: string;
+  openRate: string;
+  created_at: string;
+}
+
+export interface AdPlacement {
+  id: string;
+  name: string;
+  impressions: number;
+  clickRate: string;
+  revenue: number;
+  active: boolean;
+  image_url?: string;
+}
+
+export interface WebsiteSection {
+  id: string;
+  type: 'hero' | 'announcement' | 'features' | 'cta' | 'footer';
+  title: string;
+  subtitle?: string;
+  content?: string;
+  buttonText?: string;
+  image_url?: string;
+  active: boolean;
+}
+
+export interface Integration {
+  id: string;
+  name: string;
+  provider: 'Stripe' | 'PayPal' | 'Twilio' | 'SendGrid';
+  status: 'Connected' | 'Disconnected';
+  api_key: string;
+}
+
+
+
 // ---------------------------------------------------------
 // Seed Data definition
 // ---------------------------------------------------------
@@ -342,6 +418,58 @@ const SEED_NOTIFICATIONS: Notification[] = [
   { id: 'notif-2', user_id: 'usr-agent-1', title: 'Negotiation Updates', message: 'Coachella contract drafts were generated and sent for Chronixx.', read_status: true, created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }
 ];
 
+const SEED_VENUES: Venue[] = [
+  { id: 'ven-1', name: 'Catherine Hall Stadium', capacity: '35,000 seats', location: 'Montego Bay', description: 'Historic home of Reggae Sumfest, seaside breeze and premium festival staging.', parking: '10,000 cars' },
+  { id: 'ven-2', name: 'National Arena Staging', capacity: '12,500 seats', location: 'Kingston', description: 'Indoor stadium, perfect for high energy dancehall clashes and sound clashes.', parking: '3,000 cars' },
+  { id: 'ven-3', name: 'O2 Arena London', capacity: '20,000 seats', location: 'United Kingdom', description: 'World famous indoor arena, perfect for massive crossover staging.', parking: '5,000 cars' }
+];
+
+const SEED_CUSTOMERS: Customer[] = [
+  { id: 'cust-1', name: 'Joe Bogdanovich', company: 'Sumfest Productions', email: 'joe@reggaesumfest.com', tier: 'VIP Organizer', notes: 'Prefers booking reggae headliners. Fast deposit execution.' },
+  { id: 'cust-2', name: 'Paul Tollett', company: 'Goldenvoice Coachella', email: 'paul@coachella.com', tier: 'Ultra VIP Promoter', notes: 'Standard US promoter client. Always requires international travel logistics check.' },
+  { id: 'cust-3', name: 'Michael Eavis', company: 'Glastonbury Festivals', email: 'eavis.client@glastonbury.co.uk', tier: 'Global Partner', notes: 'Requires full compliance check for UK COS certificates.' }
+];
+
+const SEED_TICKET_TIERS: TicketTier[] = [
+  { id: 'tier-ga', name: 'General Admission', price: 85, desc: 'Standard field gate access', capacity: 5000 },
+  { id: 'tier-vip', name: 'VIP Deck Pass', price: 250, desc: 'Raised platform, private bar', capacity: 1000 },
+  { id: 'tier-vvip', name: 'VVIP Backstage', price: 850, desc: 'Meet & greet, backline hospitality', capacity: 250 },
+  { id: 'tier-ultra', name: 'Ultra VVIP Table package', price: 3500, desc: 'Dressed cabana table for 8', capacity: 50 }
+];
+
+const SEED_PROMO_CODES: PromoCode[] = [
+  { id: 'promo-sumfest', code: 'SUMFEST2026', discount: 20, active: true, expiry: '2026-07-01' },
+  { id: 'promo-early', code: 'EARLYBIRD10', discount: 10, active: true, expiry: '2026-06-30' },
+  { id: 'promo-vip', code: 'VIPSHOWTIME', discount: 15, active: false, expiry: '2026-08-15' }
+];
+
+const SEED_CAMPAIGNS: MarketingCampaign[] = [
+  { id: 'camp-1', name: 'Koffee Sumfest Promotion', type: 'Email', subject: 'Koffee Live at Sumfest 2026!', segment: 'All Past Customers (12,504)', content: 'Get ready for Koffee live at Catherine Hall...', openRate: '34.2%', created_at: new Date().toISOString() },
+  { id: 'camp-2', name: 'Shenseea Ticket Release Alert', type: 'SMS', subject: '', segment: 'VIP Ticket Buyers Only (2,100)', content: 'Shenseea Tickets are Live! Buy now: https://showtimeservices.com/tickets', openRate: '98%', created_at: new Date().toISOString() },
+  { id: 'camp-3', name: 'Coachella Lineup Push Alert', type: 'Push', subject: 'Coachella Lineup Announced', segment: 'All Past Customers (12,504)', content: 'Check out the Coachella lineup including Chronixx!', openRate: '15.4%', created_at: new Date().toISOString() }
+];
+
+const SEED_AD_PLACEMENTS: AdPlacement[] = [
+  { id: 'ad-1', name: 'Homepage Hero Placement', impressions: 142500, clickRate: '2.4% CTR', revenue: 3420, active: true, image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400' },
+  { id: 'ad-2', name: 'Search Results Banner', impressions: 84300, clickRate: '1.8% CTR', revenue: 1510, active: true, image_url: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=400' },
+  { id: 'ad-3', name: 'Email Footer Banner', impressions: 24000, clickRate: '4.2% CTR', revenue: 1008, active: true, image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=400' }
+];
+
+const SEED_WEBSITE_SECTIONS: WebsiteSection[] = [
+  { id: 'sec-hero', type: 'hero', title: 'Caribbean Talent Booking Platform', subtitle: 'Book the absolute best Reggae, Dancehall, and Afrobeat acts globally.', content: 'Visual component block preview area.', buttonText: 'Book Artist Now', active: true, image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=600' },
+  { id: 'sec-ann', type: 'announcement', title: '★ Reggae Sumfest 2026 Headliners Confirmed!', content: 'Get your early bird tickets before they sell out.', active: true },
+  { id: 'sec-cta', type: 'cta', title: 'Plan Your Next Tour With Showtime', subtitle: 'From permits to event production, we handle everything you need.', buttonText: 'Get Started', active: true, image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600' }
+];
+
+const SEED_INTEGRATIONS: Integration[] = [
+  { id: 'int-stripe', name: 'Stripe Payment Gateway', provider: 'Stripe', status: 'Connected', api_key: 'pk_live_51M...' },
+  { id: 'int-twilio', name: 'Twilio SMS Business API', provider: 'Twilio', status: 'Connected', api_key: 'AC...' },
+  { id: 'int-paypal', name: 'PayPal Commerce Platform', provider: 'PayPal', status: 'Connected', api_key: 'client_id_...' },
+  { id: 'int-sendgrid', name: 'SendGrid Email API Service', provider: 'SendGrid', status: 'Connected', api_key: 'SG...' }
+];
+
+
+
 // Initialize local DB state helper
 const getStoreValue = <T>(key: string, seed: T[]): T[] => {
   if (typeof window === 'undefined') return seed;
@@ -386,6 +514,36 @@ export const db = {
       if (!error && data) return data as User[];
     }
     return getStoreValue('st_users', SEED_USERS);
+  },
+
+  async createUser(usr: Omit<User, 'id' | 'created_at'>): Promise<User> {
+    const users = await this.getUsers();
+    const newUsr: User = {
+      ...usr,
+      id: 'usr-' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    users.push(newUsr);
+    setStoreValue('st_users', users);
+    return newUsr;
+  },
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const users = await this.getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...updates };
+      setStoreValue('st_users', users);
+      return users[idx];
+    }
+    throw new Error('User not found');
+  },
+
+  async deleteUser(id: string): Promise<boolean> {
+    const users = await this.getUsers();
+    const filtered = users.filter(u => u.id !== id);
+    setStoreValue('st_users', filtered);
+    return true;
   },
 
   // --- ARTISTS ---
@@ -820,5 +978,362 @@ export const db = {
       notif.read_status = true;
       setStoreValue('st_notifs', allNotifs);
     }
+  },
+
+  // --- ADDITIONAL CRUD HELPER METHODS ---
+  async deleteBooking(id: string): Promise<boolean> {
+    const bookings = await this.getBookings();
+    const filtered = bookings.filter(b => b.id !== id);
+    setStoreValue('st_bookings', filtered);
+    return true;
+  },
+
+  async updateBooking(id: string, updates: Partial<Booking>): Promise<Booking> {
+    const bookings = await this.getBookings();
+    const idx = bookings.findIndex(b => b.id === id);
+    if (idx !== -1) {
+      bookings[idx] = { ...bookings[idx], ...updates };
+      setStoreValue('st_bookings', bookings);
+      return bookings[idx];
+    }
+    throw new Error('Booking not found');
+  },
+
+  async createBooking(bk: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
+    const bookings = await this.getBookings();
+    const newBk: Booking = {
+      ...bk,
+      id: 'bk-' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    bookings.unshift(newBk);
+    setStoreValue('st_bookings', bookings);
+    return newBk;
+  },
+
+  async deleteArtist(id: string): Promise<boolean> {
+    const artists = await this.getArtists();
+    const filtered = artists.filter(a => a.id !== id);
+    setStoreValue('st_artists_v2', filtered);
+    return true;
+  },
+
+  async createArtist(art: Omit<Artist, 'id'>): Promise<Artist> {
+    const artists = await this.getArtists();
+    const newArt: Artist = {
+      ...art,
+      id: 'art-' + Math.random().toString(36).substr(2, 9)
+    };
+    artists.push(newArt);
+    setStoreValue('st_artists_v2', artists);
+    return newArt;
+  },
+
+  // --- VENUES ---
+  async getVenues(): Promise<Venue[]> {
+    return getStoreValue('st_venues', SEED_VENUES);
+  },
+
+  async createVenue(venue: Omit<Venue, 'id'>): Promise<Venue> {
+    const venues = await this.getVenues();
+    const newVen: Venue = {
+      ...venue,
+      id: 'ven-' + Math.random().toString(36).substr(2, 9)
+    };
+    venues.push(newVen);
+    setStoreValue('st_venues', venues);
+    return newVen;
+  },
+
+  async updateVenue(id: string, updates: Partial<Venue>): Promise<Venue> {
+    const venues = await this.getVenues();
+    const idx = venues.findIndex(v => v.id === id);
+    if (idx !== -1) {
+      venues[idx] = { ...venues[idx], ...updates };
+      setStoreValue('st_venues', venues);
+      return venues[idx];
+    }
+    throw new Error('Venue not found');
+  },
+
+  async deleteVenue(id: string): Promise<boolean> {
+    const venues = await this.getVenues();
+    const filtered = venues.filter(v => v.id !== id);
+    setStoreValue('st_venues', filtered);
+    return true;
+  },
+
+  // --- CUSTOMERS ---
+  async getCustomers(): Promise<Customer[]> {
+    return getStoreValue('st_customers', SEED_CUSTOMERS);
+  },
+
+  async createCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
+    const customers = await this.getCustomers();
+    const newCust: Customer = {
+      ...customer,
+      id: 'cust-' + Math.random().toString(36).substr(2, 9)
+    };
+    customers.push(newCust);
+    setStoreValue('st_customers', customers);
+    return newCust;
+  },
+
+  async updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer> {
+    const customers = await this.getCustomers();
+    const idx = customers.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      customers[idx] = { ...customers[idx], ...updates };
+      setStoreValue('st_customers', customers);
+      return customers[idx];
+    }
+    throw new Error('Customer not found');
+  },
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    const customers = await this.getCustomers();
+    const filtered = customers.filter(c => c.id !== id);
+    setStoreValue('st_customers', filtered);
+    return true;
+  },
+
+  // --- TICKET TIERS ---
+  async getTicketTiers(): Promise<TicketTier[]> {
+    return getStoreValue('st_ticket_tiers', SEED_TICKET_TIERS);
+  },
+
+  async createTicketTier(tier: Omit<TicketTier, 'id'>): Promise<TicketTier> {
+    const tiers = await this.getTicketTiers();
+    const newTier: TicketTier = {
+      ...tier,
+      id: 'tier-' + Math.random().toString(36).substr(2, 9)
+    };
+    tiers.push(newTier);
+    setStoreValue('st_ticket_tiers', tiers);
+    return newTier;
+  },
+
+  async updateTicketTier(id: string, updates: Partial<TicketTier>): Promise<TicketTier> {
+    const tiers = await this.getTicketTiers();
+    const idx = tiers.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      tiers[idx] = { ...tiers[idx], ...updates };
+      setStoreValue('st_ticket_tiers', tiers);
+      return tiers[idx];
+    }
+    throw new Error('Ticket tier not found');
+  },
+
+  async deleteTicketTier(id: string): Promise<boolean> {
+    const tiers = await this.getTicketTiers();
+    const filtered = tiers.filter(t => t.id !== id);
+    setStoreValue('st_ticket_tiers', filtered);
+    return true;
+  },
+
+  // --- PROMO CODES ---
+  async getPromoCodes(): Promise<PromoCode[]> {
+    return getStoreValue('st_promo_codes', SEED_PROMO_CODES);
+  },
+
+  async createPromoCode(promo: Omit<PromoCode, 'id'>): Promise<PromoCode> {
+    const promos = await this.getPromoCodes();
+    const newPromo: PromoCode = {
+      ...promo,
+      id: 'promo-' + Math.random().toString(36).substr(2, 9)
+    };
+    promos.push(newPromo);
+    setStoreValue('st_promo_codes', promos);
+    return newPromo;
+  },
+
+  async updatePromoCode(id: string, updates: Partial<PromoCode>): Promise<PromoCode> {
+    const promos = await this.getPromoCodes();
+    const idx = promos.findIndex(p => p.id === id);
+    if (idx !== -1) {
+      promos[idx] = { ...promos[idx], ...updates };
+      setStoreValue('st_promo_codes', promos);
+      return promos[idx];
+    }
+    throw new Error('Promo code not found');
+  },
+
+  async deletePromoCode(id: string): Promise<boolean> {
+    const promos = await this.getPromoCodes();
+    const filtered = promos.filter(p => p.id !== id);
+    setStoreValue('st_promo_codes', filtered);
+    return true;
+  },
+
+  // --- INVOICES EXTRA CRUD ---
+  async createInvoice(inv: Omit<Invoice, 'id' | 'created_at'>): Promise<Invoice> {
+    const invoices = await this.getInvoices();
+    const newInv: Invoice = {
+      ...inv,
+      id: 'inv-' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    invoices.unshift(newInv);
+    setStoreValue('st_invoices', invoices);
+    return newInv;
+  },
+
+  async updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice> {
+    const invoices = await this.getInvoices();
+    const idx = invoices.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      invoices[idx] = { ...invoices[idx], ...updates };
+      setStoreValue('st_invoices', invoices);
+      return invoices[idx];
+    }
+    throw new Error('Invoice not found');
+  },
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    const invoices = await this.getInvoices();
+    const filtered = invoices.filter(i => i.id !== id);
+    setStoreValue('st_invoices', filtered);
+    return true;
+  },
+
+  // --- CAMPAIGNS ---
+  async getCampaigns(): Promise<MarketingCampaign[]> {
+    return getStoreValue('st_campaigns', SEED_CAMPAIGNS);
+  },
+
+  async createCampaign(camp: Omit<MarketingCampaign, 'id' | 'created_at' | 'openRate'>): Promise<MarketingCampaign> {
+    const camps = await this.getCampaigns();
+    const newCamp: MarketingCampaign = {
+      ...camp,
+      id: 'camp-' + Math.random().toString(36).substr(2, 9),
+      openRate: '0%',
+      created_at: new Date().toISOString()
+    };
+    camps.unshift(newCamp);
+    setStoreValue('st_campaigns', camps);
+    return newCamp;
+  },
+
+  async updateCampaign(id: string, updates: Partial<MarketingCampaign>): Promise<MarketingCampaign> {
+    const camps = await this.getCampaigns();
+    const idx = camps.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      camps[idx] = { ...camps[idx], ...updates };
+      setStoreValue('st_campaigns', camps);
+      return camps[idx];
+    }
+    throw new Error('Campaign not found');
+  },
+
+  async deleteCampaign(id: string): Promise<boolean> {
+    const camps = await this.getCampaigns();
+    const filtered = camps.filter(c => c.id !== id);
+    setStoreValue('st_campaigns', filtered);
+    return true;
+  },
+
+  // --- AD PLACEMENTS ---
+  async getAdPlacements(): Promise<AdPlacement[]> {
+    return getStoreValue('st_ad_placements', SEED_AD_PLACEMENTS);
+  },
+
+  async createAdPlacement(ad: Omit<AdPlacement, 'id' | 'impressions' | 'clickRate' | 'revenue'>): Promise<AdPlacement> {
+    const ads = await this.getAdPlacements();
+    const newAd: AdPlacement = {
+      ...ad,
+      id: 'ad-' + Math.random().toString(36).substr(2, 9),
+      impressions: 0,
+      clickRate: '0.0% CTR',
+      revenue: 0
+    };
+    ads.push(newAd);
+    setStoreValue('st_ad_placements', ads);
+    return newAd;
+  },
+
+  async updateAdPlacement(id: string, updates: Partial<AdPlacement>): Promise<AdPlacement> {
+    const ads = await this.getAdPlacements();
+    const idx = ads.findIndex(a => a.id === id);
+    if (idx !== -1) {
+      ads[idx] = { ...ads[idx], ...updates };
+      setStoreValue('st_ad_placements', ads);
+      return ads[idx];
+    }
+    throw new Error('Ad placement not found');
+  },
+
+  async deleteAdPlacement(id: string): Promise<boolean> {
+    const ads = await this.getAdPlacements();
+    const filtered = ads.filter(a => a.id !== id);
+    setStoreValue('st_ad_placements', filtered);
+    return true;
+  },
+
+  // --- WEBSITE SECTIONS ---
+  async getWebsiteSections(): Promise<WebsiteSection[]> {
+    return getStoreValue('st_website_sections', SEED_WEBSITE_SECTIONS);
+  },
+
+  async createWebsiteSection(sec: Omit<WebsiteSection, 'id'>): Promise<WebsiteSection> {
+    const secs = await this.getWebsiteSections();
+    const newSec: WebsiteSection = {
+      ...sec,
+      id: 'sec-' + Math.random().toString(36).substr(2, 9)
+    };
+    secs.push(newSec);
+    setStoreValue('st_website_sections', secs);
+    return newSec;
+  },
+
+  async updateWebsiteSection(id: string, updates: Partial<WebsiteSection>): Promise<WebsiteSection> {
+    const secs = await this.getWebsiteSections();
+    const idx = secs.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      secs[idx] = { ...secs[idx], ...updates };
+      setStoreValue('st_website_sections', secs);
+      return secs[idx];
+    }
+    throw new Error('Website section not found');
+  },
+
+  async deleteWebsiteSection(id: string): Promise<boolean> {
+    const secs = await this.getWebsiteSections();
+    const filtered = secs.filter(s => s.id !== id);
+    setStoreValue('st_website_sections', filtered);
+    return true;
+  },
+
+  // --- INTEGRATIONS ---
+  async getIntegrations(): Promise<Integration[]> {
+    return getStoreValue('st_integrations', SEED_INTEGRATIONS);
+  },
+
+  async createIntegration(int: Omit<Integration, 'id'>): Promise<Integration> {
+    const ints = await this.getIntegrations();
+    const newInt: Integration = {
+      ...int,
+      id: 'int-' + Math.random().toString(36).substr(2, 9)
+    };
+    ints.push(newInt);
+    setStoreValue('st_integrations', ints);
+    return newInt;
+  },
+
+  async updateIntegration(id: string, updates: Partial<Integration>): Promise<Integration> {
+    const ints = await this.getIntegrations();
+    const idx = ints.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      ints[idx] = { ...ints[idx], ...updates };
+      setStoreValue('st_integrations', ints);
+      return ints[idx];
+    }
+    throw new Error('Integration not found');
+  },
+
+  async deleteIntegration(id: string): Promise<boolean> {
+    const ints = await this.getIntegrations();
+    const filtered = ints.filter(i => i.id !== id);
+    setStoreValue('st_integrations', filtered);
+    return true;
   }
 };

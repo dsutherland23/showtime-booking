@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { db, Lead, Booking, Task, Notification, Invoice, Artist } from '@/utils/db';
+import { db, Lead, Booking, Task, Notification, Invoice, Artist, Venue, Customer, User, TicketTier, PromoCode, MarketingCampaign, AdPlacement, WebsiteSection, Integration } from '@/utils/db';
 import { 
   LayoutDashboard, Calendar, MapPin, Users, Ticket, Receipt, FileEdit,
   Globe, Megaphone, BarChart3, CircleDollarSign, Brain, ShieldCheck, Cable, Settings,
@@ -48,6 +48,109 @@ const ROLE_PERMISSIONS: Record<string, TabId[]> = {
   'Booking Agent': ['dashboard', 'events', 'artists', 'orders', 'customers']
 };
 
+interface ImageUploaderProps {
+  label: string;
+  value?: string;
+  onChange: (base64: string) => void;
+}
+
+function ImageUploader({ label, value, onChange }: ImageUploaderProps) {
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file (png, jpg, jpeg, webp, gif).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        onChange(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-white/50 text-xs font-semibold">{label}</label>
+      <div 
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition relative min-h-[120px] overflow-hidden ${
+          dragActive ? 'border-[#d4af37] bg-[#d4af37]/5' : 'border-white/10 hover:border-white/20 bg-white/5'
+        }`}
+      >
+        <input 
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleChange}
+        />
+        {value ? (
+          <div className="absolute inset-0 w-full h-full group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="Preview" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1">
+              <span className="text-[10px] font-bold text-white uppercase tracking-wider">Drag or click to replace</span>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange('');
+                }}
+                className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <svg className="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <div className="text-center">
+              <p className="text-xs text-white/80 font-medium">Click to upload or drag & drop</p>
+              <p className="text-[10px] text-white/40 mt-0.5">PNG, JPG, JPEG, WEBP or GIF</p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPortal() {
   const { user, hasPermission } = useAuth();
   
@@ -67,12 +170,131 @@ export default function AdminPortal() {
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([]);
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [adPlacements, setAdPlacements] = useState<AdPlacement[]>([]);
+  const [websiteSections, setWebsiteSections] = useState<WebsiteSection[]>([]);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
 
   // Modals & Builders
   const [showEventBuilder, setShowEventBuilder] = useState(false);
   const [eventBuilderStep, setEventBuilderStep] = useState(1);
   const [showCreateLead, setShowCreateLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  // Dynamic CRUD Panel State (Premium Drawer)
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelType, setPanelType] = useState<'event' | 'venue' | 'artist' | 'customer' | 'staff' | 'ticket' | 'promo' | 'order' | 'campaign' | 'ad' | 'section' | 'integration' | null>(null);
+  const [panelMode, setPanelMode] = useState<'create' | 'edit'>('create');
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  // Form states for CRUD
+  const [eventForm, setEventForm] = useState({
+    artist_id: '',
+    event_title: '',
+    event_date: '',
+    event_venue: '',
+    event_country: '',
+    status: 'Inquiry' as Booking['status'],
+    total_amount: '50000',
+    deposit_amount: '25000',
+    client_name: '',
+    artist_image: ''
+  });
+
+  const [venueForm, setVenueForm] = useState({
+    name: '',
+    capacity: '',
+    location: '',
+    description: '',
+    parking: ''
+  });
+
+  const [artistForm, setArtistForm] = useState({
+    stage_name: '',
+    legal_name: '',
+    category: 'Reggae Artists',
+    genre: '',
+    bio: '',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available' as Artist['booking_status'],
+    availability_status: 'Active' as Artist['availability_status'],
+    technical_rider: '',
+    hospitality_rider: ''
+  });
+
+  const [customerForm, setCustomerForm] = useState({
+    name: '',
+    company: '',
+    email: '',
+    tier: 'Standard Client',
+    notes: ''
+  });
+
+  const [staffForm, setStaffForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'Booking Agent',
+    status: 'Active' as User['status']
+  });
+
+  const [ticketForm, setTicketForm] = useState({
+    name: '',
+    price: '85',
+    desc: '',
+    capacity: '1000'
+  });
+
+  const [promoForm, setPromoForm] = useState({
+    code: '',
+    discount: '20',
+    active: true,
+    expiry: ''
+  });
+
+  const [orderForm, setOrderForm] = useState({
+    booking_id: '',
+    amount: '50000',
+    status: 'Unpaid' as Invoice['status'],
+    due_date: ''
+  });
+
+  const [campaignForm, setCampaignForm] = useState({
+    name: '',
+    type: 'Email' as MarketingCampaign['type'],
+    subject: '',
+    segment: 'All Past Customers (12,504)',
+    content: ''
+  });
+
+  const [adForm, setAdForm] = useState({
+    name: '',
+    active: true,
+    image_url: ''
+  });
+
+  const [sectionForm, setSectionForm] = useState({
+    type: 'hero' as WebsiteSection['type'],
+    title: '',
+    subtitle: '',
+    content: '',
+    buttonText: '',
+    image_url: '',
+    active: true
+  });
+
+  const [integrationForm, setIntegrationForm] = useState({
+    name: '',
+    provider: 'Stripe' as Integration['provider'],
+    status: 'Connected' as Integration['status'],
+    api_key: ''
+  });
 
   // Command palette focus index
   const [paletteIndex, setPaletteIndex] = useState(0);
@@ -142,6 +364,17 @@ export default function AdminPortal() {
       const allTasks = await db.getTasks();
       const allInvoices = await db.getInvoices();
       const allArtists = await db.getArtists();
+      const allVenues = await db.getVenues();
+      const allCustomers = await db.getCustomers();
+      const allUsers = await db.getUsers();
+
+      const allTiers = await db.getTicketTiers();
+      const allPromos = await db.getPromoCodes();
+      const allCamps = await db.getCampaigns();
+      const allAds = await db.getAdPlacements();
+      const allSecs = await db.getWebsiteSections();
+      const allInts = await db.getIntegrations();
+
       if (user) {
         const userNotifs = await db.getNotifications(user.id);
         setNotifs(userNotifs);
@@ -151,6 +384,16 @@ export default function AdminPortal() {
       setTasks(allTasks);
       setInvoices(allInvoices);
       setArtists(allArtists);
+      setVenues(allVenues);
+      setCustomers(allCustomers);
+      setUsers(allUsers);
+
+      setTicketTiers(allTiers);
+      setPromoCodes(allPromos);
+      setCampaigns(allCamps);
+      setAdPlacements(allAds);
+      setWebsiteSections(allSecs);
+      setIntegrations(allInts);
     } catch (err) {
       console.error('Failed to load portal data:', err);
     }
@@ -159,6 +402,400 @@ export default function AdminPortal() {
   useEffect(() => {
     loadPortalData();
   }, [user]);
+
+  // Open sliding panel and prepare state
+  const openCrudPanel = (type: typeof panelType, mode: 'create' | 'edit', itemId: string | null = null) => {
+    setPanelType(type);
+    setPanelMode(mode);
+    setSelectedItemId(itemId);
+    setPanelOpen(true);
+    
+    if (mode === 'edit' && itemId) {
+      if (type === 'event') {
+        const item = bookings.find(b => b.id === itemId);
+        if (item) {
+          setEventForm({
+            artist_id: item.artist_id,
+            event_title: item.event_title,
+            event_date: item.event_date,
+            event_venue: item.event_venue,
+            event_country: item.event_country,
+            status: item.status,
+            total_amount: String(item.total_amount),
+            deposit_amount: String(item.deposit_amount),
+            client_name: item.client_name,
+            artist_image: item.artist_image || ''
+          });
+        }
+      } else if (type === 'venue') {
+        const item = venues.find(v => v.id === itemId);
+        if (item) {
+          setVenueForm({
+            name: item.name,
+            capacity: item.capacity,
+            location: item.location,
+            description: item.description || '',
+            parking: item.parking || ''
+          });
+        }
+      } else if (type === 'artist') {
+        const item = artists.find(a => a.id === itemId);
+        if (item) {
+          setArtistForm({
+            stage_name: item.stage_name,
+            legal_name: item.legal_name,
+            category: item.category,
+            genre: item.genre,
+            bio: item.bio,
+            profile_image: item.profile_image,
+            cover_image: item.cover_image,
+            booking_status: item.booking_status,
+            availability_status: item.availability_status,
+            technical_rider: item.technical_rider || '',
+            hospitality_rider: item.hospitality_rider || ''
+          });
+        }
+      } else if (type === 'customer') {
+        const item = customers.find(c => c.id === itemId);
+        if (item) {
+          setCustomerForm({
+            name: item.name,
+            company: item.company,
+            email: item.email,
+            notes: item.notes,
+            tier: item.tier
+          });
+        }
+      } else if (type === 'staff') {
+        const item = users.find(u => u.id === itemId);
+        if (item) {
+          setStaffForm({
+            first_name: item.first_name,
+            last_name: item.last_name,
+            email: item.email,
+            role: item.role,
+            status: item.status
+          });
+        }
+      } else if (type === 'ticket') {
+        const item = ticketTiers.find(t => t.id === itemId);
+        if (item) {
+          setTicketForm({
+            name: item.name,
+            price: String(item.price),
+            desc: item.desc,
+            capacity: String(item.capacity || 1000)
+          });
+        }
+      } else if (type === 'promo') {
+        const item = promoCodes.find(p => p.id === itemId);
+        if (item) {
+          setPromoForm({
+            code: item.code,
+            discount: String(item.discount),
+            active: item.active,
+            expiry: item.expiry || ''
+          });
+        }
+      } else if (type === 'order') {
+        const item = invoices.find(i => i.id === itemId);
+        if (item) {
+          setOrderForm({
+            booking_id: item.booking_id,
+            amount: String(item.amount),
+            status: item.status,
+            due_date: item.due_date
+          });
+        }
+      } else if (type === 'campaign') {
+        const item = campaigns.find(c => c.id === itemId);
+        if (item) {
+          setCampaignForm({
+            name: item.name,
+            type: item.type,
+            subject: item.subject || '',
+            segment: item.segment,
+            content: item.content
+          });
+        }
+      } else if (type === 'ad') {
+        const item = adPlacements.find(a => a.id === itemId);
+        if (item) {
+          setAdForm({
+            name: item.name,
+            active: item.active,
+            image_url: item.image_url || ''
+          });
+        }
+      } else if (type === 'section') {
+        const item = websiteSections.find(s => s.id === itemId);
+        if (item) {
+          setSectionForm({
+            type: item.type,
+            title: item.title,
+            subtitle: item.subtitle || '',
+            content: item.content || '',
+            buttonText: item.buttonText || '',
+            image_url: item.image_url || '',
+            active: item.active
+          });
+        }
+      } else if (type === 'integration') {
+        const item = integrations.find(i => i.id === itemId);
+        if (item) {
+          setIntegrationForm({
+            name: item.name,
+            provider: item.provider,
+            status: item.status,
+            api_key: item.api_key
+          });
+        }
+      }
+    } else {
+      if (type === 'event') {
+        setEventForm({
+          artist_id: artists[0]?.id || '',
+          event_title: '',
+          event_date: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+          event_venue: '',
+          event_country: 'Jamaica',
+          status: 'Inquiry',
+          total_amount: '50000',
+          deposit_amount: '25000',
+          client_name: '',
+          artist_image: ''
+        });
+      } else if (type === 'venue') {
+        setVenueForm({ name: '', capacity: '', location: '', description: '', parking: '' });
+      } else if (type === 'artist') {
+        setArtistForm({
+          stage_name: '',
+          legal_name: '',
+          category: 'Reggae Artists',
+          genre: '',
+          bio: '',
+          profile_image: '/images/artist_reggae.jpg',
+          cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
+          booking_status: 'Available',
+          availability_status: 'Active',
+          technical_rider: '',
+          hospitality_rider: ''
+        });
+      } else if (type === 'customer') {
+        setCustomerForm({ name: '', company: '', email: '', notes: '', tier: 'Standard Client' });
+      } else if (type === 'staff') {
+        setStaffForm({ first_name: '', last_name: '', email: '', role: 'Booking Agent', status: 'Active' });
+      } else if (type === 'ticket') {
+        setTicketForm({ name: '', price: '85', desc: '', capacity: '1000' });
+      } else if (type === 'promo') {
+        setPromoForm({ code: '', discount: '20', active: true, expiry: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] });
+      } else if (type === 'order') {
+        setOrderForm({ booking_id: bookings[0]?.id || '', amount: '50000', status: 'Unpaid', due_date: new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0] });
+      } else if (type === 'campaign') {
+        setCampaignForm({ name: '', type: 'Email', subject: '', segment: 'All Past Customers (12,504)', content: '' });
+      } else if (type === 'ad') {
+        setAdForm({ name: '', active: true, image_url: '' });
+      } else if (type === 'section') {
+        setSectionForm({ type: 'hero', title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true });
+      } else if (type === 'integration') {
+        setIntegrationForm({ name: '', provider: 'Stripe', status: 'Connected', api_key: '' });
+      }
+    }
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (panelType === 'event') {
+        const selectedArtist = artists.find(a => a.id === eventForm.artist_id);
+        const bookingData = {
+          artist_id: eventForm.artist_id,
+          artist_name: selectedArtist ? selectedArtist.stage_name : 'Unknown Artist',
+          artist_image: selectedArtist ? selectedArtist.profile_image : '/images/artist_reggae.jpg',
+          client_id: 'cli-user',
+          client_name: eventForm.client_name,
+          event_id: 'evt-' + Math.random().toString(36).substr(2, 9),
+          event_title: eventForm.event_title,
+          event_date: eventForm.event_date,
+          event_venue: eventForm.event_venue,
+          event_country: eventForm.event_country,
+          status: eventForm.status,
+          total_amount: parseFloat(eventForm.total_amount) || 0,
+          deposit_amount: parseFloat(eventForm.deposit_amount) || 0
+        };
+        if (panelMode === 'create') {
+          await db.createBooking(bookingData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateBooking(selectedItemId, bookingData);
+        }
+      } else if (panelType === 'venue') {
+        if (panelMode === 'create') {
+          await db.createVenue(venueForm);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateVenue(selectedItemId, venueForm);
+        }
+      } else if (panelType === 'artist') {
+        if (panelMode === 'create') {
+          await db.createArtist(artistForm);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateArtistProfile(selectedItemId, artistForm);
+        }
+      } else if (panelType === 'customer') {
+        if (panelMode === 'create') {
+          await db.createCustomer(customerForm);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateCustomer(selectedItemId, customerForm);
+        }
+      } else if (panelType === 'staff') {
+        if (panelMode === 'create') {
+          await db.createUser(staffForm);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateUser(selectedItemId, staffForm);
+        }
+      } else if (panelType === 'ticket') {
+        const ticketData = {
+          name: ticketForm.name,
+          price: parseFloat(ticketForm.price) || 0,
+          desc: ticketForm.desc,
+          capacity: parseInt(ticketForm.capacity) || 1000
+        };
+        if (panelMode === 'create') {
+          await db.createTicketTier(ticketData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateTicketTier(selectedItemId, ticketData);
+        }
+      } else if (panelType === 'promo') {
+        const promoData = {
+          code: promoForm.code,
+          discount: parseFloat(promoForm.discount) || 0,
+          active: promoForm.active,
+          expiry: promoForm.expiry
+        };
+        if (panelMode === 'create') {
+          await db.createPromoCode(promoData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updatePromoCode(selectedItemId, promoData);
+        }
+      } else if (panelType === 'order') {
+        const orderData = {
+          booking_id: orderForm.booking_id,
+          amount: parseFloat(orderForm.amount) || 0,
+          balance_due: orderForm.status === 'Paid' ? 0 : (parseFloat(orderForm.amount) || 0),
+          status: orderForm.status,
+          due_date: orderForm.due_date
+        };
+        if (panelMode === 'create') {
+          await db.createInvoice(orderData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateInvoice(selectedItemId, orderData);
+        }
+      } else if (panelType === 'campaign') {
+        const campaignData = {
+          name: campaignForm.name,
+          type: campaignForm.type,
+          subject: campaignForm.subject,
+          segment: campaignForm.segment,
+          content: campaignForm.content
+        };
+        if (panelMode === 'create') {
+          await db.createCampaign(campaignData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateCampaign(selectedItemId, campaignData);
+        }
+      } else if (panelType === 'ad') {
+        const adData = {
+          name: adForm.name,
+          active: adForm.active,
+          image_url: adForm.image_url
+        };
+        if (panelMode === 'create') {
+          await db.createAdPlacement(adData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateAdPlacement(selectedItemId, adData);
+        }
+      } else if (panelType === 'section') {
+        const sectionData = {
+          type: sectionForm.type,
+          title: sectionForm.title,
+          subtitle: sectionForm.subtitle,
+          content: sectionForm.content,
+          buttonText: sectionForm.buttonText,
+          image_url: sectionForm.image_url,
+          active: sectionForm.active
+        };
+        if (panelMode === 'create') {
+          await db.createWebsiteSection(sectionData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateWebsiteSection(selectedItemId, sectionData);
+        }
+      } else if (panelType === 'integration') {
+        const integrationData = {
+          name: integrationForm.name,
+          provider: integrationForm.provider,
+          status: integrationForm.status,
+          api_key: integrationForm.api_key
+        };
+        if (panelMode === 'create') {
+          await db.createIntegration(integrationData);
+        } else if (panelMode === 'edit' && selectedItemId) {
+          await db.updateIntegration(selectedItemId, integrationData);
+        }
+      }
+      setPanelOpen(false);
+      await loadPortalData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save record.');
+    }
+  };
+
+  const handleDelete = async (type: typeof panelType, id: string) => {
+    if (!confirm('Are you sure you want to delete this record?')) return;
+    try {
+      if (type === 'event') {
+        await db.deleteBooking(id);
+      } else if (type === 'venue') {
+        await db.deleteVenue(id);
+      } else if (type === 'artist') {
+        await db.deleteArtist(id);
+      } else if (type === 'customer') {
+        await db.deleteCustomer(id);
+      } else if (type === 'staff') {
+        await db.deleteUser(id);
+      } else if (type === 'ticket') {
+        await db.deleteTicketTier(id);
+      } else if (type === 'promo') {
+        await db.deletePromoCode(id);
+      } else if (type === 'order') {
+        await db.deleteInvoice(id);
+      } else if (type === 'campaign') {
+        await db.deleteCampaign(id);
+      } else if (type === 'ad') {
+        await db.deleteAdPlacement(id);
+      } else if (type === 'section') {
+        await db.deleteWebsiteSection(id);
+      } else if (type === 'integration') {
+        await db.deleteIntegration(id);
+      }
+      await loadPortalData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete record.');
+    }
+  };
+
+  // Auto-collapse sidebar on mobile screen loads & window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarCollapsed(true);
+      } else {
+        setSidebarCollapsed(false);
+      }
+    };
+    handleResize(); // run initially
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Command palette hotkeys listener
   useEffect(() => {
@@ -367,16 +1004,29 @@ export default function AdminPortal() {
       {/* ── CORE SAAS BODY GRID ── */}
       <div className="flex-1 flex overflow-hidden">
         
+        {/* Mobile Sidebar backdrop */}
+        {!sidebarCollapsed && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[140] lg:hidden animate-fade"
+            onClick={() => setSidebarCollapsed(true)}
+          />
+        )}
+
         {/* Collapsible Sidebar */}
-        <aside className={`border-r border-white/5 bg-[#0c0a17]/50 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'w-0 lg:w-16 overflow-hidden' : 'w-64'}`}>
+        <aside className={`border-r border-white/5 bg-[#0c0a17]/95 lg:bg-[#0c0a17]/50 flex flex-col transition-all duration-300 fixed lg:static inset-y-0 left-0 z-[150] h-full lg:h-auto ${
+          sidebarCollapsed 
+            ? '-translate-x-full lg:translate-x-0 lg:w-16 overflow-hidden' 
+            : 'translate-x-0 lg:w-64'
+        }`}>
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
             
             {/* Group Navigation items by Category */}
             {['Core Operations', 'Website Management', 'Growth & Promo', 'Administration', 'Settings'].map((category, catIdx) => {
               const items = NAV_ITEMS.filter(i => i.category === category);
+              const isCollapsed = sidebarCollapsed;
               return (
                 <div key={category} className="flex flex-col gap-1">
-                  {!sidebarCollapsed && (
+                  {!isCollapsed && (
                     <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 px-3 py-1.5 mt-2">
                       {category}
                     </span>
@@ -390,7 +1040,13 @@ export default function AdminPortal() {
                       <button
                         key={item.id}
                         onClick={() => {
-                          if (hasAccess) setActiveTab(item.id);
+                          if (hasAccess) {
+                            setActiveTab(item.id);
+                            // Auto-close on mobile when item clicked
+                            if (window.innerWidth < 1024) {
+                              setSidebarCollapsed(true);
+                            }
+                          }
                         }}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition ${
                           active ? 'bg-[#d4af37] text-[#07050e] font-semibold' : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -398,8 +1054,8 @@ export default function AdminPortal() {
                         title={item.label}
                       >
                         <IconComp className="w-4 h-4 flex-shrink-0" />
-                        {!sidebarCollapsed && <span className="text-sm">{item.label}</span>}
-                        {!hasAccess && !sidebarCollapsed && (
+                        {!isCollapsed && <span className="text-sm">{item.label}</span>}
+                        {!hasAccess && !isCollapsed && (
                           <span className="text-[8px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded ml-auto">Lock</span>
                         )}
                       </button>
@@ -558,9 +1214,14 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Events Management</h2>
                   <p className="text-white/50 text-sm">Schedule events, archive, duplicate, and adjust pricing categories.</p>
                 </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2.5 px-6 rounded-full hover:scale-105 transition flex items-center gap-2" onClick={() => setShowEventBuilder(true)}>
-                  <Plus className="w-4 h-4" /> Add Event
-                </button>
+                <div className="flex gap-2">
+                  <button className="btn bg-white/5 border border-white/10 hover:bg-white/10 px-4 py-2 rounded-full font-semibold text-xs transition flex items-center gap-1.5" onClick={() => openCrudPanel('event', 'create')}>
+                    <Plus className="w-3.5 h-3.5" /> Quick Add
+                  </button>
+                  <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1.5 text-xs" onClick={() => setShowEventBuilder(true)}>
+                    <Sparkles className="w-3.5 h-3.5" /> 8-Step Wizard
+                  </button>
+                </div>
               </div>
 
               {/* Grid lists of current simulated bookings/events */}
@@ -581,17 +1242,24 @@ export default function AdminPortal() {
                         <span className="text-xs text-white/50 flex items-center gap-1.5 mt-1">
                           <MapPin className="w-3.5 h-3.5 text-[#d4af37]" /> {bk.event_venue}, {bk.event_country}
                         </span>
+                        <span className="text-[10px] text-white/40 block mt-1">Client: {bk.client_name}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs text-white/60 pt-3 border-t border-white/5">
                         <span>Date: {bk.event_date}</span>
                         <strong className="text-white font-bold">${bk.total_amount.toLocaleString()}</strong>
                       </div>
                       <div className="flex gap-2 mt-4">
-                        <button className="btn flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2 rounded-lg text-xs transition">
-                          Duplicate
+                        <button 
+                          className="btn flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
+                          onClick={() => openCrudPanel('event', 'edit', bk.id)}
+                        >
+                          <FileEdit className="w-3 h-3 text-[#d4af37]" /> Edit
                         </button>
-                        <button className="btn flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2 rounded-lg text-xs transition">
-                          Archive
+                        <button 
+                          className="btn flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
+                          onClick={() => handleDelete('event', bk.id)}
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete
                         </button>
                       </div>
                     </div>
@@ -609,6 +1277,9 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Venue Manager &amp; Seat Maps</h2>
                   <p className="text-white/50 text-sm">Assign capacity settings, parking, and paint booking seats zones.</p>
                 </div>
+                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('venue', 'create')}>
+                  <Plus className="w-3.5 h-3.5" /> Add Venue
+                </button>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -667,17 +1338,27 @@ export default function AdminPortal() {
                   <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
                     <h3 className="font-bold text-lg border-b border-white/5 pb-2">Active Venues</h3>
                     <div className="flex flex-col gap-3">
-                      {[
-                        { name: 'Catherine Hall Stadium', capacity: '35,000 seats', location: 'Montego Bay' },
-                        { name: 'National Arena Staging', capacity: '12,500 seats', location: 'Kingston' },
-                        { name: 'O2 Arena London', capacity: '20,000 seats', location: 'United Kingdom' }
-                      ].map((venue, idx) => (
-                        <div key={idx} className="p-3 bg-white/5 border border-white/5 rounded-xl flex justify-between items-center gap-3">
-                          <div>
-                            <strong className="block text-sm text-white">{venue.name}</strong>
-                            <span className="text-xs text-white/50">{venue.location}</span>
+                      {venues.map((venue) => (
+                        <div key={venue.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
+                          <div className="flex justify-between items-start gap-3">
+                            <div>
+                              <strong className="block text-sm text-white">{venue.name}</strong>
+                              <span className="text-xs text-white/50">{venue.location}</span>
+                            </div>
+                            <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-white/60">{venue.capacity}</span>
                           </div>
-                          <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-white/60">{venue.capacity}</span>
+                          {venue.description && <p className="text-xs text-white/40 line-clamp-2">{venue.description}</p>}
+                          <div className="flex justify-between items-center text-[10px] text-white/50 border-t border-white/5 pt-2 mt-1">
+                            <span>Parking: {venue.parking || 'N/A'}</span>
+                            <div className="flex gap-2">
+                              <button className="text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('venue', 'edit', venue.id)}>
+                                <FileEdit className="w-3 h-3" /> Edit
+                              </button>
+                              <button className="text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('venue', venue.id)}>
+                                <Trash2 className="w-3 h-3" /> Delete
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -696,6 +1377,9 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Artist CRM Profiles</h2>
                   <p className="text-white/50 text-sm">Configure technical riders, biographies, and tour schedules.</p>
                 </div>
+                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('artist', 'create')}>
+                  <Plus className="w-3.5 h-3.5" /> Add Artist
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -708,7 +1392,7 @@ export default function AdminPortal() {
                         <h4 className="font-extrabold text-xl">{art.stage_name}</h4>
                         <span className="text-xs text-[#d4af37] font-semibold">{art.genre}</span>
                       </div>
-                      <span className="ml-auto text-xs bg-white/5 border border-white/10 px-3 py-1 rounded-full text-white/70 uppercase">
+                      <span className="ml-auto text-xs bg-white/5 border border-white/10 px-3 py-1 rounded-full text-white/70 uppercase font-mono">
                         {art.booking_status}
                       </span>
                     </div>
@@ -722,12 +1406,24 @@ export default function AdminPortal() {
 
                     <div className="flex gap-2 mt-4 border-t border-white/5 pt-4">
                       <button 
-                        className="btn flex-1 bg-white/5 hover:bg-white/10 border border-white/10 py-2 rounded-lg text-xs transition font-semibold"
+                        className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 rounded-lg text-xs transition font-semibold"
                         onClick={() => {
                           alert(`Technical Rider: \n${art.technical_rider}\n\nHospitality Rider: \n${art.hospitality_rider}`);
                         }}
                       >
                         Inspect Riders
+                      </button>
+                      <button 
+                        className="btn flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
+                        onClick={() => openCrudPanel('artist', 'edit', art.id)}
+                      >
+                        <FileEdit className="w-3 h-3 text-[#d4af37]" /> Edit Profile
+                      </button>
+                      <button 
+                        className="btn flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
+                        onClick={() => handleDelete('artist', art.id)}
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
                       </button>
                     </div>
                   </div>
@@ -875,15 +1571,14 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Customer CRM Directory</h2>
                   <p className="text-white/50 text-sm">Assign VIP tiers, manage support notes, and track behaviors.</p>
                 </div>
+                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('customer', 'create')}>
+                  <Plus className="w-3.5 h-3.5" /> Add Customer
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { name: 'Joe Bogdanovich', company: 'Sumfest Productions', email: 'joe@reggaesumfest.com', tier: 'VIP Organizer', notes: 'Prefers booking reggae headliners. Fast deposit execution.' },
-                  { name: 'Paul Tollett', company: 'Goldenvoice Coachella', email: 'paul@coachella.com', tier: 'Ultra VIP Promoter', notes: 'Standard US promoter client. Always requires international travel logistics check.' },
-                  { name: 'Michael Eavis', company: 'Glastonbury Festivals', email: 'eavis.client@glastonbury.co.uk', tier: 'Global Partner', notes: 'Requires full compliance check for UK COS certificates.' }
-                ].map((customer, idx) => (
-                  <div key={idx} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-3 shadow-xl">
+                {customers.map((customer) => (
+                  <div key={customer.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-3 shadow-xl">
                     <div className="flex justify-between items-start gap-3">
                       <div>
                         <strong className="block text-lg text-white">{customer.name}</strong>
@@ -896,7 +1591,15 @@ export default function AdminPortal() {
                     <p className="text-xs text-white/60 bg-black/30 p-3 rounded-lg border border-white/5 mt-2">
                       <strong>CRM Behavior Log:</strong> {customer.notes}
                     </p>
-                    <div className="flex justify-end gap-2 mt-2">
+                    <div className="flex justify-between items-center mt-2 border-t border-white/5 pt-2">
+                      <div className="flex gap-3">
+                        <button className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('customer', 'edit', customer.id)}>
+                          <FileEdit className="w-3 h-3" /> Edit
+                        </button>
+                        <button className="text-xs text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('customer', customer.id)}>
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </button>
+                      </div>
                       <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5 rounded-lg text-xs transition" onClick={() => alert(`Opening conversation with ${customer.name}`)}>
                         Contact Client
                       </button>
@@ -1325,6 +2028,9 @@ export default function AdminPortal() {
                   <h2 className="text-3xl font-extrabold tracking-tight">Staff Directories &amp; RBAC Roles</h2>
                   <p className="text-white/50 text-sm">Review staff roles and configure access matrices (RBAC).</p>
                 </div>
+                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('staff', 'create')}>
+                  <Plus className="w-3.5 h-3.5" /> Add Staff Member
+                </button>
               </div>
 
               <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
@@ -1337,24 +2043,27 @@ export default function AdminPortal() {
                         <th className="pb-3">Staff Name</th>
                         <th className="pb-3">Email Address</th>
                         <th className="pb-3">Assigned Role</th>
-                        <th className="pb-3">Security Clearances</th>
-                        <th className="pb-3 text-right">Actions</th>
+                        <th className="pb-3">Status</th>
+                        <th className="pb-3 text-right font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {[
-                        { name: 'Damian Marley', email: 'damian.admin@showtime.com', role: 'Super Admin', clearance: 'All Permissions' },
-                        { name: 'Sarah Silverman', email: 'sarah.agent@showtime.com', role: 'Booking Agent', clearance: 'Events, Artists, Customers' },
-                        { name: 'Robert Livingston', email: 'robert.manager@showtime.com', role: 'Content Manager', clearance: 'Content, Builder, Artists' }
-                      ].map((staff, idx) => (
-                        <tr key={idx} className="text-white/80">
-                          <td className="py-3.5 font-bold">{staff.name}</td>
+                      {users.map((staff) => (
+                        <tr key={staff.id} className="text-white/80">
+                          <td className="py-3.5 font-bold">{staff.first_name} {staff.last_name}</td>
                           <td className="py-3.5 font-mono text-xs">{staff.email}</td>
-                          <td className="py-3.5"><span className="text-xs bg-[#d4af37]/20 text-[#d4af37] px-2 py-0.5 rounded font-semibold">{staff.role}</span></td>
-                          <td className="py-3.5 text-xs text-white/60">{staff.clearance}</td>
-                          <td className="py-3.5 text-right">
-                            <button className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-3 py-1 rounded text-xs transition" onClick={() => alert("Opening security privileges matrix...")}>
-                              Configure Access
+                          <td className="py-3.5">
+                            <span className="text-xs bg-[#d4af37]/20 text-[#d4af37] px-2 py-0.5 rounded font-semibold">{staff.role}</span>
+                          </td>
+                          <td className="py-3.5 text-xs text-white/60">
+                            Status: <span className={staff.status === 'Active' ? 'text-emerald-400' : staff.status === 'Suspended' ? 'text-red-500' : 'text-white/40'}>{staff.status}</span>
+                          </td>
+                          <td className="py-3.5 text-right flex justify-end gap-2">
+                            <button className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-2.5 py-1 rounded text-xs transition" onClick={() => openCrudPanel('staff', 'edit', staff.id)}>
+                              <FileEdit className="w-3.5 h-3.5" />
+                            </button>
+                            <button className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs transition" onClick={() => handleDelete('staff', staff.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
@@ -1820,6 +2529,862 @@ export default function AdminPortal() {
                 <button type="submit" className="px-6 py-2 bg-[#d4af37] text-[#07050e] rounded-full font-bold">Log Inquiry</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── DYNAMIC CRUD SLIDE-OVER DRAWER ── */}
+      {panelOpen && panelType && (
+        <div className="fixed inset-0 z-[4500] bg-black/60 backdrop-blur-sm flex justify-end">
+          {/* Backdrop Click Dismiss */}
+          <div className="absolute inset-0" onClick={() => setPanelOpen(false)} />
+          
+          <div className="relative w-full max-w-md bg-[#0c0a17] border-l border-white/10 h-full overflow-y-auto p-6 md:p-8 flex flex-col gap-6 shadow-2xl animate-slide-in">
+            
+            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+              <div>
+                <h3 className="font-extrabold text-xl capitalize text-[#d4af37]">{panelMode} {panelType}</h3>
+                <p className="text-xs text-white/50">Ensure all details are accurate before saving.</p>
+              </div>
+              <button 
+                className="text-white/40 hover:text-white p-1 rounded-full hover:bg-white/5"
+                onClick={() => setPanelOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 flex flex-col justify-between gap-8">
+              <div className="flex flex-col gap-4 overflow-y-auto text-xs">
+                
+                {/* ── EVENT FORM FIELDS ── */}
+                {panelType === 'event' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Event Title *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={eventForm.event_title} 
+                        onChange={e => setEventForm({ ...eventForm, event_title: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Client / Promoter Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={eventForm.client_name} 
+                        onChange={e => setEventForm({ ...eventForm, client_name: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Select Assigned Artist *</label>
+                      <select 
+                        required 
+                        value={eventForm.artist_id}
+                        onChange={e => setEventForm({ ...eventForm, artist_id: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="">-- Choose Artist --</option>
+                        {artists.map(a => <option key={a.id} value={a.id}>{a.stage_name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Event Date *</label>
+                        <input 
+                          type="date" 
+                          required 
+                          value={eventForm.event_date} 
+                          onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Country *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={eventForm.event_country} 
+                          onChange={e => setEventForm({ ...eventForm, event_country: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Venue Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={eventForm.event_venue} 
+                        onChange={e => setEventForm({ ...eventForm, event_venue: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Total Amount (USD) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={eventForm.total_amount} 
+                          onChange={e => setEventForm({ ...eventForm, total_amount: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Deposit Amount (USD) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={eventForm.deposit_amount} 
+                          onChange={e => setEventForm({ ...eventForm, deposit_amount: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Status *</label>
+                      <select 
+                        required 
+                        value={eventForm.status} 
+                        onChange={e => setEventForm({ ...eventForm, status: e.target.value as any })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="Inquiry">Inquiry</option>
+                        <option value="Proposal Generated">Proposal Generated</option>
+                        <option value="Contract Sent">Contract Sent</option>
+                        <option value="Deposit Paid">Deposit Paid</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <ImageUploader 
+                      label="Event Banner Image" 
+                      value={eventForm.artist_image} 
+                      onChange={base64 => setEventForm({ ...eventForm, artist_image: base64 })} 
+                    />
+                  </>
+                )}
+
+                {/* ── VENUE FORM FIELDS ── */}
+                {panelType === 'venue' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Venue Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={venueForm.name} 
+                        onChange={e => setVenueForm({ ...venueForm, name: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Capacity *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={venueForm.capacity} 
+                        onChange={e => setVenueForm({ ...venueForm, capacity: e.target.value })}
+                        placeholder="e.g. 15,000 seats"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Location / City *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={venueForm.location} 
+                        onChange={e => setVenueForm({ ...venueForm, location: e.target.value })}
+                        placeholder="e.g. Kingston, Jamaica"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Parking Details</label>
+                      <input 
+                        type="text" 
+                        value={venueForm.parking} 
+                        onChange={e => setVenueForm({ ...venueForm, parking: e.target.value })}
+                        placeholder="e.g. 2,000 cars"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Description</label>
+                      <textarea 
+                        rows={3} 
+                        value={venueForm.description} 
+                        onChange={e => setVenueForm({ ...venueForm, description: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* ── ARTIST FORM FIELDS ── */}
+                {panelType === 'artist' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Stage Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={artistForm.stage_name} 
+                        onChange={e => setArtistForm({ ...artistForm, stage_name: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Legal Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={artistForm.legal_name} 
+                        onChange={e => setArtistForm({ ...artistForm, legal_name: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Category *</label>
+                        <select 
+                          required 
+                          value={artistForm.category}
+                          onChange={e => setArtistForm({ ...artistForm, category: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Reggae Artists">Reggae</option>
+                          <option value="Dancehall Artists">Dancehall</option>
+                          <option value="DJs">DJs &amp; Selectors</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Genre *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={artistForm.genre} 
+                          onChange={e => setArtistForm({ ...artistForm, genre: e.target.value })}
+                          placeholder="e.g. Roots Reggae"
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Bio *</label>
+                      <textarea 
+                        rows={3} 
+                        required 
+                        value={artistForm.bio} 
+                        onChange={e => setArtistForm({ ...artistForm, bio: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Booking Status *</label>
+                        <select 
+                          required 
+                          value={artistForm.booking_status}
+                          onChange={e => setArtistForm({ ...artistForm, booking_status: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Available">Available</option>
+                          <option value="Booked">Booked</option>
+                          <option value="On Tour">On Tour</option>
+                          <option value="On Hold">On Hold</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Availability *</label>
+                        <select 
+                          required 
+                          value={artistForm.availability_status}
+                          onChange={e => setArtistForm({ ...artistForm, availability_status: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Technical Rider Details</label>
+                      <textarea 
+                        rows={2} 
+                        value={artistForm.technical_rider} 
+                        onChange={e => setArtistForm({ ...artistForm, technical_rider: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Hospitality Rider Details</label>
+                      <textarea 
+                        rows={2} 
+                        value={artistForm.hospitality_rider} 
+                        onChange={e => setArtistForm({ ...artistForm, hospitality_rider: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <ImageUploader 
+                        label="Profile Image" 
+                        value={artistForm.profile_image} 
+                        onChange={base64 => setArtistForm({ ...artistForm, profile_image: base64 })} 
+                      />
+                      <ImageUploader 
+                        label="Cover Image" 
+                        value={artistForm.cover_image} 
+                        onChange={base64 => setArtistForm({ ...artistForm, cover_image: base64 })} 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* ── CUSTOMER FORM FIELDS ── */}
+                {panelType === 'customer' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Customer Contact Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={customerForm.name} 
+                        onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Company Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={customerForm.company} 
+                        onChange={e => setCustomerForm({ ...customerForm, company: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Email Address *</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={customerForm.email} 
+                        onChange={e => setCustomerForm({ ...customerForm, email: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">VIP Group / Tier *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={customerForm.tier} 
+                        onChange={e => setCustomerForm({ ...customerForm, tier: e.target.value })}
+                        placeholder="e.g. VIP Organizer"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">CRM / Booking Log Notes</label>
+                      <textarea 
+                        rows={4} 
+                        value={customerForm.notes} 
+                        onChange={e => setCustomerForm({ ...customerForm, notes: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* ── STAFF FORM FIELDS ── */}
+                {panelType === 'staff' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">First Name *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={staffForm.first_name} 
+                          onChange={e => setStaffForm({ ...staffForm, first_name: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Last Name *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={staffForm.last_name} 
+                          onChange={e => setStaffForm({ ...staffForm, last_name: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Email Address *</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={staffForm.email} 
+                        onChange={e => setStaffForm({ ...staffForm, email: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Assigned Role *</label>
+                        <select 
+                          required 
+                          value={staffForm.role}
+                          onChange={e => setStaffForm({ ...staffForm, role: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Super Admin">Super Admin</option>
+                          <option value="Owner">Owner</option>
+                          <option value="Finance Manager">Finance Manager</option>
+                          <option value="Marketing Manager">Marketing Manager</option>
+                          <option value="Content Manager">Content Manager</option>
+                          <option value="Support Agent">Support Agent</option>
+                          <option value="Promoter">Promoter</option>
+                          <option value="Venue Manager">Venue Manager</option>
+                          <option value="Booking Agent">Booking Agent</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Status *</label>
+                        <select 
+                          required 
+                          value={staffForm.status}
+                          onChange={e => setStaffForm({ ...staffForm, status: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Suspended">Suspended</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── TICKET FORM FIELDS ── */}
+                {panelType === 'ticket' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Tier Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={ticketForm.name} 
+                        onChange={e => setTicketForm({ ...ticketForm, name: e.target.value })}
+                        placeholder="e.g. General Admission"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Price (USD) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={ticketForm.price} 
+                          onChange={e => setTicketForm({ ...ticketForm, price: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Capacity *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={ticketForm.capacity} 
+                          onChange={e => setTicketForm({ ...ticketForm, capacity: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Description *</label>
+                      <textarea 
+                        rows={3} 
+                        required 
+                        value={ticketForm.desc} 
+                        onChange={e => setTicketForm({ ...ticketForm, desc: e.target.value })}
+                        placeholder="Standard gate access..."
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* ── PROMO CODE FORM FIELDS ── */}
+                {panelType === 'promo' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Promo Code Title *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={promoForm.code} 
+                        onChange={e => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
+                        placeholder="e.g. SUMFEST2026"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono uppercase" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Discount Value (%) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={promoForm.discount} 
+                          onChange={e => setPromoForm({ ...promoForm, discount: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Expiry Date *</label>
+                        <input 
+                          type="date" 
+                          required 
+                          value={promoForm.expiry} 
+                          onChange={e => setPromoForm({ ...promoForm, expiry: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Active Status</label>
+                      <select 
+                        value={promoForm.active ? 'true' : 'false'} 
+                        onChange={e => setPromoForm({ ...promoForm, active: e.target.value === 'true' })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* ── ORDER/INVOICE FORM FIELDS ── */}
+                {panelType === 'order' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Select Event/Booking Link *</label>
+                      <select 
+                        required 
+                        value={orderForm.booking_id} 
+                        onChange={e => setOrderForm({ ...orderForm, booking_id: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="">-- Choose Booking --</option>
+                        {bookings.map(b => <option key={b.id} value={b.id}>{b.event_title} ({b.client_name})</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Total Amount (USD) *</label>
+                        <input 
+                          type="number" 
+                          required 
+                          value={orderForm.amount} 
+                          onChange={e => setOrderForm({ ...orderForm, amount: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Due Date *</label>
+                        <input 
+                          type="date" 
+                          required 
+                          value={orderForm.due_date} 
+                          onChange={e => setOrderForm({ ...orderForm, due_date: e.target.value })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Invoice Status *</label>
+                      <select 
+                        value={orderForm.status} 
+                        onChange={e => setOrderForm({ ...orderForm, status: e.target.value as any })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="Paid">Paid</option>
+                        <option value="Unpaid">Unpaid</option>
+                        <option value="Partially Paid">Partially Paid</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* ── CAMPAIGN FORM FIELDS ── */}
+                {panelType === 'campaign' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Campaign Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={campaignForm.name} 
+                        onChange={e => setCampaignForm({ ...campaignForm, name: e.target.value })}
+                        placeholder="e.g. Koffee Sumfest Promotion"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Broadcast Channel *</label>
+                        <select 
+                          value={campaignForm.type} 
+                          onChange={e => setCampaignForm({ ...campaignForm, type: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Email">Email</option>
+                          <option value="SMS">SMS</option>
+                          <option value="Push">Push Announcement</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Audience Segment *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          value={campaignForm.segment} 
+                          onChange={e => setCampaignForm({ ...campaignForm, segment: e.target.value })}
+                          placeholder="e.g. VIP Ticket Buyers Only"
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    </div>
+                    {campaignForm.type === 'Email' && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Email Subject Line *</label>
+                        <input 
+                          type="text" 
+                          required={campaignForm.type === 'Email'}
+                          value={campaignForm.subject} 
+                          onChange={e => setCampaignForm({ ...campaignForm, subject: e.target.value })}
+                          placeholder="Announcing new acts!"
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Broadcast Message Body *</label>
+                      <textarea 
+                        rows={5} 
+                        required 
+                        value={campaignForm.content} 
+                        onChange={e => setCampaignForm({ ...campaignForm, content: e.target.value })}
+                        placeholder="Draft the message content..."
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* ── AD PLACEMENT FORM FIELDS ── */}
+                {panelType === 'ad' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Placement Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={adForm.name} 
+                        onChange={e => setAdForm({ ...adForm, name: e.target.value })}
+                        placeholder="e.g. Homepage Hero Placement"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Active Status</label>
+                      <select 
+                        value={adForm.active ? 'true' : 'false'} 
+                        onChange={e => setAdForm({ ...adForm, active: e.target.value === 'true' })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                      >
+                        <option value="true">Active Placement</option>
+                        <option value="false">Paused / Inactive</option>
+                      </select>
+                    </div>
+                    <ImageUploader 
+                      label="Placement Banner Media" 
+                      value={adForm.image_url} 
+                      onChange={base64 => setAdForm({ ...adForm, image_url: base64 })} 
+                    />
+                  </>
+                )}
+
+                {/* ── WEBSITE SECTION FORM FIELDS ── */}
+                {panelType === 'section' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Section Type *</label>
+                        <select 
+                          value={sectionForm.type} 
+                          onChange={e => setSectionForm({ ...sectionForm, type: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="hero">Hero Header</option>
+                          <option value="announcement">Announcement Bar</option>
+                          <option value="features">Features Spotlight</option>
+                          <option value="cta">Call to Action</option>
+                          <option value="footer">Footer Info</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Active Status</label>
+                        <select 
+                          value={sectionForm.active ? 'true' : 'false'} 
+                          onChange={e => setSectionForm({ ...sectionForm, active: e.target.value === 'true' })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="true">Visible</option>
+                          <option value="false">Hidden / Draft</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Section Title *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={sectionForm.title} 
+                        onChange={e => setSectionForm({ ...sectionForm, title: e.target.value })}
+                        placeholder="Enter section title..."
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Subtitle</label>
+                      <input 
+                        type="text" 
+                        value={sectionForm.subtitle} 
+                        onChange={e => setSectionForm({ ...sectionForm, subtitle: e.target.value })}
+                        placeholder="Enter subtitle..."
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Content Body / Description</label>
+                      <textarea 
+                        rows={3} 
+                        value={sectionForm.content} 
+                        onChange={e => setSectionForm({ ...sectionForm, content: e.target.value })}
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    {['hero', 'cta'].includes(sectionForm.type) && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Action Button Text</label>
+                        <input 
+                          type="text" 
+                          value={sectionForm.buttonText} 
+                          onChange={e => setSectionForm({ ...sectionForm, buttonText: e.target.value })}
+                          placeholder="e.g. Learn More"
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                        />
+                      </div>
+                    )}
+                    {['hero', 'cta', 'features'].includes(sectionForm.type) && (
+                      <ImageUploader 
+                        label="Section Background / Card Graphic" 
+                        value={sectionForm.image_url} 
+                        onChange={base64 => setSectionForm({ ...sectionForm, image_url: base64 })} 
+                      />
+                    )}
+                  </>
+                )}
+
+                {/* ── INTEGRATION FORM FIELDS ── */}
+                {panelType === 'integration' && (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">Integration Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={integrationForm.name} 
+                        onChange={e => setIntegrationForm({ ...integrationForm, name: e.target.value })}
+                        placeholder="e.g. Stripe Payment Gateway"
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Provider *</label>
+                        <select 
+                          value={integrationForm.provider} 
+                          onChange={e => setIntegrationForm({ ...integrationForm, provider: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Stripe">Stripe</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Twilio">Twilio</option>
+                          <option value="SendGrid">SendGrid</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-white/50 font-semibold">Connection Status</label>
+                        <select 
+                          value={integrationForm.status} 
+                          onChange={e => setIntegrationForm({ ...integrationForm, status: e.target.value as any })}
+                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
+                        >
+                          <option value="Connected">Connected</option>
+                          <option value="Disconnected">Disconnected</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-white/50 font-semibold">API Private Key / SID *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={integrationForm.api_key} 
+                        onChange={e => setIntegrationForm({ ...integrationForm, api_key: e.target.value })}
+                        placeholder="e.g. sk_live_..."
+                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
+                      />
+                    </div>
+                  </>
+                )}
+
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 border-t border-white/10 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setPanelOpen(false)}
+                  className="btn flex-1 bg-[#16122c] border border-white/10 py-3 rounded-full text-xs font-semibold transition text-center hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn flex-1 bg-[#d4af37] text-[#07050e] hover:scale-105 py-3 rounded-full text-xs font-extrabold transition text-center"
+                >
+                  Save Changes
+                </button>
+              </div>
+
+            </form>
+
           </div>
         </div>
       )}
