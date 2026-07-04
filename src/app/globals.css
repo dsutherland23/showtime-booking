@@ -295,6 +295,11 @@ select:focus {
   box-shadow: 0 0 0 3.5px rgba(0, 113, 227, 0.2);
 }
 
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 /* Modern base-select for Chrome 135+ */
 @supports (appearance: base-select) {
   select {
@@ -306,13 +311,13 @@ select:focus {
   select, select::picker(select) { appearance: base-select; }
 
   select::picker(select) {
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(12, 10, 23, 0.96);
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 14px;
     padding: 6px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   select option {
@@ -321,17 +326,19 @@ select:focus {
     font-family: var(--font-body);
     font-size: 0.875rem;
     color: var(--text-primary);
+    background-color: transparent;
     cursor: pointer;
   }
 
   select option:hover {
-    background: rgba(0, 113, 227, 0.08);
+    background: rgba(212, 175, 55, 0.15);
     color: var(--accent);
   }
 
   select option:checked {
     background: var(--accent);
-    color: #ffffff;
+    color: var(--bg-primary);
+    font-weight: 600;
   }
 }
 

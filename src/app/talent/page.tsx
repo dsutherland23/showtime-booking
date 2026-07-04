@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, Music, MapPin, DollarSign, Filter } from 'lucide-react';
+import { Search, SlidersHorizontal, Music, MapPin, DollarSign, Filter, X, Upload } from 'lucide-react';
 
 // Pricing tiers for artists
 const ARTIST_PRICING: Record<string, { fee: number; tier: string }> = {
@@ -15,9 +16,46 @@ const ARTIST_PRICING: Record<string, { fee: number; tier: string }> = {
   'art-rodigan': { fee: 20000, tier: '$' }
 };
 
+// Deterministic fallback pricing for seed / dynamically added artists
+const getArtistPricing = (id: string, category: string): { fee: number; tier: string } => {
+  if (ARTIST_PRICING[id]) return ARTIST_PRICING[id];
+  
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const factor = Math.abs(hash % 10);
+  
+  let fee = 15000;
+  let tier = '$$';
+  
+  if (category === 'Reggae Artists' || category === 'Dancehall Artists') {
+    fee = 35000 + factor * 10000;
+    tier = fee > 80000 ? '$$$$' : fee > 50000 ? '$$$' : '$$';
+  } else if (category === 'DJs') {
+    fee = 10000 + factor * 3000;
+    tier = fee > 30000 ? '$$$' : fee > 18000 ? '$$' : '$';
+  } else if (category === 'Bands') {
+    fee = 20000 + factor * 5000;
+    tier = fee > 50000 ? '$$$' : '$$';
+  } else if (category === 'Dancers') {
+    fee = 3000 + factor * 1000;
+    tier = fee > 8000 ? '$$' : '$';
+  } else if (category === 'Hosts') {
+    fee = 5000 + factor * 1500;
+    tier = fee > 12000 ? '$$' : '$';
+  } else {
+    fee = 10000 + factor * 2000;
+    tier = '$$';
+  }
+  
+  return { fee, tier };
+};
+
 const TalentDirectoryContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { hasPermission } = useAuth();
   
   const [artists, setArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
@@ -25,23 +63,42 @@ const TalentDirectoryContent = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [budgetTier, setBudgetTier] = useState('All');
 
+  // Form state for creating new artist
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const [stageName, setStageName] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [category, setCategory] = useState('Dancehall Artists');
+  const [genre, setGenre] = useState('');
+  const [bio, setBio] = useState('');
+  const [profileImageBase64, setProfileImageBase64] = useState('');
+  const [techRider, setTechRider] = useState('');
+  const [hospRider, setHospRider] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const canManage = hasPermission('manage_artists');
+
   // Sync category filter from URL params (e.g. from Home page)
   useEffect(() => {
     const cat = searchParams.get('category');
     if (cat) {
-      if (cat.toLowerCase().includes('reggae')) setSelectedCategory('Reggae Artists');
-      else if (cat.toLowerCase().includes('dancehall')) setSelectedCategory('Dancehall Artists');
-      else if (cat.toLowerCase().includes('dj')) setSelectedCategory('DJs');
+      const lower = cat.toLowerCase();
+      if (lower.includes('reggae')) setSelectedCategory('Reggae Artists');
+      else if (lower.includes('dancehall')) setSelectedCategory('Dancehall Artists');
+      else if (lower.includes('dj')) setSelectedCategory('DJs');
+      else if (lower.includes('band')) setSelectedCategory('Bands');
+      else if (lower.includes('dancer')) setSelectedCategory('Dancers');
+      else if (lower.includes('host')) setSelectedCategory('Hosts');
     }
   }, [searchParams]);
 
   // Load artists
+  const loadArtists = async () => {
+    const all = await db.getArtists();
+    setArtists(all);
+    setFilteredArtists(all);
+  };
+
   useEffect(() => {
-    const loadArtists = async () => {
-      const all = await db.getArtists();
-      setArtists(all);
-      setFilteredArtists(all);
-    };
     loadArtists();
   }, []);
 
@@ -68,8 +125,7 @@ const TalentDirectoryContent = () => {
     // Budget Filter
     if (budgetTier !== 'All') {
       result = result.filter(a => {
-        const pricing = ARTIST_PRICING[a.id];
-        if (!pricing) return true;
+        const pricing = getArtistPricing(a.id, a.category);
         const fee = pricing.fee;
         if (budgetTier === 'tier-1') return fee < 30000;
         if (budgetTier === 'tier-2') return fee >= 30000 && fee <= 80000;
@@ -81,6 +137,112 @@ const TalentDirectoryContent = () => {
     setFilteredArtists(result);
   }, [searchQuery, selectedCategory, budgetTier, artists]);
 
+  // Fallback for dialog click dismiss (click on backdrop closes)
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const handleBackdropClick = (event: MouseEvent) => {
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        if (event.target !== dialog) return;
+        const rect = dialog.getBoundingClientRect();
+        const isDialogContent = (
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width
+        );
+        if (!isDialogContent) {
+          dialog.close();
+        }
+      }
+    };
+
+    dialog.addEventListener('click', handleBackdropClick);
+    return () => {
+      dialog.removeEventListener('click', handleBackdropClick);
+    };
+  }, []);
+
+  // Handle local image file read
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImageBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Submit form to create talent
+  const handleAddTalentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!stageName.trim()) {
+      setFormError('Stage Name is required');
+      return;
+    }
+
+    // Choose default cover and profile pictures based on category if not uploaded
+    let finalProfileImage = profileImageBase64;
+    let finalCoverImage = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200';
+
+    if (!finalProfileImage) {
+      if (category === 'Reggae Artists') {
+        finalProfileImage = '/images/artist_reggae.jpg';
+        finalCoverImage = 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200';
+      } else if (category === 'DJs') {
+        finalProfileImage = '/images/artist_dj.jpg';
+        finalCoverImage = 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200';
+      } else if (category === 'Bands') {
+        finalProfileImage = '/images/concert_stage.jpg';
+      } else if (category === 'Dancers') {
+        finalProfileImage = '/images/hero_ambient.jpg';
+        finalCoverImage = 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200';
+      } else {
+        finalProfileImage = '/images/artist_dancehall.jpg';
+        finalCoverImage = 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200';
+      }
+    }
+
+    try {
+      await db.createArtist({
+        stage_name: stageName,
+        legal_name: legalName || stageName,
+        category,
+        genre: genre || category.replace(' Artists', ''),
+        bio: bio || `${stageName} is an elite professional performer available for global booking.`,
+        profile_image: finalProfileImage,
+        cover_image: finalCoverImage,
+        booking_status: 'Available',
+        availability_status: 'Active',
+        technical_rider: techRider,
+        hospitality_rider: hospRider
+      });
+
+      // Reset form fields
+      setStageName('');
+      setLegalName('');
+      setGenre('');
+      setBio('');
+      setProfileImageBase64('');
+      setTechRider('');
+      setHospRider('');
+      
+      // Close modal and refresh list
+      if (dialogRef.current) {
+        dialogRef.current.close();
+      }
+      await loadArtists();
+    } catch (err) {
+      console.error(err);
+      setFormError('Failed to create artist profile. Please try again.');
+    }
+  };
+
   return (
     <div className="talent-directory-container container">
       {/* Page Header */}
@@ -88,6 +250,17 @@ const TalentDirectoryContent = () => {
         <span className="gold-badge">Showtime Roster</span>
         <h2>Talent Directory</h2>
         <p>Browse our curated roster of leading Reggae, Dancehall, and live performers available for global bookings.</p>
+        
+        {canManage && (
+          <button 
+            className="btn btn-primary"
+            style={{ marginTop: '1.25rem', padding: '0.6rem 1.5rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            onClick={() => dialogRef.current?.showModal()}
+            id="open-add-dialog-btn"
+          >
+            + Add New Talent
+          </button>
+        )}
       </div>
 
       {/* Interactive Filtering Panel */}
@@ -99,6 +272,7 @@ const TalentDirectoryContent = () => {
             placeholder="Search artists by name, genre, keywords..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search talent directory"
           />
         </div>
 
@@ -114,6 +288,9 @@ const TalentDirectoryContent = () => {
               <option value="Reggae Artists">Reggae Artists</option>
               <option value="Dancehall Artists">Dancehall Artists</option>
               <option value="DJs">DJs & Sound Systems</option>
+              <option value="Bands">Bands</option>
+              <option value="Dancers">Dancers</option>
+              <option value="Hosts">Hosts</option>
             </select>
           </div>
 
@@ -137,7 +314,7 @@ const TalentDirectoryContent = () => {
       {filteredArtists.length > 0 ? (
         <div className="grid-3 directory-grid">
           {filteredArtists.map((artist) => {
-            const pricing = ARTIST_PRICING[artist.id];
+            const pricing = getArtistPricing(artist.id, artist.category);
             return (
               <div key={artist.id} className="luxury-card artist-card animate-fade">
                 <div className="artist-image-container">
@@ -198,6 +375,146 @@ const TalentDirectoryContent = () => {
           </button>
         </div>
       )}
+
+      {/* Modern Dialog Modal for Adding Talent */}
+      <dialog 
+        ref={dialogRef} 
+        id="add-talent-dialog" 
+        className="admin-modal" 
+        closedby="any"
+        aria-labelledby="dialogTitle"
+      >
+        <div className="modal-header">
+          <h3 id="dialogTitle">Add New Talent Roster</h3>
+          <button 
+            type="button" 
+            className="btn-close-modal" 
+            onClick={() => dialogRef.current?.close()}
+            aria-label="Close dialog"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleAddTalentSubmit} className="form-grid">
+          {formError && <p className="form-row-full error-text">{formError}</p>}
+          
+          <div className="form-group">
+            <label htmlFor="stageNameInput">Stage Name *</label>
+            <input 
+              id="stageNameInput" 
+              type="text" 
+              value={stageName} 
+              onChange={(e) => setStageName(e.target.value)} 
+              placeholder="e.g. Beenie Man" 
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="legalNameInput">Legal Name</label>
+            <input 
+              id="legalNameInput" 
+              type="text" 
+              value={legalName} 
+              onChange={(e) => setLegalName(e.target.value)} 
+              placeholder="e.g. Moses Davis"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="categorySelect">Category</label>
+            <select 
+              id="categorySelect" 
+              value={category} 
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="Reggae Artists">Reggae Artists</option>
+              <option value="Dancehall Artists">Dancehall Artists</option>
+              <option value="DJs">DJs & Sound Systems</option>
+              <option value="Bands">Bands</option>
+              <option value="Dancers">Dancers</option>
+              <option value="Hosts">Hosts</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="genreInput">Genre / Style</label>
+            <input 
+              id="genreInput" 
+              type="text" 
+              value={genre} 
+              onChange={(e) => setGenre(e.target.value)} 
+              placeholder="e.g. Roots Reggae, Trap Dancehall"
+            />
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="bioInput">Biography Description</label>
+            <textarea 
+              id="bioInput" 
+              value={bio} 
+              onChange={(e) => setBio(e.target.value)} 
+              placeholder="Enter career details, achievements, background story..."
+              rows={3}
+            />
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="imageFileInput">Profile Picture Upload</label>
+            <div className="file-upload-wrapper">
+              <Upload className="w-5 h-5 text-amber-500" />
+              <input 
+                id="imageFileInput" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageUpload}
+              />
+            </div>
+            {profileImageBase64 && (
+              <div className="preview-img-container">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={profileImageBase64} alt="Preview" className="preview-img" />
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="techRiderInput">Technical Rider Summary</label>
+            <textarea 
+              id="techRiderInput" 
+              value={techRider} 
+              onChange={(e) => setTechRider(e.target.value)} 
+              placeholder="Sound requirements, backline details..."
+              rows={2}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="hospRiderInput">Hospitality Rider Summary</label>
+            <textarea 
+              id="hospRiderInput" 
+              value={hospRider} 
+              onChange={(e) => setHospRider(e.target.value)} 
+              placeholder="Hotel requirements, dressing room details..."
+              rows={2}
+            />
+          </div>
+
+          <div className="modal-actions form-row-full">
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => dialogRef.current?.close()}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Save Talent
+            </button>
+          </div>
+        </form>
+      </dialog>
 
       <style jsx>{`
         .talent-directory-container {
@@ -465,6 +782,149 @@ const TalentDirectoryContent = () => {
           font-size: 0.9rem;
           margin-bottom: var(--spacing-sm);
         }
+
+        /* Dialog Modal Styling */
+        dialog.admin-modal {
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(12, 10, 23, 0.96);
+          backdrop-filter: blur(25px);
+          border-radius: var(--radius-lg);
+          padding: 2.25rem;
+          color: var(--text-primary);
+          max-width: 600px;
+          width: 90%;
+          margin: auto;
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+          overflow-y: auto;
+          max-height: 90vh;
+        }
+
+        dialog.admin-modal::backdrop {
+          background-color: rgba(7, 5, 14, 0.75);
+          backdrop-filter: blur(8px);
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+          padding-bottom: 0.75rem;
+        }
+
+        .modal-header h3 {
+          font-size: 1.25rem;
+          color: var(--gold-primary);
+        }
+
+        .btn-close-modal {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          font-size: 1.5rem;
+          cursor: pointer;
+          line-height: 1;
+        }
+
+        .btn-close-modal:hover {
+          color: var(--color-error);
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1.25rem;
+        }
+
+        @media (min-width: 480px) {
+          .form-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .form-row-full {
+            grid-column: span 2;
+          }
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .form-group label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-sm);
+          color: #ffffff;
+          font-size: 0.9rem;
+          width: 100%;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+          border-color: var(--gold-primary);
+          outline: none;
+          background: rgba(255, 255, 255, 0.07);
+        }
+
+        .file-upload-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px dashed rgba(255, 255, 255, 0.15);
+          border-radius: var(--radius-sm);
+          position: relative;
+          cursor: pointer;
+        }
+
+        .file-upload-wrapper input[type="file"] {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+        }
+
+        .preview-img-container {
+          margin-top: 0.5rem;
+          border-radius: var(--radius-sm);
+          overflow: hidden;
+          width: 100px;
+          height: 75px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .preview-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .error-text {
+          color: var(--color-error);
+          font-size: 0.85rem;
+          font-weight: 550;
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 1rem;
+          margin-top: 2rem;
+        }
       `}</style>
     </div>
   );
@@ -477,3 +937,4 @@ export default function TalentDirectory() {
     </Suspense>
   );
 }
+

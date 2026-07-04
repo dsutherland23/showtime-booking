@@ -323,6 +323,610 @@ const SEED_ARTISTS: Artist[] = [
     ],
     technical_rider: 'Technical: 2 Pioneer CDJ-3000, 1 Pioneer DJM-A9 mixer, 1 wired Shure SM58 microphone, 2 booth monitor wedges adjustable at the booth.',
     hospitality_rider: 'Hospitality: Assorted beers (Red Stripe), sparkling water, Earl Grey tea bags, fresh milk, 2 clean towels, small plate of sandwiches (vegetarian options included).'
+  },
+  {
+    id: 'art-skeng',
+    stage_name: 'Skeng',
+    legal_name: 'Kevon Douglas',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Trap',
+    bio: 'Skeng is a leading voice in contemporary Jamaican dancehall, known for his dark, high-energy tracks and viral anthems like "Gvnman Shift" and "Lollipop".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    socials: { Instagram: { url: 'https://instagram.com/skengdon', followers: 980000 } }
+  },
+  {
+    id: 'art-shaneil-muir',
+    stage_name: 'Shaneil Muir',
+    legal_name: 'Shaneil Muir',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Reggae / Soul',
+    bio: 'Shaneil Muir is a powerhouse vocalist who rose to fame with her inspirational anthem "Yamabella", blending gospel-infused passion with heavy dancehall rhythms.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    socials: { Instagram: { url: 'https://instagram.com/shaneilmuir', followers: 450000 } }
+  },
+  {
+    id: 'art-rajah-wild',
+    stage_name: 'Rajah Wild',
+    legal_name: 'Rajah Wild',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Rajah Wild is a prominent member of the new wave of dancehall, known for his unique vocal styling, melodic delivery, and viral hits like "Wild Out".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-450',
+    stage_name: '450',
+    legal_name: '450',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / R&B',
+    bio: '450 is a Jamaican dancehall artist celebrated for his smooth, introspective lyrics and melodic approach to topics of relationship, struggle, and ambition.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-jada-kingdom',
+    stage_name: 'Jada Kingdom',
+    legal_name: 'Jada Kingdom',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / R&B',
+    bio: 'Jada Kingdom, also known as "Twinkle", is a Jamaican singer-songwriter recognized for her distinctive voice, blending dancehall, reggae, and contemporary R&B.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    socials: { Instagram: { url: 'https://instagram.com/jadakingdom', followers: 2300000 } }
+  },
+  {
+    id: 'art-govana',
+    stage_name: 'Govana',
+    legal_name: 'Govana',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Govana (formerly Deablo) is a seasoned Jamaican dancehall artist and lyricist, widely respected for his storytelling ability and hits like "Bake Bean" and "Gyal Thief".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-stalk-ashley',
+    stage_name: 'Stalk Ashley',
+    legal_name: 'Stalk Ashley',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / R&B',
+    bio: 'Stalk Ashley is a contemporary Jamaican singer blending sultry R&B textures with dancehall rhythms, known for hits like "Young" and "Desert".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-iwatta',
+    stage_name: 'Iwatta',
+    legal_name: 'Iwatta',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Iwatta is a high-energy dancehall selector and artist known for his vibrant style and popular singles in the Caribbean underground.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-intence',
+    stage_name: 'Intence',
+    legal_name: 'Tashawn George Gabbidon',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Intence (Yeng Boss) is a popular Jamaican dancehall artist known for his eccentric style, unique cadence, and massive street anthems like "Go Hard".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-mr-lexx',
+    stage_name: 'Mr Lexx',
+    legal_name: 'Lexus Palmer',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Classic',
+    bio: 'Mr. Lexx (formerly Lexxus) is a legendary dancehall veteran who ruled the late 90s and 2000s with energetic dancehall classics like "Full Hundred" and "Ring Mi Cell".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-chronic-law',
+    stage_name: 'Chronic Law',
+    legal_name: 'Akeeme Campbell',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Reggae',
+    bio: 'Chronic Law is a prolific Jamaican singjay, widely known as a voice of the streets with hit songs focusing on hardship, loyalty, and survival.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-alkaline',
+    stage_name: 'Alkaline',
+    legal_name: 'Earlan Bartley',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Alkaline is one of the most influential and chart-topping dancehall artists of the modern era, known for his boundary-pushing lyrics and loyal global fanbase.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-valiant',
+    stage_name: 'Valiant',
+    legal_name: 'Valiant',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Trap',
+    bio: 'Valiant is a leading figure in the Jamaican "Trap Dancehall" movement, soaring to viral fame with hits like "Dunce Cheque" and "North Carolina".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-aidonia',
+    stage_name: 'Aidonia',
+    legal_name: 'Sheldon Lawrence',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Aidonia is an elite dancehall artist and leader of the J.O.P. camp, celebrated for his exceptional flow, lyrical dexterity, and club anthems.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-agent-sasco',
+    stage_name: 'Agent Sasco',
+    legal_name: 'Jeffrey Campbell',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Dancehall',
+    bio: 'Agent Sasco (Assassin) is a highly respected Jamaican artist known for his powerful baritone voice, conscious lyrics, and collaborations with Kanye West and Kendrick Lamar.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-taurus-riley',
+    stage_name: 'Taurus Riley',
+    legal_name: 'Tarrus Riley',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Lovers Rock',
+    bio: 'Tarrus Riley is an acclaimed reggae singer and songwriter, known for his classic hits like "She\'s Royal" and "Good Girl Gone Bad".',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-vgn',
+    stage_name: 'VGN',
+    legal_name: 'Very Good Network',
+    category: 'Dancers',
+    genre: 'Dance Performance',
+    bio: 'VGN (Very Good Network) is a premier Caribbean dance group known for choreographing high-impact dancehall routines and performing at global stage shows.',
+    profile_image: '/images/hero_ambient.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-patrice-roberts',
+    stage_name: 'Patrice Roberts',
+    legal_name: 'Patrice Roberts',
+    category: 'Reggae Artists',
+    genre: 'Soca / Carnival',
+    bio: 'Patrice Roberts is a Trinidadian soca powerhouse, beloved for her infectious carnival anthems, stunning vocals, and high-energy live shows.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-spice',
+    stage_name: 'Spice',
+    legal_name: 'Grace Hamilton',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Spice is the undisputed "Queen of Dancehall", known for her extravagant performances, colorful wigs, and chart-topping hits like "So Mi Like It".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-sizzla',
+    stage_name: 'Sizzla',
+    legal_name: 'Miguel Orlando Collins',
+    category: 'Reggae Artists',
+    genre: 'Roots Reggae / Dancehall',
+    bio: 'Sizzla Kalonji is a legendary, highly prolific reggae artist who has released over 70 albums, spearheading the neo-rastafarian movement.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-ruff-kutt-crew',
+    stage_name: 'Ruff Kutt Crew',
+    legal_name: 'Ruff Kutt Crew Band',
+    category: 'Bands',
+    genre: 'Reggae Band / Live Backline',
+    bio: 'Ruff Kutt Crew is Jamaica\'s premier backing band, having toured worldwide providing live instrumentation for elite dancehall and reggae artists.',
+    profile_image: '/images/concert_stage.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-tommy-lee',
+    stage_name: 'Tommy Lee',
+    legal_name: 'Leroy Russell',
+    category: 'Dancehall Artists',
+    genre: 'Gothic Dancehall / Trap',
+    bio: 'Tommy Lee Sparta is a unique Jamaican dancehall artist known for his dark, theatrical style and high-energy performances.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-vanessa-bling',
+    stage_name: 'Vanessa Bling',
+    legal_name: 'Vanessa Bling',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Lovers Rock',
+    bio: 'Vanessa Bling (Gaza Slim) is a popular Jamaican singer-songwriter known for her soulful, romantic dancehall collaborations and solo work.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-stylo-g',
+    stage_name: 'Stylo G',
+    legal_name: 'Jason McDermott',
+    category: 'Dancehall Artists',
+    genre: 'UK Dancehall / Crossover',
+    bio: 'Stylo G is a UK-based Jamaican dancehall artist who bridged the gap between Caribbean music and European club scenes with his hits "My Yout" and "Touch Down".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-bayka',
+    stage_name: 'Bayka',
+    legal_name: 'Bayka',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Bayka is a rising force in the Jamaican trap dancehall space, recognized for his deep voice, dark beats, and sharp lyrical compositions.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-prettii-prettii',
+    stage_name: 'Prettii Prettii',
+    legal_name: 'Prettii Prettii',
+    category: 'Dancers',
+    genre: 'Dancehall Dancer',
+    bio: 'Prettii Prettii is a prominent Jamaican dancer and social media personality, known for creating viral dance steps and performing on international stages.',
+    profile_image: '/images/hero_ambient.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-tc',
+    stage_name: 'TC',
+    legal_name: 'TC',
+    category: 'Dancers',
+    genre: 'Dancehall Dancer',
+    bio: 'TC is an iconic female dancer from Jamaica, a key figure in the female dancehall movement, and a member of the popular "Spice Dancer" alumni.',
+    profile_image: '/images/hero_ambient.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-barbie-j',
+    stage_name: 'Barbie J',
+    legal_name: 'Barbie J',
+    category: 'Dancers',
+    genre: 'Dancehall Dancer / Performer',
+    bio: 'Barbie J is a highly talented Jamaican dancer known for her expressive moves, performance skills, and high-profile music video appearances.',
+    profile_image: '/images/hero_ambient.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-cham',
+    stage_name: 'Cham',
+    legal_name: 'Damian Beckett',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Baby Cham is a veteran dancehall artist known for his crossover hits like "Ghetto Story" and collaborations with international producers like Dave Kelly.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-dexta-daps',
+    stage_name: 'Dexta Daps',
+    legal_name: 'Louis Grandison',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Reggae / Soul',
+    bio: 'Dexta Daps is a popular Jamaican singjay, celebrated for his romantic ballads, soulful voice, and intense live performances that captivate female audiences.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-elephant-man',
+    stage_name: 'Elephant Man',
+    legal_name: 'O\'Neil Bryan',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Energy',
+    bio: 'Elephant Man (The Energy God) is a legendary dancehall artist known for his hyper-active stage shows, colorful hair, and creation of dozens of classic dance moves.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-ayetian',
+    stage_name: 'Ayetian',
+    legal_name: 'Ayetian',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Afrofusion',
+    bio: 'Ayetian is a rising contemporary artist combining traditional reggae rhythms with modern afrofusion elements to create uplifting global sounds.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-mr-killa',
+    stage_name: 'Mr Killa',
+    legal_name: 'Hollice Mapp',
+    category: 'Reggae Artists',
+    genre: 'Soca / Carnival',
+    bio: 'Mr. Killa is a Grenadian Soca artist known for his high-energy, acrobatic performances and massive carnival hits like "Run Wid It".',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-shane-o',
+    stage_name: 'Shane O',
+    legal_name: 'Shane Brown',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Shane O is a talented Jamaican singer-songwriter and veteran lyricist, known for hit songs like "Lightning Flash" and "Partner Draw".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-jahmeil',
+    stage_name: 'Jahmeil',
+    legal_name: 'Jahmiel Foster',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Dancehall',
+    bio: 'Jahmiel is a conscious Jamaican artist known for his soulful, positive anthems detailing struggle, spirituality, and triumph.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-nation-boss',
+    stage_name: 'Nation Boss',
+    legal_name: 'Nation Boss',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Soul',
+    bio: 'Nation Boss is a breakout Jamaican singer who captured global attention with his acoustic viral sensation "Humans", blending deep reggae message with soul.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-9ine',
+    stage_name: '9ine',
+    legal_name: '9ine',
+    category: 'Dancehall Artists',
+    genre: 'Trap Dancehall',
+    bio: '9ine is a fresh voice in the Jamaican dancehall landscape, delivering melodic rap-infused flows over contemporary trap beats.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-iq',
+    stage_name: 'IQ',
+    legal_name: 'IQ',
+    category: 'Dancehall Artists',
+    genre: 'UK Dancehall / Afroswing',
+    bio: 'IQ is a London-based dancehall artist known for blending traditional Jamaican rhythms with UK Afroswing and Drill elements.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-monifa',
+    stage_name: 'Monifa',
+    legal_name: 'Monifa',
+    category: 'Dancers',
+    genre: 'Dance / Host',
+    bio: 'Monifa is a versatile Caribbean dancer and stage host, known for her charismatic personality, event hosting, and energetic dance routines.',
+    profile_image: '/images/hero_ambient.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-chippa-don',
+    stage_name: 'Chippa Don',
+    legal_name: 'Chippa Don',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Chippa Don is a raw, energetic dancehall artist from the Kingston underground, delivering high-octane street anthems.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-kash-promise-move',
+    stage_name: 'Kash Promise Move',
+    legal_name: 'Kash Promise Move',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Kash Promise Move is a rising artist in the Jamaican trap dancehall scene, known for his unique lyrical delivery and melodic singles.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-munga',
+    stage_name: 'Munga',
+    legal_name: 'Munga Honorable',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Munga Honorable is a seasoned Jamaican dancehall star known as the "Gangsta Ras", blending conscious Rastafarian themes with gritty street style.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-demarco',
+    stage_name: 'Demarco',
+    legal_name: 'Collin Demar Edwards',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall / Producer',
+    bio: 'Demarco is a highly successful Jamaican artist, songwriter, and producer, known for global anthems like "I Love My Life" and "Fallen Soldiers".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-dj-flare-chippy',
+    stage_name: 'DJ Flare and Chippy',
+    legal_name: 'DJ Flare & Chippy',
+    category: 'DJs',
+    genre: 'DJs / Selectors',
+    bio: 'DJ Flare and Chippy are a dynamic DJ duo known for their high-energy mixes, seamless transitions, and headlining Caribbean sound clashes.',
+    profile_image: '/images/artist_dj.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-banka-poppi',
+    stage_name: 'Banka and Poppi',
+    legal_name: 'Banka & Poppi',
+    category: 'DJs',
+    genre: 'DJs / Selectors',
+    bio: 'Banka and Poppi are elite selectors and party-starters, bringing authentic dancehall juggling and sound clash energy to clubs worldwide.',
+    profile_image: '/images/artist_dj.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-loyal-squad',
+    stage_name: 'Loyal Squad',
+    legal_name: 'Loyal Squad sound',
+    category: 'DJs',
+    genre: 'DJ Sound System',
+    bio: 'Loyal Squad is a top-tier UK-based reggae and dancehall sound system, known for their dubplate collection and high-octane event juggling.',
+    profile_image: '/images/artist_dj.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-intll-starr',
+    stage_name: 'Intll Starr',
+    legal_name: 'International Starr',
+    category: 'DJs',
+    genre: 'DJ / Producer',
+    bio: 'International Starr is a world-renowned DJ and remix artist, specializing in fusing dancehall, reggae, hip-hop, and house music.',
+    profile_image: '/images/artist_dj.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-younger-melody',
+    stage_name: 'Younger Melody',
+    legal_name: 'Younger Melody',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Soul',
+    bio: 'Younger Melody is a talented reggae singer carrying on the tradition of classical lovers rock and roots message in the modern era.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-singer-j',
+    stage_name: 'Singer J',
+    legal_name: 'Singer J',
+    category: 'Reggae Artists',
+    genre: 'Reggae / Gospel',
+    bio: 'Singer J is a veteran Jamaican reggae singer known for his powerful vocals and hit conscious songs like "Can\'t Stop Me".',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active'
+  },
+  {
+    id: 'art-beenie-man',
+    stage_name: 'Beenie Man',
+    legal_name: 'Moses Davis',
+    category: 'Dancehall Artists',
+    genre: 'Dancehall',
+    bio: 'Beenie Man (The King of Dancehall) is a Grammy-winning icon and one of the most prolific and celebrated dancehall artists of all time, ruling stages since the 1980s.',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    socials: { Instagram: { url: 'https://instagram.com/kingbeenieman', followers: 2000000 } }
   }
 ];
 
@@ -479,7 +1083,24 @@ const getStoreValue = <T>(key: string, seed: T[]): T[] => {
     return seed;
   }
   try {
-    return JSON.parse(raw) as T[];
+    const parsed = JSON.parse(raw) as T[];
+    // Merge new seed items if they don't exist by ID in localStorage
+    if (key === 'st_artists_v2') {
+      const parsedArtists = parsed as unknown as Artist[];
+      const seedArtists = seed as unknown as Artist[];
+      let updated = false;
+      seedArtists.forEach(seedArt => {
+        if (!parsedArtists.some(pa => pa.id === seedArt.id)) {
+          parsedArtists.push(seedArt);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem(key, JSON.stringify(parsedArtists));
+        return parsedArtists as unknown as T[];
+      }
+    }
+    return parsed;
   } catch {
     return seed;
   }

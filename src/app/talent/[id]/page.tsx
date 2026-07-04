@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { 
-  Music, Award, Calendar, MapPin, CheckCircle, FileText, Play, Pause, ChevronLeft, Volume2, Camera, Video
+  Music, Award, Calendar, MapPin, CheckCircle, FileText, Play, Pause, ChevronLeft, Volume2, Camera, Video, Edit2, Trash2, X, Upload
 } from 'lucide-react';
 
 export default function ArtistProfile() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const { hasPermission } = useAuth();
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -26,6 +28,26 @@ export default function ArtistProfile() {
   const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed 5)
   const monthName = "June 2026";
 
+  // Dialog Refs
+  const editDialogRef = useRef<HTMLDialogElement | null>(null);
+  const deleteDialogRef = useRef<HTMLDialogElement | null>(null);
+
+  // Edit form state
+  const [stageName, setStageName] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [category, setCategory] = useState('');
+  const [genre, setGenre] = useState('');
+  const [bio, setBio] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [coverImage, setCoverImage] = useState('');
+  const [bookingStatus, setBookingStatus] = useState<'Available' | 'Booked' | 'On Tour' | 'On Hold'>('Available');
+  const [availabilityStatus, setAvailabilityStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [techRider, setTechRider] = useState('');
+  const [hospRider, setHospRider] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const canManage = hasPermission('manage_artists') || hasPermission('update_profile');
+
   useEffect(() => {
     if (!id) return;
     
@@ -36,6 +58,19 @@ export default function ArtistProfile() {
           setArtist(data);
           const dates = await db.getArtistAvailability(data.id);
           setBlockedDates(dates);
+
+          // Populate edit state
+          setStageName(data.stage_name);
+          setLegalName(data.legal_name || data.stage_name);
+          setCategory(data.category);
+          setGenre(data.genre);
+          setBio(data.bio);
+          setProfileImage(data.profile_image);
+          setCoverImage(data.cover_image);
+          setBookingStatus(data.booking_status);
+          setAvailabilityStatus(data.availability_status);
+          setTechRider(data.technical_rider || '');
+          setHospRider(data.hospitality_rider || '');
         }
       } catch (err) {
         console.error('Failed to load artist:', err);
@@ -46,6 +81,104 @@ export default function ArtistProfile() {
     
     loadArtistData();
   }, [id]);
+
+  // Dialog Backdrop Click Light Dismiss Fallback
+  useEffect(() => {
+    const editDialog = editDialogRef.current;
+    const deleteDialog = deleteDialogRef.current;
+
+    const handleBackdropClick = (dialog: HTMLDialogElement) => (event: MouseEvent) => {
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        if (event.target !== dialog) return;
+        const rect = dialog.getBoundingClientRect();
+        const isDialogContent = (
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width
+        );
+        if (!isDialogContent) {
+          dialog.close();
+        }
+      }
+    };
+
+    const editListener = editDialog ? handleBackdropClick(editDialog) : null;
+    const deleteListener = deleteDialog ? handleBackdropClick(deleteDialog) : null;
+
+    if (editDialog && editListener) editDialog.addEventListener('click', editListener);
+    if (deleteDialog && deleteListener) deleteDialog.addEventListener('click', deleteListener);
+
+    return () => {
+      if (editDialog && editListener) editDialog.removeEventListener('click', editListener);
+      if (deleteDialog && deleteListener) deleteDialog.removeEventListener('click', deleteListener);
+    };
+  }, [artist]);
+
+  // File Upload Handlers
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEditProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!stageName.trim()) {
+      setFormError('Stage Name is required');
+      return;
+    }
+
+    try {
+      const updated = await db.updateArtistProfile(id, {
+        stage_name: stageName,
+        legal_name: legalName,
+        category,
+        genre: genre,
+        bio: bio,
+        profile_image: profileImage,
+        cover_image: coverImage,
+        booking_status: bookingStatus,
+        availability_status: availabilityStatus,
+        technical_rider: techRider,
+        hospitality_rider: hospRider
+      });
+
+      setArtist(updated);
+      editDialogRef.current?.close();
+    } catch (err) {
+      console.error(err);
+      setFormError('Failed to save profile changes.');
+    }
+  };
+
+  const handleDeleteProfileSubmit = async () => {
+    try {
+      await db.deleteArtist(id);
+      deleteDialogRef.current?.close();
+      router.push('/talent');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (loading) {
     return (
@@ -207,6 +340,28 @@ export default function ArtistProfile() {
           {/* Sidebar Action / Stats Column */}
           <div className="profile-sidebar-col">
             
+            {/* Admin Management controls */}
+            {canManage && (
+              <div className="luxury-card admin-controls-card animate-fade">
+                <h3>Management Controls</h3>
+                <p>Modify riders, bio profile details, or remove this talent from active roster.</p>
+                <div className="admin-btn-group">
+                  <button 
+                    className="btn btn-secondary btn-admin"
+                    onClick={() => editDialogRef.current?.showModal()}
+                  >
+                    <Edit2 className="w-4 h-4 mr-2 text-amber-500" /> Edit Profile
+                  </button>
+                  <button 
+                    className="btn btn-danger btn-admin"
+                    onClick={() => deleteDialogRef.current?.showModal()}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete Profile
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Booking Action Box */}
             <div className="luxury-card sidebar-action-card">
               <h3>Secure Booking Slot</h3>
@@ -750,7 +905,419 @@ export default function ArtistProfile() {
         .legend-dot.blocked {
           background: var(--color-error);
         }
+
+        /* Admin Controls */
+        .admin-controls-card {
+          border-color: rgba(168, 85, 247, 0.4);
+          box-shadow: 0 4px 15px rgba(168, 85, 247, 0.1);
+        }
+
+        .admin-controls-card h3 {
+          color: #a855f7;
+          margin-bottom: 8px;
+        }
+
+        .admin-controls-card p {
+          font-size: 0.825rem;
+          margin-bottom: var(--spacing-md);
+        }
+
+        .admin-btn-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .btn-admin {
+          width: 100%;
+          justify-content: center;
+          display: flex;
+          align-items: center;
+        }
+
+        .btn-danger {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.35);
+          color: #ff453a;
+        }
+
+        .btn-danger:hover {
+          background: rgba(239, 68, 68, 0.3);
+          border-color: #ff453a;
+        }
+
+        /* Dialog Modal Styling */
+        dialog.admin-modal {
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(12, 10, 23, 0.96);
+          backdrop-filter: blur(25px);
+          border-radius: var(--radius-lg);
+          padding: 2.25rem;
+          color: var(--text-primary);
+          max-width: 600px;
+          width: 90%;
+          margin: auto;
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+          overflow-y: auto;
+          max-height: 90vh;
+        }
+
+        dialog.admin-modal::backdrop {
+          background-color: rgba(7, 5, 14, 0.75);
+          backdrop-filter: blur(8px);
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+          padding-bottom: 0.75rem;
+        }
+
+        .modal-header h3 {
+          font-size: 1.25rem;
+          color: var(--gold-primary);
+        }
+
+        .btn-close-modal {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          font-size: 1.5rem;
+          cursor: pointer;
+          line-height: 1;
+        }
+
+        .btn-close-modal:hover {
+          color: var(--color-error);
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1.25rem;
+        }
+
+        @media (min-width: 480px) {
+          .form-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .form-row-full {
+            grid-column: span 2;
+          }
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .form-group label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-sm);
+          color: #ffffff;
+          font-size: 0.9rem;
+          width: 100%;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+          border-color: var(--gold-primary);
+          outline: none;
+          background: rgba(255, 255, 255, 0.07);
+        }
+
+        .file-upload-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px dashed rgba(255, 255, 255, 0.15);
+          border-radius: var(--radius-sm);
+          position: relative;
+          cursor: pointer;
+        }
+
+        .file-upload-wrapper input[type="file"] {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+        }
+
+        .preview-img-container {
+          margin-top: 0.5rem;
+          border-radius: var(--radius-sm);
+          overflow: hidden;
+          width: 100px;
+          height: 75px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .preview-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .error-text {
+          color: var(--color-error);
+          font-size: 0.85rem;
+          font-weight: 550;
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 1rem;
+          margin-top: 2rem;
+        }
+
+        .delete-modal-body {
+          font-size: 0.95rem;
+          line-height: 1.6;
+          color: var(--text-secondary);
+        }
       `}</style>
+
+      {/* Edit Profile Modal Dialog */}
+      <dialog 
+        ref={editDialogRef} 
+        id="edit-talent-dialog" 
+        className="admin-modal" 
+        closedby="any"
+        aria-labelledby="editDialogTitle"
+      >
+        <div className="modal-header">
+          <h3 id="editDialogTitle">Edit Talent Profile</h3>
+          <button 
+            type="button" 
+            className="btn-close-modal" 
+            onClick={() => editDialogRef.current?.close()}
+            aria-label="Close edit profile dialog"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleEditProfileSubmit} className="form-grid">
+          {formError && <p className="form-row-full error-text">{formError}</p>}
+          
+          <div className="form-group">
+            <label htmlFor="editStageNameInput">Stage Name *</label>
+            <input 
+              id="editStageNameInput" 
+              type="text" 
+              value={stageName} 
+              onChange={(e) => setStageName(e.target.value)} 
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editLegalNameInput">Legal Name</label>
+            <input 
+              id="editLegalNameInput" 
+              type="text" 
+              value={legalName} 
+              onChange={(e) => setLegalName(e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editCategorySelect">Category</label>
+            <select 
+              id="editCategorySelect" 
+              value={category} 
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="Reggae Artists">Reggae Artists</option>
+              <option value="Dancehall Artists">Dancehall Artists</option>
+              <option value="DJs">DJs & Sound Systems</option>
+              <option value="Bands">Bands</option>
+              <option value="Dancers">Dancers</option>
+              <option value="Hosts">Hosts</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editGenreInput">Genre / Style</label>
+            <input 
+              id="editGenreInput" 
+              type="text" 
+              value={genre} 
+              onChange={(e) => setGenre(e.target.value)} 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editBookingStatus">Booking Status</label>
+            <select 
+              id="editBookingStatus" 
+              value={bookingStatus} 
+              onChange={(e) => setBookingStatus(e.target.value as any)}
+            >
+              <option value="Available">Available</option>
+              <option value="Booked">Booked</option>
+              <option value="On Tour">On Tour</option>
+              <option value="On Hold">On Hold</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editAvailabilityStatus">Roster Status</label>
+            <select 
+              id="editAvailabilityStatus" 
+              value={availabilityStatus} 
+              onChange={(e) => setAvailabilityStatus(e.target.value as any)}
+            >
+              <option value="Active">Active / Visible</option>
+              <option value="Inactive">Inactive / Hidden</option>
+            </select>
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="editBioInput">Biography Description</label>
+            <textarea 
+              id="editBioInput" 
+              value={bio} 
+              onChange={(e) => setBio(e.target.value)} 
+              rows={4}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editProfileImageFileInput">Profile Image Upload</label>
+            <div className="file-upload-wrapper">
+              <Upload className="w-5 h-5 text-amber-500" />
+              <input 
+                id="editProfileImageFileInput" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleProfileImageChange}
+              />
+            </div>
+            {profileImage && (
+              <div className="preview-img-container">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={profileImage} alt="Profile Preview" className="preview-img" />
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="editCoverImageFileInput">Cover Image Upload</label>
+            <div className="file-upload-wrapper">
+              <Upload className="w-5 h-5 text-amber-500" />
+              <input 
+                id="editCoverImageFileInput" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleCoverImageChange}
+              />
+            </div>
+            {coverImage && (
+              <div className="preview-img-container">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverImage} alt="Cover Preview" className="preview-img" />
+              </div>
+            )}
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="editTechRiderInput">Technical Rider Summary</label>
+            <textarea 
+              id="editTechRiderInput" 
+              value={techRider} 
+              onChange={(e) => setTechRider(e.target.value)} 
+              rows={2}
+            />
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="editHospRiderInput">Hospitality Rider Summary</label>
+            <textarea 
+              id="editHospRiderInput" 
+              value={hospRider} 
+              onChange={(e) => setHospRider(e.target.value)} 
+              rows={2}
+            />
+          </div>
+
+          <div className="modal-actions form-row-full">
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={() => editDialogRef.current?.close()}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      {/* Delete Confirmation Modal Dialog */}
+      <dialog 
+        ref={deleteDialogRef} 
+        id="delete-talent-dialog" 
+        className="admin-modal delete-modal" 
+        closedby="any"
+        aria-labelledby="deleteDialogTitle"
+      >
+        <div className="modal-header">
+          <h3 id="deleteDialogTitle" style={{ color: '#ef4444' }}>Delete Talent Profile</h3>
+          <button 
+            type="button" 
+            className="btn-close-modal" 
+            onClick={() => deleteDialogRef.current?.close()}
+            aria-label="Close delete confirmation dialog"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="delete-modal-body">
+          <p>Are you sure you want to permanently delete the profile of <strong>{artist.stage_name}</strong> from Showtime Booking roster?</p>
+          <p style={{ marginTop: '0.5rem', fontSize: '0.825rem', color: 'var(--text-muted)' }}>This action cannot be undone and will remove all associated metadata, profile riders, and custom image uploads.</p>
+        </div>
+
+        <div className="modal-actions">
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            onClick={() => deleteDialogRef.current?.close()}
+          >
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            className="btn btn-danger" 
+            onClick={handleDeleteProfileSubmit}
+            style={{ padding: '0.5rem 1.25rem' }}
+          >
+            Delete Permanently
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 }
