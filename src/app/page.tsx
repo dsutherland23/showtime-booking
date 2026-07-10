@@ -203,6 +203,9 @@ export default function Home() {
   const [reggaePool, setReggaePool] = React.useState<Artist[]>([]);
   const [dancehallPool, setDancehallPool] = React.useState<Artist[]>([]);
   const [djPool, setDjPool] = React.useState<Artist[]>([]);
+  const [bandsPool, setBandsPool] = React.useState<Artist[]>([]);
+  const [dancersPool, setDancersPool] = React.useState<Artist[]>([]);
+  const [socaAfroPool, setSocaAfroPool] = React.useState<Artist[]>([]);
 
   useEffect(() => {
     const loadFeatured = async () => {
@@ -219,10 +222,16 @@ export default function Home() {
       const reggae = all.filter(a => a.category === 'Reggae Artists');
       const dancehall = all.filter(a => a.category === 'Dancehall Artists');
       const djs = all.filter(a => a.category === 'DJs');
+      const bands = all.filter(a => a.category === 'Bands');
+      const dancers = all.filter(a => a.category === 'Dancers');
+      const socaAfro = all.filter(a => a.category === 'Soca Artists' || a.category === 'Afrobeats Artists');
 
       setReggaePool(sortFeaturedFirst(reggae));
       setDancehallPool(sortFeaturedFirst(dancehall));
       setDjPool(sortFeaturedFirst(djs));
+      setBandsPool(sortFeaturedFirst(bands));
+      setDancersPool(sortFeaturedFirst(dancers));
+      setSocaAfroPool(sortFeaturedFirst(socaAfro));
     };
     loadFeatured();
   }, []);
@@ -288,6 +297,11 @@ export default function Home() {
             <ArtistCardPremiumCycling categoryArtists={reggaePool} />
             <ArtistCardPremiumCycling categoryArtists={dancehallPool} />
             <ArtistCardPremiumCycling categoryArtists={djPool} />
+          </div>
+          <div className="grid-3 reveal-stagger" style={{ marginTop: '2rem' }}>
+            <ArtistCardPremiumCycling categoryArtists={bandsPool} />
+            <ArtistCardPremiumCycling categoryArtists={dancersPool} />
+            <ArtistCardPremiumCycling categoryArtists={socaAfroPool} />
           </div>
         </div>
       </section>

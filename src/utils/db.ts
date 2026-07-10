@@ -540,7 +540,7 @@ const SEED_ARTISTS: Artist[] = [
     id: 'art-patrice-roberts',
     stage_name: 'Patrice Roberts',
     legal_name: 'Patrice Roberts',
-    category: 'Reggae Artists',
+    category: 'Soca Artists',
     genre: 'Soca / Carnival',
     bio: 'Patrice Roberts is a Trinidadian soca powerhouse, beloved for her infectious carnival anthems, stunning vocals, and high-energy live shows.',
     profile_image: '/images/artist_reggae.jpg',
@@ -933,6 +933,45 @@ const SEED_ARTISTS: Artist[] = [
     availability_status: 'Active',
     socials: { Instagram: { url: 'https://instagram.com/kingbeenieman', followers: 2000000 } },
     is_featured: true
+  },
+  {
+    id: 'art-machel-montano',
+    stage_name: 'Machel Montano',
+    legal_name: 'Machel Jesus Montano',
+    category: 'Soca Artists',
+    genre: 'Soca',
+    bio: 'Machel Montano is the "King of Soca" and one of the most famous soca singers in the world, renowned for his high-energy performances and record wins at the Road March and Soca Monarch competitions.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    is_featured: true
+  },
+  {
+    id: 'art-burna-boy',
+    stage_name: 'Burna Boy',
+    legal_name: 'Damini Ebunoluwa Ogulu',
+    category: 'Afrobeats Artists',
+    genre: 'Afrobeats / Afro-fusion',
+    bio: 'Burna Boy is a Grammy-winning Nigerian superstar who has conquered global charts and sold out stadiums worldwide (including Madison Square Garden) with hits like "Last Last".',
+    profile_image: '/images/artist_dancehall.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    is_featured: true
+  },
+  {
+    id: 'art-destra-garcia',
+    stage_name: 'Destra Garcia',
+    legal_name: 'Destra Garcia',
+    category: 'Soca Artists',
+    genre: 'Soca',
+    bio: 'Destra Garcia is the "Queen of Soca", beloved for her incredible vocals, carnival anthems, and electrifying stage choreography representing Trinidad & Tobago.',
+    profile_image: '/images/artist_reggae.jpg',
+    cover_image: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
+    booking_status: 'Available',
+    availability_status: 'Active',
+    is_featured: false
   }
 ];
 
