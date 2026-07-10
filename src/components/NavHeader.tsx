@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, Menu, X, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { Menu, X, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export function NavHeader() {
@@ -91,7 +91,7 @@ export function NavHeader() {
                 aria-label="User menu"
               >
                 <div className="user-avatar" aria-hidden="true">{initials}</div>
-                <span className="user-name hidden md:block">{profile.first_name}</span>
+                <span className="user-name">{profile.first_name}</span>
                 <ChevronDown className={`user-chevron ${userMenuOpen ? 'open' : ''}`} />
               </button>
 
@@ -236,6 +236,23 @@ export function NavHeader() {
           flex-shrink: 0;
         }
         .user-chevron.open { transform: rotate(180deg); }
+
+        @media (max-width: 767px) {
+          .user-name { display: none; }
+          .user-chevron { display: none; }
+          .user-menu-trigger {
+            padding: 0.3rem;
+            border-radius: 50%;
+            background: transparent;
+            border-color: transparent;
+          }
+          .user-menu-trigger:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(212,175,55,0.2);
+          }
+          .user-avatar { width: 32px; height: 32px; font-size: 0.7rem; }
+          .user-dropdown { right: 0; width: 220px; }
+        }
         .user-dropdown {
           position: absolute;
           top: calc(100% + 8px);

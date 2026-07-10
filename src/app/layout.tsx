@@ -10,7 +10,6 @@ import { SplashScreen } from '@/components/SplashScreen';
 import { StickyCTA } from '@/components/StickyCTA';
 import Link from 'next/link';
 import React from 'react';
-import RoleSwitcher from '@/components/RoleSwitcher';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
 
@@ -159,7 +158,6 @@ export default function RootLayout({
                 </div>
               </footer>
               <StickyCTA />
-              <RoleSwitcher />
             </div>
           </AuthProvider>
         </ThemeProvider>

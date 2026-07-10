@@ -801,6 +801,33 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           </FGrid>
           <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <Field label="Bio"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
+
+            {/* Image fields with preview */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+              <div>
+                <Field label="Profile Image URL">
+                  <FInput value={form.profile_image} onChange={v => setForm(f => ({ ...f, profile_image: v }))} placeholder="https://..." />
+                </Field>
+                {form.profile_image && (
+                  <div style={{ marginTop: '0.5rem', width: 60, height: 60, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(212,175,55,0.3)', background: 'rgba(255,255,255,0.04)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.profile_image} alt="Profile preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  </div>
+                )}
+              </div>
+              <div>
+                <Field label="Cover Image URL">
+                  <FInput value={form.cover_image} onChange={v => setForm(f => ({ ...f, cover_image: v }))} placeholder="https://..." />
+                </Field>
+                {form.cover_image && (
+                  <div style={{ marginTop: '0.5rem', width: '100%', height: 52, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.cover_image} alt="Cover preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
             <Field label="Technical Rider"><FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={2} /></Field>
             <Field label="Hospitality Rider"><FTextarea value={form.hospitality_rider} onChange={v => setForm(f => ({ ...f, hospitality_rider: v }))} rows={2} /></Field>
           </div>
