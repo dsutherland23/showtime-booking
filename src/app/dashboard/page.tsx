@@ -239,8 +239,8 @@ function Empty({ icon: Icon, msg }: { icon: React.ElementType; msg: string }) {
 
 function Tbl({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>{children}</table>
+    <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>{children}</table>
     </div>
   );
 }
@@ -280,7 +280,7 @@ function TR({ children, onClick }: { children: React.ReactNode; onClick?: () => 
 
 function TD({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
   return (
-    <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem', color: muted ? 'var(--text-muted)' : 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+    <td style={{ padding: '0.6rem 0.75rem', fontSize: '0.82rem', color: muted ? 'var(--text-muted)' : 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
       {children}
     </td>
   );
@@ -357,7 +357,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function FGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px,1fr))', gap: '0.9rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px,1fr))', gap: '0.9rem' }}>
       {children}
     </div>
   );
@@ -365,7 +365,7 @@ function FGrid({ children }: { children: React.ReactNode }) {
 
 function FActions({ onCancel, saving, label = 'Save' }: { onCancel: () => void; saving?: boolean; label?: string }) {
   return (
-    <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+    <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
       <ABtn variant="ghost" onClick={onCancel}>Cancel</ABtn>
       <ABtn variant="primary" disabled={saving}>
         {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
@@ -391,7 +391,7 @@ function Modal({ open, onClose, title, children, width = 540 }: {
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.7)', animation: 'scaleIn 0.2s ease' }}
+        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: 'min(90vh, 100dvh - 2rem)', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.7)', animation: 'scaleIn 0.2s ease' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h3>
@@ -432,7 +432,8 @@ function Toast({ message, type, onDone }: { message: string; type: 'success' | '
   useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
   return (
     <div style={{
-      position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999,
+      position: 'fixed', bottom: '1.5rem', right: '1rem', left: '1rem', zIndex: 9999,
+      maxWidth: 380, marginLeft: 'auto',
       background: type === 'success' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)',
       border: `1px solid ${type === 'success' ? 'rgba(48,209,88,0.4)' : 'rgba(255,69,58,0.4)'}`,
       borderRadius: 'var(--radius-md)',
@@ -463,7 +464,7 @@ function AccessDenied() {
 
 function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
       <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>{title}</h3>
       {action}
     </div>
@@ -487,7 +488,7 @@ function DashboardOverview({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px,1fr))', gap: '1rem' }}>
+      <div className="dash-stat-grid">
         <StatCard label="Total Revenue" value={fmtCurrency(totalRevenue)} icon={DollarSign} trend="+12.4%" trendUp sub="vs last quarter" />
         <StatCard label="Confirmed Bookings" value={String(confirmedBookings)} icon={Calendar} trend="+3" trendUp sub="this month" />
         <StatCard label="Active Artists" value={String(artists.filter(a => a.availability_status === 'Active').length)} icon={Music} sub={`${artists.length} on roster`} />
@@ -496,7 +497,7 @@ function DashboardOverview({
         <StatCard label="New Leads" value={String(urgentLeads.length)} icon={Activity} sub="require follow-up" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="dash-two-col">
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.2rem' }}>
           <SectionHead title="Recent Bookings" action={<ABtn variant="ghost" size="sm" onClick={() => onNavigate('bookings')}><Eye size={12} />View all</ABtn>} />
           {recentBookings.length === 0 ? <Empty icon={Calendar} msg="No bookings yet" /> : (
@@ -1117,7 +1118,7 @@ function FinanceSection({ invoices, bookings }: { invoices: Invoice[]; bookings:
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px,1fr))', gap: '1rem' }}>
+      <div className="dash-stat-grid">
         <StatCard label="Total Collected" value={fmtCurrency(totalRevenue)} icon={DollarSign} trend="+8.2%" trendUp />
         <StatCard label="Outstanding" value={fmtCurrency(outstanding)} icon={CreditCard} sub="pending collection" />
         <StatCard label="Overdue Invoices" value={String(overdue)} icon={AlertCircle} sub="require action" />
@@ -1996,21 +1997,78 @@ export default function AdminPortal() {
         @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+        @keyframes slideInLeft { from { transform: translateX(-100%) } to { transform: translateX(0) } }
+
+        /* ── Dashboard responsive shell ── */
+        .dash-shell { display: flex; min-height: 100vh; background: var(--bg-primary); font-family: var(--font-body); }
+        .dash-sidebar {
+          width: var(--sidebar-w, 220px);
+          min-height: 100vh;
+          background: var(--bg-secondary);
+          border-right: 1px solid var(--border-color);
+          display: flex; flex-direction: column;
+          transition: width 0.28s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94);
+          overflow: hidden; flex-shrink: 0;
+          position: sticky; top: 0; height: 100vh; z-index: 100;
+        }
+        .dash-sidebar-backdrop { display: none; }
+        .dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
+        .dash-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
+        .dash-content-inner { max-width: 1200px; margin: 0 auto; animation: fadeInUp 0.25s ease; }
+        .dash-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px,1fr)); gap: 1rem; }
+        .dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .dash-notif-panel { position: absolute; right: 0; top: 110%; width: 300px; }
+        .dash-header-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; margin: 0; }
+
+        @media (max-width: 767px) {
+          .dash-shell { flex-direction: column; }
+
+          /* Sidebar becomes a slide-in overlay drawer */
+          .dash-sidebar {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            height: 100vh;
+            z-index: 500;
+            transform: translateX(-100%);
+            width: 240px !important;
+            box-shadow: 8px 0 40px rgba(0,0,0,0.5);
+          }
+          .dash-sidebar.sidebar-open {
+            transform: translateX(0);
+            animation: slideInLeft 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
+          }
+          /* Dark backdrop behind drawer */
+          .dash-sidebar-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            z-index: 499;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(2px);
+          }
+          .dash-main { min-height: 100vh; }
+          .dash-content { padding: 1rem 0.875rem; }
+          .dash-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+          .dash-two-col { grid-template-columns: 1fr; }
+          .dash-notif-panel { right: -60px; width: min(300px, 90vw); }
+          .dash-header-title { font-size: 0.9rem; }
+        }
+
+        @media (max-width: 400px) {
+          .dash-stat-grid { grid-template-columns: 1fr; }
+          .dash-content { padding: 0.75rem 0.75rem; }
+        }
       `}</style>
 
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)', fontFamily: 'var(--font-body)' }}>
+      <div className="dash-shell">
 
         {/* ── Sidebar ── */}
-        <aside style={{
-          width: sidebarOpen ? 220 : 58,
-          minHeight: '100vh',
-          background: 'var(--bg-secondary)',
-          borderRight: '1px solid var(--border-color)',
-          display: 'flex', flexDirection: 'column',
-          transition: 'width 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
-          overflow: 'hidden', flexShrink: 0,
-          position: 'sticky', top: 0, height: '100vh', zIndex: 100,
-        }}>
+        <aside
+          className={`dash-sidebar${sidebarOpen ? ' sidebar-open' : ''}`}
+          style={{
+            '--sidebar-w': sidebarOpen ? '220px' : '58px',
+          } as React.CSSProperties}
+        >
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: sidebarOpen ? '1rem 1rem 0.75rem' : '1rem 0.65rem 0.75rem', borderBottom: '1px solid var(--border-color)', gap: '0.5rem', flexShrink: 0 }}>
             {sidebarOpen && (
@@ -2094,21 +2152,30 @@ export default function AdminPortal() {
           </div>
         </aside>
 
+        {/* Mobile backdrop — closes sidebar when tapped outside */}
+        {sidebarOpen && (
+          <div
+            className="dash-sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* ── Main ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
+        <div className="dash-main">
 
           {/* Header */}
           <header style={{
             height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '0 1.5rem', borderBottom: '1px solid var(--border-color)',
+            padding: '0 1rem', borderBottom: '1px solid var(--border-color)',
             background: 'rgba(12,10,23,0.85)', backdropFilter: 'blur(12px)',
-            position: 'sticky', top: 0, zIndex: 50, gap: '1rem', flexShrink: 0,
+            position: 'sticky', top: 0, zIndex: 50, gap: '0.75rem', flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}>
                 <Menu size={16} />
               </button>
-              <h1 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>
+              <h1 className="dash-header-title">
                 {PAGE_TITLES[activeTab] || 'Dashboard'}
               </h1>
             </div>
@@ -2135,7 +2202,7 @@ export default function AdminPortal() {
                   {unreadNotifs > 0 && <span style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: '50%', background: 'var(--color-error)', border: '1.5px solid var(--bg-secondary)' }} />}
                 </button>
                 {notifOpen && (
-                  <div style={{ position: 'absolute', right: 0, top: '110%', width: 300, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 200, animation: 'scaleIn 0.18s ease', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', right: 0, top: '110%', background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 200, animation: 'scaleIn 0.18s ease', overflow: 'hidden' }} className="dash-notif-panel">
                     <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.83rem', fontWeight: 600 }}>Notifications</span>
                       {unreadNotifs > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{unreadNotifs} unread</span>}
@@ -2165,8 +2232,8 @@ export default function AdminPortal() {
           </header>
 
           {/* Page Content */}
-          <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-            <div style={{ maxWidth: 1200, margin: '0 auto', animation: 'fadeInUp 0.25s ease' }}>
+          <main className="dash-content">
+            <div className="dash-content-inner">
               {renderContent()}
             </div>
           </main>
