@@ -1,182 +1,533 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import Spline from '@splinetool/react-spline';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const TOTAL_FRAMES = 240;
+const FRAME_DIR = '/images/ezgif-22f91a0364986244-jpg';
+const SCROLL_MULTIPLIER = 3.0; // 300vh total scroll distance
+const PRELOAD_INITIAL = 15;    // frames to preload immediately
+const PRELOAD_MOBILE  = 8;     // fewer on mobile
 
-function HeroSplineBackground() {
-  const [isDesktop, setIsDesktop] = useState(false);
+// Pad frame number: 001 – 240
+const frameSrc = (n: number) =>
+  `${FRAME_DIR}/ezgif-frame-${String(n).padStart(3, '0')}.jpg`;
+
+// ─── Text phases keyed to scroll progress 0→1 ─────────────────────────────
+interface TextPhase {
+  start: number;
+  end: number;
+  headline: string;
+  sub?: string;
+  tags?: string[];
+  ctas?: { label: string; href: string; primary?: boolean }[];
+}
+
+const TEXT_PHASES: TextPhase[] = [
+  {
+    start: 0,
+    end: 0.28,
+    headline: 'Where Talent\nMeets The World.',
+    sub: 'Connecting iconic artists, DJs, and selectors with unforgettable experiences.',
+  },
+  {
+    start: 0.32,
+    end: 0.65,
+    headline: 'Beyond\nThe Stage.',
+    tags: ['Curated Talent.', 'Global Experiences.', 'Unforgettable Moments.'],
+  },
+  {
+    start: 0.72,
+    end: 1.0,
+    headline: 'Book The\nExperience.',
+    sub: 'Premium entertainment. Exceptional talent.',
+    ctas: [
+      { label: 'Book An Artist', href: '/book', primary: true },
+      { label: 'Explore Talent', href: '/talent' },
+    ],
+  },
+];
+
+// ─── easeInOutCubic for smooth frame interpolation ─────────────────────────
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ─── Hook: preload images into an array ───────────────────────────────────
+function useImageSequence() {
+  const imagesRef = useRef<(HTMLImageElement | null)[]>(
+    Array(TOTAL_FRAMES).fill(null)
+  );
+  const loadedRef = useRef<boolean[]>(Array(TOTAL_FRAMES).fill(false));
+  const [initialReady, setInitialReady] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768);
+    const isMobile = window.innerWidth < 768;
+    const preloadCount = isMobile ? PRELOAD_MOBILE : PRELOAD_INITIAL;
+    let readyCount = 0;
+
+    const onLoad = (i: number) => {
+      loadedRef.current[i] = true;
+      readyCount++;
+      if (readyCount >= preloadCount) setInitialReady(true);
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Phase 1: preload first N frames immediately
+    for (let i = 0; i < preloadCount; i++) {
+      const img = new Image();
+      img.src = frameSrc(i + 1);
+      img.onload = () => onLoad(i);
+      img.onerror = () => onLoad(i); // still count as done
+      imagesRef.current[i] = img;
+    }
+
+    // Phase 2: load rest in background after a short delay
+    const timer = setTimeout(() => {
+      for (let i = preloadCount; i < TOTAL_FRAMES; i++) {
+        const img = new Image();
+        img.src = frameSrc(i + 1);
+        img.onload = () => { loadedRef.current[i] = true; };
+        imagesRef.current[i] = img;
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, []);
 
+  return { imagesRef, loadedRef, initialReady };
+}
+
+// ─── Main Hero Component ───────────────────────────────────────────────────
+const HeroSection: React.FC = () => {
+  const canvasRef      = useRef<HTMLCanvasElement>(null);
+  const wrapperRef     = useRef<HTMLDivElement>(null);
+  const stickyRef      = useRef<HTMLDivElement>(null);
+  const rafRef         = useRef<number>(0);
+  const lastFrameRef   = useRef<number>(-1);
+  const progressRef    = useRef<number>(0);
+
+  const { imagesRef, loadedRef, initialReady } = useImageSequence();
+
+  // ── Draw a specific frame index onto the canvas ──────────────────────────
+  const drawFrame = useCallback((frameIdx: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const img = imagesRef.current[frameIdx];
+    if (!img || !loadedRef.current[frameIdx]) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Cover-fit the image to canvas
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const iw = img.naturalWidth  || 1920;
+    const ih = img.naturalHeight || 1080;
+    const scale = Math.max(cw / iw, ch / ih);
+    const sw = iw * scale;
+    const sh = ih * scale;
+    const sx = (cw - sw) / 2;
+    const sy = (ch - sh) / 2;
+
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.drawImage(img, sx, sy, sw, sh);
+  }, [imagesRef, loadedRef]);
+
+  // ── Resize canvas to match window ────────────────────────────────────────
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    // Redraw current frame after resize
+    const fi = Math.min(
+      Math.round(progressRef.current * (TOTAL_FRAMES - 1)),
+      TOTAL_FRAMES - 1
+    );
+    drawFrame(fi);
+  }, [drawFrame]);
+
+  // ── RAF-driven scroll handler ─────────────────────────────────────────────
+  useEffect(() => {
+    const onScroll = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const wrapper = wrapperRef.current;
+        if (!wrapper) return;
+
+        const rect   = wrapper.getBoundingClientRect();
+        const total  = wrapper.offsetHeight - window.innerHeight;
+        const scrolled = -rect.top; // pixels scrolled into wrapper
+        const rawProgress = Math.max(0, Math.min(1, scrolled / total));
+
+        // Smooth easing so it doesn't feel 1:1 mechanical
+        const easedProgress = easeInOutCubic(rawProgress);
+        progressRef.current = easedProgress;
+
+        const frameIdx = Math.min(
+          Math.round(easedProgress * (TOTAL_FRAMES - 1)),
+          TOTAL_FRAMES - 1
+        );
+
+        if (frameIdx !== lastFrameRef.current) {
+          lastFrameRef.current = frameIdx;
+          drawFrame(frameIdx);
+        }
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    resizeCanvas();
+    drawFrame(0);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [drawFrame, resizeCanvas]);
+
+  // Draw frame 0 once initial frames are ready
+  useEffect(() => {
+    if (initialReady) {
+      resizeCanvas();
+      drawFrame(0);
+    }
+  }, [initialReady, drawFrame, resizeCanvas]);
+
   return (
-    <div style={{
-      position: 'relative',
-      width: '100%',
-      height: '100vh',
-      pointerEvents: 'auto',
-      overflow: 'hidden',
-    }}>
-      {isDesktop ? (
-        <Spline
-          style={{
-            width: '100%',
-            height: '100vh',
-            pointerEvents: 'auto',
-          }}
-          scene="https://prod.spline.design/dJqTIQ-tE3ULUPMi/scene.splinecode"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-[#07050e] overflow-hidden">
-          {/* Animated gold ambient glow */}
-          <div className="absolute top-[20%] left-[10%] w-[250px] h-[250px] rounded-full bg-[#d4af37]/10 blur-[100px] animate-pulse" style={{ animationDuration: '6s' }} />
-          {/* Animated purple ambient glow */}
-          <div className="absolute bottom-[30%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#a855f7]/8 blur-[110px] animate-pulse" style={{ animationDuration: '8s' }} />
-        </div>
-      )}
+    <div
+      ref={wrapperRef}
+      style={{
+        height: `${SCROLL_MULTIPLIER * 100}vh`,
+        position: 'relative',
+        background: '#050505',
+      }}
+    >
+      {/* ── Sticky viewport that pins during scroll ── */}
       <div
+        ref={stickyRef}
         style={{
-          position: 'absolute',
+          position: 'sticky',
           top: 0,
-          left: 0,
           width: '100%',
           height: '100vh',
-          background: `
-            linear-gradient(to right, rgba(7, 5, 14, 0.85), transparent 30%, transparent 70%, rgba(7, 5, 14, 0.85)),
-            linear-gradient(to bottom, transparent 40%, rgba(7, 5, 14, 1))
-          `,
-          pointerEvents: 'none',
-        }}
-      />
-    </div>
-  );
-}
-
-function ScreenshotSection({ screenshotRef }: { screenshotRef: React.RefObject<HTMLDivElement | null> }) {
-  return (
-    <section className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8 mt-11 md:mt-12">
-      <div 
-        ref={screenshotRef} 
-        className="bg-[#0c0a17]/80 rounded-2xl overflow-hidden shadow-2xl border border-white/10 w-full md:w-[80%] lg:w-[70%] mx-auto backdrop-blur-md transition-all duration-300 hover:border-[#d4af37]/30"
-        style={{
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(212, 175, 55, 0.05)',
+          overflow: 'hidden',
+          background: '#050505',
         }}
       >
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/concert_stage.jpg"
-            alt="Showtime Booking Concert Stage Production"
-            className="w-full h-full object-cover block"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#07050e] via-transparent to-transparent opacity-60" />
-        </div>
-      </div>
-    </section>
-  );
-}
+        {/* Canvas — full viewport, hardware-accelerated */}
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            willChange: 'transform',
+            transform: 'translateZ(0)',
+          }}
+        />
 
-function HeroContent() {
-  return (
-    <div className="text-white px-6 max-w-screen-xl mx-auto w-full flex flex-col lg:flex-row justify-between items-start lg:items-center py-16 gap-8">
+        {/* Dark vignette edges — blends canvas into page bg */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `
+              radial-gradient(ellipse 80% 60% at 50% 100%, rgba(5,5,5,0.85) 0%, transparent 70%),
+              radial-gradient(ellipse 100% 30% at 50% 0%, rgba(5,5,5,0.6) 0%, transparent 60%),
+              linear-gradient(to right, rgba(5,5,5,0.55) 0%, transparent 15%, transparent 85%, rgba(5,5,5,0.55) 100%)
+            `,
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
 
-      <div className="w-full lg:w-3/5 pr-0 lg:pr-8 mb-4 lg:mb-0">
-        <div className="inline-flex items-center gap-2 mb-6">
-          <span className="text-[11px] font-semibold tracking-wider text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full uppercase">
-            Showtime &middot; Live 3D Experience
-          </span>
-        </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.05] tracking-tight">
-          The world&apos;s leading <br />
-          <span className="shimmer-text font-extrabold">
-            Caribbean talent
-          </span><br />
-          booking platform.
-        </h1>
-        <div className="text-[11px] font-bold text-[#d4af37] tracking-[0.2em] mt-6 flex items-center gap-2">
-          ROOTS <span className="opacity-30">&middot;</span> DANCEHALL <span className="opacity-30">&middot;</span> REGGAE <span className="opacity-30">&middot;</span> SELECTORS <span className="opacity-30">&middot;</span> SOUNDS
-        </div>
-      </div>
+        {/* ── Overlay text phases ── */}
+        <TextOverlay progressRef={progressRef} />
 
-      <div className="w-full lg:w-2/5 pl-0 lg:pl-8 flex flex-col items-start">
-         <p className="text-base sm:text-lg text-white/60 mb-8 max-w-md leading-relaxed">
-           Enterprise booking, tour logistics, and compliance management—built for the world's leading festivals and concert routes.
-        </p>
-        <div className="flex pointer-events-auto flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-             <Link 
-               href="/talent" 
-               className="btn btn-secondary py-3.5 px-8 rounded-full border border-white/20 hover:border-[#d4af37] text-white hover:text-[#d4af37] transition duration-300 w-full sm:w-auto text-center justify-center font-medium"
-             >
-                Explore Talent
-            </Link>
-             <Link 
-               href="/book" 
-               className="pointer-events-auto btn btn-primary py-3.5 px-8 rounded-full transition duration-300 hover:scale-105 flex items-center justify-center w-full sm:w-auto font-semibold gap-2"
-               style={{
-                 background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
-                 color: '#07050e',
-               }}
-             >
-                Book Talent
-             </Link>
-        </div>
-      </div>
-
-    </div>
-  );
-}
-
-const HeroSection = () => {
-  const screenshotRef = useRef<HTMLDivElement>(null);
-  const heroContentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (screenshotRef.current && heroContentRef.current) {
-        requestAnimationFrame(() => {
-          const scrollPosition = window.scrollY;
-
-          if (screenshotRef.current) {
-            screenshotRef.current.style.transform = `translateY(-${scrollPosition * 0.35}px)`;
-          }
-
-          const maxScroll = 500;
-          const opacity = 1 - Math.min(scrollPosition / maxScroll, 1);
-          if (heroContentRef.current) {
-             heroContentRef.current.style.opacity = opacity.toString();
-          }
-        });
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  return (
-    <div className="relative mt-[-52px]">
-      <div className="relative min-h-screen overflow-hidden">
-        <div className="absolute inset-0 z-0 pointer-events-auto">
-          <HeroSplineBackground />
-        </div>
-
-        <div ref={heroContentRef} className="relative z-10 min-h-screen flex items-center justify-center pointer-events-none w-full py-24 md:py-32">
-          <HeroContent />
-        </div>
-      </div>
-
-      <div className="bg-[#07050e] relative z-10" style={{ marginTop: '-15vh' }}>
-        <ScreenshotSection screenshotRef={screenshotRef} />
+        {/* Scroll cue — only visible at very start */}
+        <ScrollCue />
       </div>
     </div>
   );
 };
+
+// ─── Text Overlay — updates on RAF tick independently ─────────────────────
+function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) {
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number>(0);
+  const lastRef = useRef<number>(-1);
+
+  useEffect(() => {
+    const tick = () => {
+      const p = progressRef.current;
+      if (Math.abs(p - lastRef.current) > 0.001) {
+        lastRef.current = p;
+        setProgress(p);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [progressRef]);
+
+  // Determine which phase is active
+  const activePhase = TEXT_PHASES.find(ph => progress >= ph.start && progress <= ph.end) ?? null;
+  const prevPhase   = TEXT_PHASES.find(ph => progress > ph.end && progress < ph.end + 0.08) ?? null;
+
+  // Use the leaving phase for fade-out
+  const displayPhase = activePhase ?? prevPhase;
+
+  let phaseProgress = 0;
+  let visible = false;
+  if (displayPhase) {
+    const range = displayPhase.end - displayPhase.start;
+    const local = progress - displayPhase.start;
+    phaseProgress = Math.max(0, Math.min(1, local / range));
+    visible = activePhase !== null;
+  }
+
+  // Fade in first 15% of phase, hold, fade out last 15%
+  const fadeIn  = Math.min(1, phaseProgress / 0.15);
+  const fadeOut = phaseProgress > 0.85 ? Math.max(0, 1 - (phaseProgress - 0.85) / 0.15) : 1;
+  const opacity = visible ? fadeIn * fadeOut : 0;
+  const translateY = visible ? (1 - fadeIn) * 20 : 10;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        paddingBottom: 'clamp(4rem, 10vh, 8rem)',
+        paddingLeft: '1.5rem',
+        paddingRight: '1.5rem',
+        pointerEvents: opacity > 0.1 ? 'auto' : 'none',
+        textAlign: 'center',
+      }}
+    >
+      {displayPhase && (
+        <div
+          style={{
+            opacity,
+            transform: `translateY(${translateY}px)`,
+            transition: 'none',
+            maxWidth: 760,
+            width: '100%',
+          }}
+        >
+          {/* Headline */}
+          <h1
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'clamp(2.25rem, 6vw, 5rem)',
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: '-0.04em',
+              color: '#ffffff',
+              margin: '0 0 1.25rem',
+              whiteSpace: 'pre-line',
+              textShadow: '0 2px 40px rgba(0,0,0,0.8)',
+            }}
+          >
+            {displayPhase.headline}
+          </h1>
+
+          {/* Sub */}
+          {displayPhase.sub && (
+            <p
+              style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 'clamp(0.95rem, 1.8vw, 1.2rem)',
+                color: 'rgba(255,255,255,0.65)',
+                lineHeight: 1.6,
+                margin: '0 auto 2rem',
+                maxWidth: 520,
+                textShadow: '0 1px 20px rgba(0,0,0,0.7)',
+              }}
+            >
+              {displayPhase.sub}
+            </p>
+          )}
+
+          {/* Tags */}
+          {displayPhase.tags && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.6rem',
+                justifyContent: 'center',
+                marginBottom: '2rem',
+              }}
+            >
+              {displayPhase.tags.map((t, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 'clamp(0.82rem, 1.4vw, 1rem)',
+                    color: 'rgba(255,255,255,0.55)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 100,
+                    padding: '0.35rem 1.1rem',
+                    background: 'rgba(255,255,255,0.04)',
+                    backdropFilter: 'blur(8px)',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* CTAs */}
+          {displayPhase.ctas && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
+              {displayPhase.ctas.map((cta) =>
+                cta.primary ? (
+                  <Link
+                    key={cta.href}
+                    href={cta.href}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.85rem 2.2rem',
+                      borderRadius: 100,
+                      background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
+                      color: '#07050e',
+                      fontFamily: 'var(--font-body)',
+                      fontWeight: 700,
+                      fontSize: '0.9375rem',
+                      textDecoration: 'none',
+                      letterSpacing: '-0.01em',
+                      boxShadow: '0 8px 32px rgba(212,175,55,0.35)',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px) scale(1.03)';
+                      (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 12px 40px rgba(212,175,55,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.transform = '';
+                      (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 8px 32px rgba(212,175,55,0.35)';
+                    }}
+                  >
+                    {cta.label}
+                  </Link>
+                ) : (
+                  <Link
+                    key={cta.href}
+                    href={cta.href}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.85rem 2.2rem',
+                      borderRadius: 100,
+                      background: 'rgba(255,255,255,0.07)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      color: '#ffffff',
+                      fontFamily: 'var(--font-body)',
+                      fontWeight: 500,
+                      fontSize: '0.9375rem',
+                      textDecoration: 'none',
+                      backdropFilter: 'blur(12px)',
+                      transition: 'background 0.2s, border-color 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.12)';
+                      (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(212,175,55,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.07)';
+                      (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.2)';
+                    }}
+                  >
+                    {cta.label}
+                  </Link>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Scroll cue ───────────────────────────────────────────────────────────
+function ScrollCue() {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const onScroll = () => { if (window.scrollY > 80) setVisible(false); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '2rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.5rem',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease',
+        pointerEvents: 'none',
+      }}
+    >
+      <span
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: '0.65rem',
+          letterSpacing: '0.2em',
+          color: 'rgba(255,255,255,0.35)',
+          textTransform: 'uppercase',
+        }}
+      >
+        Scroll
+      </span>
+      <div
+        style={{
+          width: 1,
+          height: 40,
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.35), transparent)',
+          animation: 'scrollCuePulse 1.6s ease-in-out infinite',
+        }}
+      />
+      <style>{`
+        @keyframes scrollCuePulse {
+          0%, 100% { opacity: 0.35; transform: scaleY(1); }
+          50%       { opacity: 0.8;  transform: scaleY(1.15); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export { HeroSection };
