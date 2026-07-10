@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
@@ -8,6 +8,150 @@ import { ArrowRight, Star, Music, Award, ShieldAlert, Sparkles, MapPin, Users, H
 import { FlowArt, FlowSection } from '@/components/ui/story-scroll';
 import { DottedSurface } from '@/components/ui/dotted-surface';
 import { HeroSection } from '@/components/ui/3d-hero-section-boxes';
+
+/* ── Animated Counter ── */
+function useCountUp(target: number, duration = 2000) {
+  const [value, setValue] = React.useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const animated = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !animated.current) {
+          animated.current = true;
+          const start = performance.now();
+          const tick = (now: number) => {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setValue(Math.round(eased * target));
+            if (progress < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [target, duration]);
+
+  return { value, ref };
+}
+
+function StatCounter({ end, suffix, label }: { end: number; suffix: string; label: string }) {
+  const { value, ref } = useCountUp(end, 1800);
+  return (
+    <div className="stat-item">
+      <span className="stat-number" ref={ref}>
+        {value}{suffix}
+      </span>
+      <span className="stat-label">{label}</span>
+    </div>
+  );
+}
+
+function StatsBar() {
+  return (
+    <section className="stats-bar" aria-label="Key statistics">
+      <div className="stats-bar-grid">
+        <StatCounter end={200} suffix="+" label="Artists Represented" />
+        <StatCounter end={35}  suffix="+" label="Countries Toured" />
+        <StatCounter end={1000} suffix="+" label="Events Produced" />
+        <StatCounter end={98}  suffix="%" label="Client Satisfaction" />
+      </div>
+    </section>
+  );
+}
+
+/* ── Marquee Section ── */
+const MARQUEE_ITEMS = [
+  'Reggae Sumfest', 'Glastonbury', 'Coachella', 'One Love', 'Caribbean Carnival',
+  'Notting Hill', 'Rototom Sunsplash', 'Rebel Salute', 'Jazz & Blues Festival',
+  'Carifesta', 'Rocksteady', 'Siren Festival'
+];
+
+function MarqueeSection() {
+  const doubled = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+  return (
+    <section className="marquee-section" aria-label="Events and festivals">
+      <p className="marquee-eyebrow">Trusted by global festivals &amp; promoters</p>
+      <div className="marquee-track" aria-hidden="true">
+        {doubled.map((item, i) => (
+          <React.Fragment key={i}>
+            <span className="marquee-item">{item}</span>
+            <span className="marquee-dot" />
+          </React.Fragment>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Premium Artist Card with Hover Reveal + 3D Tilt ── */
+function ArtistCardPremium({ artist }: { artist: Artist }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const rotateX = ((y - cy) / cy) * -8;
+    const rotateY = ((x - cx) / cx) * 8;
+    card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(4px)`;
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px)';
+    card.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    card.style.transition = 'transform 0.1s ease, box-shadow 0.3s ease, border-color 0.3s ease';
+  }, []);
+
+  return (
+    <div
+      ref={cardRef}
+      className="artist-card-premium reveal"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onMouseEnter={handleMouseEnter}
+    >
+      <div className="artist-card-img-wrap">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={artist.profile_image} alt={artist.stage_name} />
+        {artist.booking_status === 'Available' && (
+          <span className="status-available-glow">
+            <span className="status-glow-dot" />
+            Available
+          </span>
+        )}
+        <div className="artist-card-reveal">
+          <div className="artist-card-genre-pill">{artist.genre}</div>
+          <h3 className="artist-card-name">{artist.stage_name}</h3>
+          <p className="artist-card-bio">{artist.bio.substring(0, 90)}&hellip;</p>
+          <Link href={`/talent/${artist.id}`} className="artist-card-cta" data-cursor="View">
+            View Profile <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export default function Home() {
   const router = useRouter();
@@ -38,10 +182,16 @@ export default function Home() {
   return (
     <div className="home-viewport">
 
-      {/* ── 1. HERO — Interactive 3D Spline boxes ── */}
+      {/* ── 1. HERO ── */}
       <HeroSection />
 
-      {/* ── 2. CATEGORIES — Apple product grid ── */}
+      {/* ── 1b. STATS COUNTER BAR ── */}
+      <StatsBar />
+
+      {/* ── 1c. CLIENT LOGOS MARQUEE ── */}
+      <MarqueeSection />
+
+      {/* ── 2. CATEGORIES ── */}
       <section className="section-pad border-t border-white/5 bg-[#07050e]">
         <div className="container">
           <div className="section-header reveal">
@@ -88,27 +238,7 @@ export default function Home() {
           </div>
           <div className="grid-3 reveal-stagger">
             {featuredArtists.map((artist) => (
-              <div key={artist.id} className="luxury-card artist-card reveal">
-                <div className="artist-img-wrap">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={artist.profile_image} alt={artist.stage_name} className="artist-img" />
-                  <span className="artist-genre-pill">{artist.genre}</span>
-                </div>
-                <div className="artist-body">
-                  <h3 className="artist-name">{artist.stage_name}</h3>
-                  <p className="artist-bio">{artist.bio.substring(0, 100)}&hellip;</p>
-                  <div className="artist-meta">
-                    <span className="artist-cat">{artist.category}</span>
-                    <span className="artist-status">
-                      <span className="status-dot" />
-                      {artist.booking_status}
-                    </span>
-                  </div>
-                  <Link href={`/talent/${artist.id}`} className="btn btn-secondary artist-cta">
-                    View Profile
-                  </Link>
-                </div>
-              </div>
+              <ArtistCardPremium key={artist.id} artist={artist} />
             ))}
           </div>
         </div>

@@ -5,6 +5,9 @@ import { NavHeader } from '@/components/NavHeader';
 import { ScrollRevealInit } from '@/components/ScrollRevealInit';
 import { ThemeProvider } from 'next-themes';
 import { SmoothScroll } from '@/components/SmoothScroll';
+import { CustomCursor } from '@/components/CustomCursor';
+import { SplashScreen } from '@/components/SplashScreen';
+import { StickyCTA } from '@/components/StickyCTA';
 import Link from 'next/link';
 import React from 'react';
 import RoleSwitcher from '@/components/RoleSwitcher';
@@ -89,6 +92,8 @@ export default function RootLayout({
           <AuthProvider>
             <div className="app-layout">
               <ScrollRevealInit />
+              <SplashScreen />
+              <CustomCursor />
               <NavHeader />
 
               <SmoothScroll>
@@ -154,6 +159,7 @@ export default function RootLayout({
                   <p>Kingston, Jamaica &bull; London, United Kingdom</p>
                 </div>
               </footer>
+              <StickyCTA />
               <RoleSwitcher />
             </div>
           </AuthProvider>

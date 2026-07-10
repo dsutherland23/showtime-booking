@@ -95,16 +95,8 @@ function HeroContent() {
           </span>
         </div>
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 leading-[1.05] tracking-tight">
-          The world's leading <br />
-          <span 
-            className="font-extrabold"
-            style={{
-              background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
+          The world&apos;s leading <br />
+          <span className="shimmer-text font-extrabold">
             Caribbean talent
           </span><br />
           booking platform.

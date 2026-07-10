@@ -909,3 +909,656 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   gap: 1.25rem;
 }
 }
+
+/* ================================================================
+   PREMIUM ENHANCEMENTS — $10K Design Upgrades
+   ================================================================ */
+
+/* ── 1. Film Grain / Noise Overlay ────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  animation: grain-shift 0.5s steps(1) infinite;
+}
+
+@keyframes grain-shift {
+  0%   { background-position: 0px 0px; }
+  10%  { background-position: -45px 12px; }
+  20%  { background-position: 15px -30px; }
+  30%  { background-position: -60px 25px; }
+  40%  { background-position: 30px 5px; }
+  50%  { background-position: -15px -45px; }
+  60%  { background-position: 60px 30px; }
+  70%  { background-position: -30px 15px; }
+  80%  { background-position: 45px -15px; }
+  90%  { background-position: -5px 60px; }
+  100% { background-position: 10px -10px; }
+}
+
+/* ── 2. Gold Shimmer Text ─────────────────────────────────────── */
+@keyframes gold-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    105deg,
+    #d4af37 0%,
+    #f5d061 20%,
+    #ffffff 35%,
+    #f5d061 50%,
+    #d4af37 65%,
+    #aa841c 80%,
+    #d4af37 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gold-shimmer 4s linear infinite;
+}
+
+/* ── 3. Custom Cursor ─────────────────────────────────────────── */
+/* Hide default cursor on non-touch devices when cursor components are present */
+@media (pointer: fine) {
+  html, body, a, button, [role="button"] {
+    cursor: none !important;
+  }
+}
+
+.cursor-dot {
+  position: fixed;
+  top: -6px;
+  left: -6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.08s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+  transform: translate(-200px, -200px);
+  mix-blend-mode: normal;
+}
+
+.cursor-dot.visible { opacity: 1; }
+.cursor-dot.pressed { transform: scale(0.5); }
+
+.cursor-ring {
+  position: fixed;
+  top: -20px;
+  left: -20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212, 175, 55, 0.6);
+  pointer-events: none;
+  z-index: 99998;
+  opacity: 0;
+  will-change: transform;
+  transform: translate(-200px, -200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.3s ease,
+    width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.25s ease,
+    background 0.25s ease;
+}
+
+.cursor-ring.visible { opacity: 1; }
+
+.cursor-ring.expanded {
+  width: 72px;
+  height: 72px;
+  border-color: var(--accent);
+  background: rgba(212, 175, 55, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.cursor-ring.pressed {
+  width: 28px;
+  height: 28px;
+  background: rgba(212, 175, 55, 0.15);
+}
+
+.cursor-label {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.cursor-ring.expanded .cursor-label { opacity: 1; }
+
+/* ── 4. Stats Counter Bar ─────────────────────────────────────── */
+.stats-bar {
+  padding: 4rem 0;
+  background: linear-gradient(180deg, #0c0a17 0%, #07050e 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.stats-bar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .stats-bar-grid { grid-template-columns: repeat(4, 1fr); gap: 0; }
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .stat-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 10%;
+    height: 80%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.stat-number {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  background: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ── 5. Marquee — Client Logos ────────────────────────────────── */
+.marquee-section {
+  padding: 3rem 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: #0a0816;
+  position: relative;
+}
+
+.marquee-section::before,
+.marquee-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 120px;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+.marquee-section::before { left: 0; background: linear-gradient(to right, #0a0816, transparent); }
+.marquee-section::after  { right: 0; background: linear-gradient(to left, #0a0816, transparent); }
+
+.marquee-eyebrow {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.marquee-track {
+  display: flex;
+  gap: 0;
+  width: max-content;
+  animation: marquee-scroll 28s linear infinite;
+}
+
+.marquee-track:hover { animation-play-state: paused; }
+
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3.5rem;
+  white-space: nowrap;
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.18);
+  transition: color 0.3s ease;
+  cursor: default;
+  user-select: none;
+}
+
+.marquee-item:hover { color: rgba(212, 175, 55, 0.55); }
+
+.marquee-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.25);
+  margin: 0 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── 6. Splash Screen ─────────────────────────────────────────── */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #07050e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  overflow: hidden;
+  transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.splash-screen.splash-hiding {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  animation: splash-rise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.splash-logo {
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.splash-tagline {
+  font-size: 0.7rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.7);
+  font-weight: 500;
+  max-width: none;
+}
+
+.splash-bar-track {
+  width: 160px;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.splash-bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #d4af37, #f5d061);
+  border-radius: 4px;
+  animation: splash-bar-grow 1.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes splash-bar-grow {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+.splash-wipe {
+  position: absolute;
+  inset: 0;
+  background: #07050e;
+  transform: translateY(100%);
+}
+
+/* ── 7. Sticky Floating CTA Bar ───────────────────────────────── */
+.sticky-cta-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9000;
+  pointer-events: none;
+  transform: translateY(100%);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sticky-cta-bar.sticky-cta-visible {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sticky-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 680px;
+  margin: 0 auto 1.5rem;
+  padding: 0.9rem 1.2rem 0.9rem 1.4rem;
+  background: rgba(12, 10, 23, 0.94);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  border-radius: 9999px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+.sticky-cta-text {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.sticky-cta-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #30d158;
+  box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.4);
+  animation: pulse-ring 2s ease infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.4); }
+  70%  { box-shadow: 0 0 0 7px rgba(48, 209, 88, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0); }
+}
+
+.sticky-cta-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.sticky-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
+  color: #07050e;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  letter-spacing: -0.01em;
+}
+
+.sticky-cta-btn:hover {
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
+  transform: scale(1.03);
+  opacity: 1;
+}
+
+.sticky-cta-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sticky-cta-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Hide on mobile — nav bar occupies bottom */
+@media (max-width: 767px) { .sticky-cta-bar { display: none; } }
+
+/* ── 8. Artist Card Tilt / Hover Reveal ───────────────────────── */
+.artist-card-premium {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  transform-style: preserve-3d;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  will-change: transform;
+}
+
+.artist-card-premium:hover {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.artist-card-img-wrap {
+  position: relative;
+  aspect-ratio: 3/4;
+  overflow: hidden;
+}
+
+.artist-card-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.artist-card-premium:hover .artist-card-img-wrap img {
+  transform: scale(1.07);
+}
+
+/* Reveal overlay — slides up on hover */
+.artist-card-reveal {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1.5rem 1.25rem 1.25rem;
+  background: linear-gradient(to top, rgba(7, 5, 14, 0.96) 0%, rgba(7, 5, 14, 0.7) 60%, transparent 100%);
+  transform: translateY(30%);
+  opacity: 0.6;
+  transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              opacity 0.35s ease;
+}
+
+.artist-card-premium:hover .artist-card-reveal {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.artist-card-genre-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  margin-bottom: 0.6rem;
+}
+
+.artist-card-name {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #f5f5f7;
+  margin: 0 0 0.35rem;
+  line-height: 1.15;
+}
+
+.artist-card-bio {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  max-width: 36ch;
+  margin-bottom: 0.9rem;
+}
+
+.artist-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  transition: gap 0.2s ease;
+}
+
+.artist-card-cta:hover { gap: 8px; opacity: 1; }
+
+/* Available status glow */
+.status-available-glow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #30d158;
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  background: rgba(7, 5, 14, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 0.3rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(48, 209, 88, 0.25);
+}
+
+.status-glow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #30d158;
+  box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.4);
+  animation: pulse-ring 2s ease infinite;
+}
+
+/* ── 9. Floating Label Inputs ─────────────────────────────────── */
+.floating-field {
+  position: relative;
+  margin-top: 0.25rem;
+}
+
+.floating-field input,
+.floating-field textarea {
+  padding-top: 1.4rem;
+  padding-bottom: 0.5rem;
+}
+
+.floating-field label {
+  position: absolute;
+  top: 0.85rem;
+  left: 1rem;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: all 0.2s ease;
+  transform-origin: left top;
+}
+
+.floating-field input:focus ~ label,
+.floating-field input:not(:placeholder-shown) ~ label,
+.floating-field textarea:focus ~ label,
+.floating-field textarea:not(:placeholder-shown) ~ label {
+  transform: translateY(-0.55rem) scale(0.72);
+  color: var(--accent);
+}
+
+/* ── 10. Kinetic Text Swap ────────────────────────────────────── */
+.kinetic-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.kinetic-word-inner {
+  display: inline-block;
+  animation: kinetic-swap 6s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+@keyframes kinetic-swap {
+  0%,  28% { transform: translateY(0); opacity: 1; }
+  33%       { transform: translateY(-110%); opacity: 0; }
+  34%       { transform: translateY(110%); opacity: 0; }
+  38%, 62%  { transform: translateY(0); opacity: 1; }
+  67%       { transform: translateY(-110%); opacity: 0; }
+  68%       { transform: translateY(110%); opacity: 0; }
+  72%, 95%  { transform: translateY(0); opacity: 1; }
+  100%      { transform: translateY(-110%); opacity: 0; }
+}
+
+/* ── 11. Counter number animation ─────────────────────────────── */
+.counter-value {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
