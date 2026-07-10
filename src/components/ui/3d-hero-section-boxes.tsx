@@ -330,23 +330,23 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
           color: #ffffff;
           margin: 0 0 1.25rem;
           white-space: pre-line;
-          text-shadow: 0 2px 40px rgba(0,0,0,0.8);
+          text-shadow: 0 4px 30px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8);
         }
 
         .hero-sub {
           font-family: var(--font-body);
           font-size: clamp(0.95rem, 1.8vw, 1.25rem);
-          color: rgba(255,255,255,0.65);
+          color: rgba(255,255,255,0.85);
           line-height: 1.6;
           margin: 0 auto 2rem;
           max-width: 520px;
-          text-shadow: 0 1px 20px rgba(0,0,0,0.7);
+          text-shadow: 0 2px 20px rgba(0,0,0,0.95), 0 1px 5px rgba(0,0,0,0.85);
         }
 
         .hero-tags-wrapper {
           display: flex;
           flex-wrap: wrap;
-          gap: 0.6rem;
+          gap: 0.65rem;
           justify-content: center;
           margin-bottom: 2rem;
         }
@@ -354,14 +354,15 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
         .hero-tag-pill {
           font-family: var(--font-body);
           font-size: clamp(0.82rem, 1.4vw, 1rem);
-          color: rgba(255,255,255,0.55);
-          border: 1px solid rgba(255,255,255,0.15);
-          borderRadius: 100px;
-          padding: 0.35rem 1.1rem;
-          background: rgba(255,255,255,0.04);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
+          color: #ffffff;
+          border: 1px solid rgba(212,175,55,0.4);
+          border-radius: 100px;
+          padding: 0.45rem 1.25rem;
+          background: rgba(7, 5, 14, 0.85);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           letter-spacing: 0.02em;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.6);
         }
 
         .hero-ctas-wrapper {

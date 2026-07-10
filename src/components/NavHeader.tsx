@@ -86,7 +86,10 @@ export function NavHeader() {
             <div className="user-menu-wrap" ref={userMenuRef}>
               <button
                 className="user-menu-trigger"
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => {
+                  setUserMenuOpen(!userMenuOpen);
+                  if (!userMenuOpen) setMobileMenuOpen(false);
+                }}
                 aria-expanded={userMenuOpen}
                 aria-label="User menu"
               >
@@ -148,7 +151,10 @@ export function NavHeader() {
           {/* Mobile toggle */}
           <button
             className="mobile-menu-toggle"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() => {
+              setMobileMenuOpen(!mobileMenuOpen);
+              if (!mobileMenuOpen) setUserMenuOpen(false);
+            }}
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -255,87 +261,106 @@ export function NavHeader() {
         }
         .user-dropdown {
           position: absolute;
-          top: calc(100% + 8px);
+          top: calc(100% + 10px);
           right: 0;
-          width: 240px;
-          background: rgba(12, 10, 23, 0.97);
-          backdrop-filter: blur(28px);
-          -webkit-backdrop-filter: blur(28px);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: var(--radius-lg);
-          box-shadow: var(--shadow-xl);
+          width: 250px;
+          background: rgba(10, 8, 20, 0.76);
+          backdrop-filter: blur(36px) saturate(210%);
+          -webkit-backdrop-filter: blur(36px) saturate(210%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 18px;
+          box-shadow: 
+            0 30px 60px rgba(0, 0, 0, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12); /* Glossy top bevel */
           overflow: hidden;
-          animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-          z-index: 100;
+          animation: premiumDropdownIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          z-index: 1000;
         }
-        @keyframes dropdownIn {
-          from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+        @keyframes premiumDropdownIn {
+          from { opacity: 0; transform: translateY(-8px) scale(0.96); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
         .user-dropdown-header {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 1rem;
+          gap: 0.85rem;
+          padding: 1.1rem;
+          background: rgba(255, 255, 255, 0.015);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
         .user-avatar-lg {
-          width: 36px;
-          height: 36px;
+          width: 38px;
+          height: 38px;
           border-radius: 50%;
           background: var(--accent-gradient);
           color: #07050e;
-          font-size: 0.75rem;
+          font-size: 0.8rem;
           font-weight: 700;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
+          border: 2px solid rgba(212, 175, 55, 0.3);
+          box-shadow: 0 0 10px rgba(212, 175, 55, 0.1);
         }
         .dropdown-name {
           font-size: 0.875rem;
           font-weight: 600;
           color: var(--text-primary);
           max-width: none;
-          margin: 0 0 2px;
+          margin: 0 0 3px;
+          letter-spacing: -0.01em;
         }
         .dropdown-role {
-          font-size: 0.7rem;
-          color: var(--text-muted);
+          font-size: 0.65rem;
+          color: var(--accent);
           max-width: none;
           margin: 0;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
+          letter-spacing: 0.08em;
+          font-weight: 700;
         }
         .user-dropdown-divider {
           height: 1px;
-          background: rgba(255,255,255,0.06);
+          background: rgba(255, 255, 255, 0.04);
           margin: 0;
         }
         .user-dropdown-item {
           display: flex;
           align-items: center;
-          gap: 0.6rem;
+          gap: 0.75rem;
           width: 100%;
-          padding: 0.65rem 1rem;
-          font-size: 0.875rem;
+          padding: 0.75rem 1.1rem;
+          font-size: 0.84rem;
           color: var(--text-secondary);
           background: none;
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: all var(--transition-fast);
+          transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
           text-decoration: none;
         }
         .user-dropdown-item:hover {
-          background: rgba(255,255,255,0.05);
+          background: rgba(255, 255, 255, 0.035);
           color: var(--text-primary);
+          padding-left: 1.3rem; /* Micro-slide on hover */
+        }
+        .user-dropdown-item svg {
+          color: var(--text-muted);
+          transition: color 0.2s;
+        }
+        .user-dropdown-item:hover svg {
+          color: var(--accent);
         }
         .user-dropdown-signout {
           color: #ff453a;
         }
         .user-dropdown-signout:hover {
-          background: rgba(255, 69, 58, 0.08);
+          background: rgba(255, 69, 58, 0.06);
+          color: #ff453a;
+          padding-left: 1.3rem;
+        }
+        .user-dropdown-signout:hover svg {
           color: #ff453a;
         }
       `}</style>

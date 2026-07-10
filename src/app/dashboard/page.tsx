@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -18,7 +18,7 @@ import {
   AlertTriangle, MoreHorizontal, Shield,
   CreditCard, Globe, Link2,
   Mail, Phone, Tag, Package,
-  Save, Loader2, Menu
+  Save, Loader2, Menu, Upload
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -343,6 +343,133 @@ function FSelect({ value, onChange, options }: {
     >
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
+  );
+}
+
+function FImageUpload({ value, onChange, label, aspect = 'square' }: {
+  value: string; onChange: (v: string) => void; label: string; aspect?: 'square' | 'wide';
+}) {
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onChange(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleClear = () => {
+    onChange('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const isBase64 = value?.startsWith('data:image/');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
+        <button 
+          type="button"
+          onClick={() => setShowUrlInput(!showUrlInput)}
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '0.72rem', cursor: 'pointer', padding: 0, fontWeight: 500 }}
+        >
+          {showUrlInput ? 'Switch to File Upload' : 'Link via Image URL'}
+        </button>
+      </div>
+
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+      />
+
+      {showUrlInput ? (
+        <FInput value={isBase64 ? '' : value} onChange={onChange} placeholder="https://..." />
+      ) : (
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          {value ? (
+            <div style={{ 
+              position: 'relative', 
+              width: aspect === 'square' ? 52 : 92, 
+              height: 52, 
+              borderRadius: aspect === 'square' ? '50%' : 8, 
+              overflow: 'hidden', 
+              border: '2px solid rgba(212,175,55,0.3)', 
+              background: 'rgba(255,255,255,0.04)',
+              flexShrink: 0 
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={value} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <button 
+                type="button" 
+                onClick={handleClear}
+                style={{ 
+                  position: 'absolute', 
+                  top: 2, 
+                  right: 2, 
+                  background: 'rgba(0,0,0,0.7)', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  width: 16, 
+                  height: 16, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer',
+                  color: 'white',
+                  padding: 0
+                }}
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                height: 44,
+                flexGrow: 1,
+                border: '1px dashed rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: 8,
+                color: 'var(--text-muted)',
+                fontSize: '0.8125rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--accent)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+              }}
+            >
+              <Upload size={13} /> Select Image File
+            </button>
+          )}
+          {value && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {isBase64 ? 'Local file selected' : 'URL linked'}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -802,30 +929,20 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <Field label="Bio"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
 
-            {/* Image fields with preview */}
+            {/* Image fields with device upload + preview support */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
-              <div>
-                <Field label="Profile Image URL">
-                  <FInput value={form.profile_image} onChange={v => setForm(f => ({ ...f, profile_image: v }))} placeholder="https://..." />
-                </Field>
-                {form.profile_image && (
-                  <div style={{ marginTop: '0.5rem', width: 60, height: 60, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(212,175,55,0.3)', background: 'rgba(255,255,255,0.04)' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={form.profile_image} alt="Profile preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  </div>
-                )}
-              </div>
-              <div>
-                <Field label="Cover Image URL">
-                  <FInput value={form.cover_image} onChange={v => setForm(f => ({ ...f, cover_image: v }))} placeholder="https://..." />
-                </Field>
-                {form.cover_image && (
-                  <div style={{ marginTop: '0.5rem', width: '100%', height: 52, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={form.cover_image} alt="Cover preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  </div>
-                )}
-              </div>
+              <FImageUpload 
+                label="Profile Image" 
+                value={form.profile_image} 
+                onChange={v => setForm(f => ({ ...f, profile_image: v }))} 
+                aspect="square" 
+              />
+              <FImageUpload 
+                label="Cover Image" 
+                value={form.cover_image} 
+                onChange={v => setForm(f => ({ ...f, cover_image: v }))} 
+                aspect="wide" 
+              />
             </div>
 
             <Field label="Technical Rider"><FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={2} /></Field>
