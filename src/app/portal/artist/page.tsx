@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export default function ArtistPortal() {
-  const { user } = useAuth();
+  const { user, profile, loading: authLoading, isArtist } = useAuth();
   
   const [artistProfile, setArtistProfile] = useState<Artist | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -26,10 +26,12 @@ export default function ArtistPortal() {
   const [riderSaving, setRiderSaving] = useState(false);
   const [riderSavedMessage, setRiderSavedMessage] = useState(false);
 
-  // Calendar dates helper
-  const daysInMonth = 30; // June 2026
-  const startingDayOfWeek = 1; // June 1, 2026 is Monday
-  const monthName = "June 2026";
+  // Calendar helpers — always shows current month
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const startingDayOfWeek = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
+  const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const todayDate = today.getDate();
   
   const calendarCells = [];
   for (let i = 0; i < startingDayOfWeek; i++) calendarCells.push(null);
@@ -40,11 +42,9 @@ export default function ArtistPortal() {
     try {
       const allArtists = await db.getArtists();
       
-      // Determine which artist is logged in
-      // Admin/Manager Robert represents Beres Hammond or Chronixx, Artist Koffee represents Koffee
       let targetArtist = allArtists[0]; // fallback
       if (user.role === 'Artist') {
-        targetArtist = allArtists.find(a => a.stage_name.toLowerCase().includes(user.first_name.toLowerCase())) || allArtists.find(a => a.manager_id === user.id) || allArtists[0];
+        targetArtist = allArtists.find(a => a.stage_name.toLowerCase().includes(profile?.first_name?.toLowerCase() || '')) || allArtists.find(a => a.manager_id === user.id) || allArtists[0];
       } else if (user.role === 'Artist Manager') {
         targetArtist = allArtists.find(a => a.manager_id === user.id) || allArtists[0];
       }
@@ -63,8 +63,8 @@ export default function ArtistPortal() {
 
       const availDates = await db.getArtistAvailability(targetArtist.id);
       setBlockedDates(availDates);
-    } catch (err) {
-      console.error('Failed to load artist portal:', err);
+    } catch {
+      // Portal data load failed — empty states will display
     } finally {
       setLoading(false);
     }
@@ -74,46 +74,34 @@ export default function ArtistPortal() {
     loadArtistData();
   }, [user]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="container center-loading" style={{ color: 'var(--gold-primary)', padding: '50px 20px', textAlign: 'center' }}>
-        Loading Artist Portal...
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '2px solid rgba(212,175,55,0.2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading your hub…</p>
+        </div>
       </div>
     );
   }
 
-  // Permission lock
-  if (!user || (user.role !== 'Artist' && user.role !== 'Artist Manager')) {
+  if (!user || !isArtist) {
     return (
-      <div className="container dashboard-unauthorized animate-fade">
-        <ShieldAlert className="unauth-icon" />
-        <h2>Artist Portal Access Restricted</h2>
-        <p>This panel is reserved for representable Artists and Managers. Please use the floating control panel in the bottom corner to swap identity to Beres Hammond (Artist), Koffee (Artist), or Robert Livingston (Manager) to inspect active calendars, gig riders, and payments.</p>
-        <style jsx>{`
-          .dashboard-unauthorized {
-            text-align: center;
-            max-width: 600px;
-            padding: var(--spacing-xxl) 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            margin: 0 auto;
-          }
-          .unauth-icon {
-            width: 64px;
-            height: 64px;
-            color: var(--color-warning);
-          }
-        `}</style>
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4rem 1.5rem' }}>
+        <div>
+          <ShieldAlert style={{ width: 48, height: 48, color: 'var(--accent)', marginBottom: '1rem' }} />
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem' }}>Artist Access Required</h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '40ch', margin: '0 auto' }}>This hub is reserved for registered Showtime artists and managers. Please sign in with your artist account to continue.</p>
+        </div>
       </div>
     );
   }
 
-  // Toggle calendar dates
   const handleDayClick = async (day: number) => {
     if (!artistProfile) return;
-    const dateStr = `2026-06-${day.toString().padStart(2, '0')}`;
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const nextDates = await db.toggleArtistDate(artistProfile.id, dateStr);
     setBlockedDates(nextDates);
   };

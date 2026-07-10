@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /talent
+Allow: /services
+Allow: /events
+Allow: /about
+Allow: /contact
+Allow: /book
+Allow: /ai-assistant
+
+# Block internal portals and auth from crawlers
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /portal/
+Disallow: /auth/
+Disallow: /unauthorized
+Disallow: /account
+
+Sitemap: https://showtimeservices.com/sitemap.xml

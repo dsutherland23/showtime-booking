@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 
 // Types corresponding to the PostgreSQL tables
 export interface User {
@@ -1066,10 +1066,10 @@ const SEED_WEBSITE_SECTIONS: WebsiteSection[] = [
 ];
 
 const SEED_INTEGRATIONS: Integration[] = [
-  { id: 'int-stripe', name: 'Stripe Payment Gateway', provider: 'Stripe', status: 'Connected', api_key: 'pk_live_51M...' },
-  { id: 'int-twilio', name: 'Twilio SMS Business API', provider: 'Twilio', status: 'Connected', api_key: 'AC...' },
-  { id: 'int-paypal', name: 'PayPal Commerce Platform', provider: 'PayPal', status: 'Connected', api_key: 'client_id_...' },
-  { id: 'int-sendgrid', name: 'SendGrid Email API Service', provider: 'SendGrid', status: 'Connected', api_key: 'SG...' }
+  { id: 'int-stripe', name: 'Stripe Payment Gateway', provider: 'Stripe', status: 'Disconnected', api_key: '' },
+  { id: 'int-twilio', name: 'Twilio SMS Business API', provider: 'Twilio', status: 'Disconnected', api_key: '' },
+  { id: 'int-paypal', name: 'PayPal Commerce Platform', provider: 'PayPal', status: 'Disconnected', api_key: '' },
+  { id: 'int-sendgrid', name: 'SendGrid Email API Service', provider: 'SendGrid', status: 'Disconnected', api_key: '' }
 ];
 
 
@@ -1077,6 +1077,15 @@ const SEED_INTEGRATIONS: Integration[] = [
 // Initialize local DB state helper
 const getStoreValue = <T>(key: string, seed: T[]): T[] => {
   if (typeof window === 'undefined') return seed;
+
+  // Migrate from old 'st_artists' to 'st_artists_v2' if needed
+  if (key === 'st_artists_v2' && !localStorage.getItem('st_artists_v2')) {
+    const oldRaw = localStorage.getItem('st_artists');
+    if (oldRaw) {
+      localStorage.setItem('st_artists_v2', oldRaw);
+    }
+  }
+
   const raw = localStorage.getItem(key);
   if (!raw) {
     localStorage.setItem(key, JSON.stringify(seed));
@@ -1113,16 +1122,17 @@ const setStoreValue = <T>(key: string, data: T[]) => {
 };
 
 // ---------------------------------------------------------
-// Supabase Client Initialization (if credentials exist)
+// Supabase Client Initialization (uses shared singleton)
 // ---------------------------------------------------------
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+// Only treat as configured if values are real (not placeholder defaults)
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey
+  && !supabaseUrl.includes('your-project-ref')
+  && !supabaseAnonKey.includes('your-anon-key'));
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+export const supabase = isSupabaseConfigured ? createClient() : null;
 
 // ---------------------------------------------------------
 // DATABASE CRUD API LAYER

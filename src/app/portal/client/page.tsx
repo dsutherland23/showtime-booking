@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export default function ClientPortal() {
-  const { user } = useAuth();
+  const { user, profile, loading: authLoading, isClient } = useAuth();
   
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -39,9 +39,7 @@ export default function ClientPortal() {
     if (!user) return;
     try {
       const allBks = await db.getBookings();
-      // Filter bookings for this client
-      // For simulator simplicity, let's show all or filter by name matching
-      const clientBks = allBks.filter(b => b.client_id.includes('cli') || b.client_name.toLowerCase().includes(user.last_name.toLowerCase()));
+      const clientBks = allBks.filter(b => b.client_id === user.id || b.client_name.toLowerCase().includes(profile?.last_name?.toLowerCase() || ''));
       setBookings(clientBks);
 
       const allCtrs = await db.getContracts();
@@ -51,11 +49,10 @@ export default function ClientPortal() {
       const allInvs = await db.getInvoices();
       setInvoices(allInvs.filter(i => bkIds.includes(i.booking_id)));
 
-      // Load messages with Sarah Silverman (usr-agent-1)
-      const chatMsgs = await db.getMessages(user.id, 'usr-agent-1');
+      const chatMsgs = await db.getMessages(user.id, 'staff');
       setMessages(chatMsgs);
-    } catch (err) {
-      console.error('Failed to load client data:', err);
+    } catch {
+      // Data load failed silently — empty states will display
     }
   };
 
@@ -70,30 +67,28 @@ export default function ClientPortal() {
     }
   }, [messages, activeTab]);
 
-  // Unauthorized page
-  if (!user || user.role !== 'Client') {
+  // Auth loading state
+  if (authLoading) {
     return (
-      <div className="container dashboard-unauthorized animate-fade">
-        <ShieldAlert className="unauth-icon" />
-        <h2>Client Hub Restricted</h2>
-        <p>This portal is reserved for Showtime Clients. Please use the floating control panel in the bottom corner to swap identity to Michael Eavis (Client) to view client bookings, contract agreements, invoices, and messaging portals.</p>
-        <style jsx>{`
-          .dashboard-unauthorized {
-            text-align: center;
-            max-width: 600px;
-            padding: var(--spacing-xxl) 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1rem;
-            margin: 0 auto;
-          }
-          .unauth-icon {
-            width: 64px;
-            height: 64px;
-            color: var(--color-warning);
-          }
-        `}</style>
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '2px solid rgba(212,175,55,0.2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Loading your portal…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthorized
+  if (!user || !isClient) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4rem 1.5rem' }}>
+        <div>
+          <ShieldAlert style={{ width: 48, height: 48, color: 'var(--accent)', marginBottom: '1rem' }} />
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.75rem' }}>Client Access Required</h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '38ch', margin: '0 auto' }}>This portal is for Showtime clients. Please sign in with your client account to continue.</p>
+        </div>
       </div>
     );
   }
@@ -157,20 +152,11 @@ export default function ClientPortal() {
   // Send message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
-    await db.sendMessage(user.id, 'usr-agent-1', chatMessage);
+    if (!chatMessage.trim() || !user) return;
+    await db.sendMessage(user.id, 'staff', chatMessage);
     setChatMessage('');
-    
-    // Refresh messages
-    const chatMsgs = await db.getMessages(user.id, 'usr-agent-1');
+    const chatMsgs = await db.getMessages(user.id, 'staff');
     setMessages(chatMsgs);
-
-    // Mock agent automated instant reply on first message for high interactive feel
-    setTimeout(async () => {
-      await db.sendMessage('usr-agent-1', user.id, 'Hi Michael! I have received your message. I am currently verifying technical riders with the artist representative and will get back to you shortly.');
-      const updatedMsgs = await db.getMessages(user.id, 'usr-agent-1');
-      setMessages(updatedMsgs);
-    }, 2000);
   };
 
   return (
@@ -180,8 +166,8 @@ export default function ClientPortal() {
       <div className="portal-header-row">
         <div>
           <span className="gold-badge">Client Portal</span>
-          <h2>Welcome back, {user.first_name}</h2>
-          <p>Review agreements, sign pending performance contracts, clear deposits, and consult with Sarah (Assigned Agent).</p>
+          <h2>Welcome back, {profile?.first_name}</h2>
+          <p>Review agreements, sign pending performance contracts, clear deposits, and message your assigned booking agent.</p>
         </div>
       </div>
 

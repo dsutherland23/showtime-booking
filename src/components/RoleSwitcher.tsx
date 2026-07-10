@@ -2,13 +2,15 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { isSupabaseReady } from '@/lib/supabase/client';
 import { Shield, ChevronDown, User, Star, Briefcase, FileText, Zap } from 'lucide-react';
 
 export const RoleSwitcher: React.FC = () => {
   const { user, usersList, switchUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  if (!user) return null;
+  // Switcher is for development/simulation mode only when Supabase is not ready
+  if (isSupabaseReady || !user || !usersList || !switchUser) return null;
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -300,3 +302,5 @@ export const RoleSwitcher: React.FC = () => {
     </div>
   );
 };
+
+export default RoleSwitcher;

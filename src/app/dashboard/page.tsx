@@ -1,3951 +1,2179 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db, Lead, Booking, Task, Notification, Invoice, Artist, Venue, Customer, User, TicketTier, PromoCode, MarketingCampaign, AdPlacement, WebsiteSection, Integration } from '@/utils/db';
-import { 
-  LayoutDashboard, Calendar, MapPin, Users, Ticket, Receipt, FileEdit,
-  Globe, Megaphone, BarChart3, CircleDollarSign, Brain, ShieldCheck, Cable, Settings,
-  Search, Menu, X, ChevronLeft, ChevronRight, Plus, Trash, Check, AlertOctagon, Eye,
-  Play, Sparkles, Undo, Redo, Copy, ChevronDown, CheckSquare, Square, RefreshCw,
-  Mail, Phone, FileText, Trash2, Shield, CreditCard, Clock, Activity, Zap, Info
+import {
+  db,
+  Lead, Booking, Task, Notification, Invoice, Artist, Venue, Customer,
+  User, TicketTier, PromoCode, MarketingCampaign, AdPlacement,
+  WebsiteSection, Integration
+} from '@/utils/db';
+import {
+  LayoutDashboard, Calendar, Music, MapPin, Users, Ticket, Receipt,
+  DollarSign, Megaphone, Radio, FileText, ShieldCheck, Cable, Settings,
+  Search, Bell, ChevronLeft, ChevronRight, Plus, Trash2, Edit2, Eye,
+  X, AlertCircle, LogOut, RefreshCw, TrendingUp,
+  TrendingDown, Activity, Star, Clock, CheckCircle, XCircle,
+  AlertTriangle, MoreHorizontal, Shield,
+  CreditCard, Globe, Link2,
+  Mail, Phone, Tag, Package,
+  Save, Loader2, Menu
 } from 'lucide-react';
 
-// Navigation tabs matching the user spec
-const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, category: 'Core Operations' },
-  { id: 'events', label: 'Events', icon: Calendar, category: 'Core Operations' },
-  { id: 'venues', label: 'Venues', icon: MapPin, category: 'Core Operations' },
-  { id: 'artists', label: 'Artists', icon: Users, category: 'Core Operations' },
-  { id: 'tickets', label: 'Tickets', icon: Ticket, category: 'Core Operations' },
-  { id: 'orders', label: 'Orders', icon: Receipt, category: 'Core Operations' },
-  { id: 'customers', label: 'Customers', icon: Users, category: 'Core Operations' },
-  { id: 'content', label: 'Content CMS', icon: FileEdit, category: 'Website Management' },
-  { id: 'builder', label: 'Website Builder', icon: Globe, category: 'Website Management' },
-  { id: 'marketing', label: 'Marketing', icon: Megaphone, category: 'Growth & Promo' },
-  { id: 'advertising', label: 'Advertising', icon: Megaphone, category: 'Growth & Promo' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, category: 'Administration' },
-  { id: 'finance', label: 'Finance', icon: CircleDollarSign, category: 'Administration' },
-  { id: 'ai-ops', label: 'AI Operations', icon: Brain, category: 'Administration' },
-  { id: 'staff', label: 'Staff & Roles', icon: ShieldCheck, category: 'Settings' },
-  { id: 'integrations', label: 'Integrations', icon: Cable, category: 'Settings' },
-  { id: 'settings', label: 'System Settings', icon: Settings, category: 'Settings' }
-] as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type TabId = typeof NAV_ITEMS[number]['id'];
+type NavSection = 'Core Operations' | 'Financial' | 'Growth' | 'Website' | 'System';
 
-// Default roles visibility matching DB and RBAC
-const ROLE_PERMISSIONS: Record<string, TabId[]> = {
-  'Super Admin': NAV_ITEMS.map(i => i.id),
-  'Owner': NAV_ITEMS.map(i => i.id),
-  'Finance Manager': ['dashboard', 'finance', 'analytics', 'orders', 'settings'],
-  'Marketing Manager': ['dashboard', 'marketing', 'advertising', 'content', 'builder', 'analytics'],
-  'Content Manager': ['dashboard', 'content', 'builder', 'artists', 'venues'],
-  'Support Agent': ['dashboard', 'customers', 'orders', 'tickets'],
-  'Promoter': ['dashboard', 'events', 'tickets', 'analytics'],
-  'Venue Manager': ['dashboard', 'venues', 'events'],
-  'Booking Agent': ['dashboard', 'events', 'artists', 'orders', 'customers']
-};
-
-interface ImageUploaderProps {
+interface NavItem {
+  id: string;
   label: string;
-  value?: string;
-  onChange: (base64: string) => void;
+  icon: React.ElementType;
+  section: NavSection;
+  permission?: string;
+  adminOnly?: boolean;
 }
 
-function ImageUploader({ label, value, onChange }: ImageUploaderProps) {
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const NAV_ITEMS: NavItem[] = [
+  { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard, section: 'Core Operations', permission: 'view_dashboard' },
+  { id: 'bookings',     label: 'Bookings',      icon: Calendar,        section: 'Core Operations', permission: 'manage_bookings' },
+  { id: 'artists',      label: 'Artists',       icon: Music,           section: 'Core Operations', permission: 'view_artists' },
+  { id: 'events',       label: 'Events',        icon: Star,            section: 'Core Operations', permission: 'view_events' },
+  { id: 'venues',       label: 'Venues',        icon: MapPin,          section: 'Core Operations', permission: 'manage_venues' },
+  { id: 'customers',    label: 'Customers',     icon: Users,           section: 'Core Operations', permission: 'view_customers' },
+  { id: 'finance',      label: 'Finance',       icon: DollarSign,      section: 'Financial',       permission: 'view_finance' },
+  { id: 'orders',       label: 'Orders',        icon: Receipt,         section: 'Financial',       permission: 'view_orders' },
+  { id: 'tickets',      label: 'Tickets',       icon: Ticket,          section: 'Financial',       permission: 'view_tickets' },
+  { id: 'marketing',    label: 'Marketing',     icon: Megaphone,       section: 'Growth',          permission: 'manage_marketing' },
+  { id: 'advertising',  label: 'Advertising',   icon: Radio,           section: 'Growth',          permission: 'manage_advertising' },
+  { id: 'content',      label: 'Content CMS',   icon: FileText,        section: 'Website',         permission: 'manage_content' },
+  { id: 'staff',        label: 'Staff & Roles', icon: ShieldCheck,     section: 'System',          adminOnly: true },
+  { id: 'integrations', label: 'Integrations',  icon: Cable,           section: 'System',          adminOnly: true },
+  { id: 'settings',     label: 'Settings',      icon: Settings,        section: 'System',          adminOnly: true },
+];
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (png, jpg, jpeg, webp, gif).');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        onChange(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
+const NAV_SECTIONS: { id: NavSection; label: string }[] = [
+  { id: 'Core Operations', label: 'Core Operations' },
+  { id: 'Financial',       label: 'Financial' },
+  { id: 'Growth',          label: 'Growth' },
+  { id: 'Website',         label: 'Website' },
+  { id: 'System',          label: 'System' },
+];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
-    }
-  };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
+function fmtCurrency(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
+function fmtDate(iso: string) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function initials(first: string, last: string) {
+  return `${first?.[0] ?? ''}${last?.[0] ?? ''}`.toUpperCase();
+}
+
+function statusColor(status: string): { bg: string; color: string } {
+  const map: Record<string, { bg: string; color: string }> = {
+    Active:               { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Available:            { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Confirmed:            { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Completed:            { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Paid:                 { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Connected:            { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Inquiry:              { bg: 'rgba(100,210,255,0.12)', color: '#64d2ff' },
+    'Proposal Generated': { bg: 'rgba(100,210,255,0.12)', color: '#64d2ff' },
+    'Lead Received':      { bg: 'rgba(100,210,255,0.12)', color: '#64d2ff' },
+    Qualified:            { bg: 'rgba(100,210,255,0.12)', color: '#64d2ff' },
+    'In Progress':        { bg: 'rgba(100,210,255,0.12)', color: '#64d2ff' },
+    'Contract Sent':      { bg: 'rgba(212,175,55,0.12)',  color: '#d4af37' },
+    'Deposit Paid':       { bg: 'rgba(212,175,55,0.12)',  color: '#d4af37' },
+    'Proposal Sent':      { bg: 'rgba(212,175,55,0.12)',  color: '#d4af37' },
+    Negotiation:          { bg: 'rgba(212,175,55,0.12)',  color: '#d4af37' },
+    'Deposit Received':   { bg: 'rgba(48,209,88,0.12)',   color: '#30d158' },
+    Unpaid:               { bg: 'rgba(255,159,10,0.12)',  color: '#ff9f0a' },
+    'Partially Paid':     { bg: 'rgba(255,159,10,0.12)',  color: '#ff9f0a' },
+    Pending:              { bg: 'rgba(255,159,10,0.12)',  color: '#ff9f0a' },
+    Overdue:              { bg: 'rgba(255,69,58,0.12)',   color: '#ff453a' },
+    Cancelled:            { bg: 'rgba(255,69,58,0.12)',   color: '#ff453a' },
+    'On Hold':            { bg: 'rgba(255,69,58,0.12)',   color: '#ff453a' },
+    Suspended:            { bg: 'rgba(255,69,58,0.12)',   color: '#ff453a' },
+    Disconnected:         { bg: 'rgba(255,69,58,0.12)',   color: '#ff453a' },
+    Inactive:             { bg: 'rgba(113,113,122,0.12)', color: '#71717a' },
+    'On Tour':            { bg: 'rgba(191,90,242,0.12)',  color: '#bf5af2' },
+    Booked:               { bg: 'rgba(191,90,242,0.12)',  color: '#bf5af2' },
   };
+  return map[status] ?? { bg: 'rgba(113,113,122,0.12)', color: '#71717a' };
+}
+
+// ─── UI Primitives ────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const { bg, color } = statusColor(status);
+  return (
+    <span style={{
+      background: bg, color,
+      fontSize: '0.72rem', fontWeight: 600,
+      padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+    }}>
+      {status}
+    </span>
+  );
+}
+
+function StatCard({
+  label, value, sub, icon: Icon, trend, trendUp,
+}: {
+  label: string; value: string; sub?: string;
+  icon: React.ElementType; trend?: string; trendUp?: boolean;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: hov ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${hov ? 'rgba(212,175,55,0.3)' : 'rgba(255,255,255,0.07)'}`,
+        borderRadius: 'var(--radius-lg)',
+        padding: '1.25rem 1.4rem',
+        display: 'flex', flexDirection: 'column', gap: '0.5rem',
+        transition: 'all 0.22s ease', cursor: 'default',
+        boxShadow: hov ? '0 8px 32px rgba(0,0,0,0.3)' : 'none',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
+        <span style={{
+          width: 32, height: 32, borderRadius: 10,
+          background: 'rgba(212,175,55,0.1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <Icon size={15} color="var(--accent)" />
+        </span>
+      </div>
+      <div style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+        {value}
+      </div>
+      {(sub || trend) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: 2 }}>
+          {trend && (
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 2,
+              fontSize: '0.72rem', fontWeight: 600,
+              color: trendUp ? 'var(--color-success)' : 'var(--color-error)',
+            }}>
+              {trendUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}{trend}
+            </span>
+          )}
+          {sub && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ABtn({
+  onClick, children, variant = 'primary', size = 'md', disabled = false,
+}: {
+  onClick?: () => void; children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'sm' | 'md'; disabled?: boolean;
+}) {
+  const [hov, setHov] = useState(false);
+  const s: Record<string, React.CSSProperties> = {
+    primary: {
+      background: hov ? 'linear-gradient(135deg,#ffde7a,#e5bd44)' : 'var(--accent-gradient)',
+      color: '#07050e', fontWeight: 600,
+      boxShadow: hov ? '0 6px 20px rgba(212,175,55,0.4)' : '0 4px 14px rgba(212,175,55,0.25)',
+    },
+    secondary: {
+      background: hov ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
+      color: hov ? 'var(--accent)' : 'var(--text-primary)',
+      border: `1px solid ${hov ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.12)'}`,
+    },
+    ghost: {
+      background: hov ? 'rgba(255,255,255,0.06)' : 'transparent',
+      color: hov ? 'var(--text-primary)' : 'var(--text-secondary)',
+    },
+    danger: {
+      background: hov ? 'rgba(255,69,58,0.2)' : 'rgba(255,69,58,0.1)',
+      color: '#ff453a',
+      border: `1px solid ${hov ? 'rgba(255,69,58,0.5)' : 'rgba(255,69,58,0.2)'}`,
+    },
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+        padding: size === 'sm' ? '0.35rem 0.8rem' : '0.5rem 1rem',
+        fontSize: size === 'sm' ? '0.78rem' : '0.85rem',
+        borderRadius: 8, border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.18s ease',
+        fontFamily: 'var(--font-body)',
+        opacity: disabled ? 0.5 : 1,
+        letterSpacing: '-0.01em',
+        ...s[variant],
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Empty({ icon: Icon, msg }: { icon: React.ElementType; msg: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 2rem', gap: '0.75rem' }}>
+      <Icon size={36} style={{ opacity: 0.3, color: 'var(--text-muted)' }} />
+      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: 280, margin: 0 }}>{msg}</p>
+    </div>
+  );
+}
+
+function Tbl({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>{children}</table>
+    </div>
+  );
+}
+
+function TH({ cols }: { cols: string[] }) {
+  return (
+    <thead>
+      <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)' }}>
+        {cols.map(c => (
+          <th key={c} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            {c}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function TR({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <tr
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={onClick}
+      style={{
+        borderBottom: '1px solid var(--border-color)',
+        background: hov ? 'rgba(255,255,255,0.025)' : 'transparent',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'background 0.15s',
+      }}
+    >
+      {children}
+    </tr>
+  );
+}
+
+function TD({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
+  return (
+    <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem', color: muted ? 'var(--text-muted)' : 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+      {children}
+    </td>
+  );
+}
+
+const iStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 8,
+  padding: '0.55rem 0.85rem',
+  fontSize: '0.875rem',
+  color: 'var(--text-primary)',
+  width: '100%',
+  outline: 'none',
+  fontFamily: 'var(--font-body)',
+  transition: 'border-color 0.15s',
+};
+
+function FInput({ value, onChange, placeholder, type = 'text' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  const [f, setF] = useState(false);
+  return (
+    <input
+      type={type} value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      onFocus={() => setF(true)} onBlur={() => setF(false)}
+      style={{ ...iStyle, borderColor: f ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
+    />
+  );
+}
+
+function FTextarea({ value, onChange, placeholder, rows = 3 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  const [f, setF] = useState(false);
+  return (
+    <textarea
+      rows={rows} value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      onFocus={() => setF(true)} onBlur={() => setF(false)}
+      style={{ ...iStyle, resize: 'vertical', borderColor: f ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
+    />
+  );
+}
+
+function FSelect({ value, onChange, options }: {
+  value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [f, setF] = useState(false);
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onFocus={() => setF(true)} onBlur={() => setF(false)}
+      style={{ ...iStyle, borderColor: f ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
+    >
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px,1fr))', gap: '0.9rem' }}>
+      {children}
+    </div>
+  );
+}
+
+function FActions({ onCancel, saving, label = 'Save' }: { onCancel: () => void; saving?: boolean; label?: string }) {
+  return (
+    <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+      <ABtn variant="ghost" onClick={onCancel}>Cancel</ABtn>
+      <ABtn variant="primary" disabled={saving}>
+        {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+        {saving ? 'Saving…' : label}
+      </ABtn>
+    </div>
+  );
+}
+
+function Modal({ open, onClose, title, children, width = 540 }: {
+  open: boolean; onClose: () => void; title: string; children: React.ReactNode; width?: number;
+}) {
+  useEffect(() => {
+    if (open) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+  if (!open) return null;
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.7)', animation: 'scaleIn 0.2s ease' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ padding: '1.4rem' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDlg({ open, title, message, onConfirm, onCancel }: {
+  open: boolean; title: string; message: string; onConfirm: () => void; onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', padding: '1.5rem', width: '100%', maxWidth: 380, boxShadow: 'var(--shadow-xl)', animation: 'scaleIn 0.18s ease' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+          <AlertTriangle size={20} color="#ff9f0a" />
+          <div>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.25rem' }}>{title}</h4>
+            <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0 }}>{message}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+          <ABtn variant="ghost" onClick={onCancel} size="sm">Cancel</ABtn>
+          <ABtn variant="danger" onClick={onConfirm} size="sm">Delete</ABtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ message, type, onDone }: { message: string; type: 'success' | 'error'; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div style={{
+      position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999,
+      background: type === 'success' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)',
+      border: `1px solid ${type === 'success' ? 'rgba(48,209,88,0.4)' : 'rgba(255,69,58,0.4)'}`,
+      borderRadius: 'var(--radius-md)',
+      padding: '0.75rem 1.1rem',
+      display: 'flex', alignItems: 'center', gap: '0.6rem',
+      color: type === 'success' ? '#30d158' : '#ff453a',
+      fontSize: '0.875rem', fontWeight: 500,
+      boxShadow: 'var(--shadow-lg)',
+      animation: 'fadeInUp 0.3s ease',
+    }}>
+      {type === 'success' ? <CheckCircle size={15} /> : <XCircle size={15} />}
+      {message}
+    </div>
+  );
+}
+
+function AccessDenied() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1rem', padding: '2rem' }}>
+      <Shield size={48} color="var(--text-muted)" style={{ opacity: 0.35 }} />
+      <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Access Restricted</h2>
+      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: 320, margin: 0 }}>
+        You don't have permission to view this section. Contact your administrator if you believe this is an error.
+      </p>
+    </div>
+  );
+}
+
+function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+      <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>{title}</h3>
+      {action}
+    </div>
+  );
+}
+
+// ─── Dashboard Overview ───────────────────────────────────────────────────────
+
+function DashboardOverview({
+  bookings, leads, invoices, artists, tasks, onNavigate,
+}: {
+  bookings: Booking[]; leads: Lead[]; invoices: Invoice[];
+  artists: Artist[]; tasks: Task[]; onNavigate: (id: string) => void;
+}) {
+  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
+  const pendingRevenue = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Cancelled').reduce((s, i) => s + i.balance_due, 0);
+  const confirmedBookings = bookings.filter(b => b.status === 'Confirmed' || b.status === 'Completed').length;
+  const pendingTasks = tasks.filter(t => t.status !== 'Completed').length;
+  const recentBookings = [...bookings].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+  const urgentLeads = leads.filter(l => l.status === 'Lead Received' || l.status === 'Qualified').slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-white/50 text-xs font-semibold">{label}</label>
-      <div 
-        onDragEnter={handleDrag}
-        onDragOver={handleDrag}
-        onDragLeave={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition relative min-h-[120px] overflow-hidden ${
-          dragActive ? 'border-[#d4af37] bg-[#d4af37]/5' : 'border-white/10 hover:border-white/20 bg-white/5'
-        }`}
-      >
-        <input 
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleChange}
-        />
-        {value ? (
-          <div className="absolute inset-0 w-full h-full group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={value} alt="Preview" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1">
-              <span className="text-[10px] font-bold text-white uppercase tracking-wider">Drag or click to replace</span>
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange('');
-                }}
-                className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded"
-              >
-                Remove
-              </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px,1fr))', gap: '1rem' }}>
+        <StatCard label="Total Revenue" value={fmtCurrency(totalRevenue)} icon={DollarSign} trend="+12.4%" trendUp sub="vs last quarter" />
+        <StatCard label="Confirmed Bookings" value={String(confirmedBookings)} icon={Calendar} trend="+3" trendUp sub="this month" />
+        <StatCard label="Active Artists" value={String(artists.filter(a => a.availability_status === 'Active').length)} icon={Music} sub={`${artists.length} on roster`} />
+        <StatCard label="Pending Revenue" value={fmtCurrency(pendingRevenue)} icon={CreditCard} sub="awaiting collection" />
+        <StatCard label="Open Tasks" value={String(pendingTasks)} icon={CheckCircle} sub={`${tasks.length} total`} />
+        <StatCard label="New Leads" value={String(urgentLeads.length)} icon={Activity} sub="require follow-up" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.2rem' }}>
+          <SectionHead title="Recent Bookings" action={<ABtn variant="ghost" size="sm" onClick={() => onNavigate('bookings')}><Eye size={12} />View all</ABtn>} />
+          {recentBookings.length === 0 ? <Empty icon={Calendar} msg="No bookings yet" /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {recentBookings.map(b => (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.025)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.83rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.event_title}</div>
+                    <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{b.artist_name} · {fmtDate(b.event_date)}</div>
+                  </div>
+                  <StatusBadge status={b.status} />
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.2rem' }}>
+          <SectionHead title="Leads Needing Attention" action={<ABtn variant="ghost" size="sm" onClick={() => onNavigate('bookings')}><Eye size={12} />View all</ABtn>} />
+          {urgentLeads.length === 0 ? <Empty icon={Activity} msg="No pending leads" /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {urgentLeads.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.025)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.83rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.contact_name}</div>
+                    <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{l.company_name || l.country} · {fmtCurrency(l.budget)}</div>
+                  </div>
+                  <StatusBadge status={l.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.2rem' }}>
+        <SectionHead title="Open Tasks" />
+        {pendingTasks === 0 ? <Empty icon={CheckCircle} msg="All tasks complete!" /> : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {tasks.filter(t => t.status !== 'Completed').slice(0, 5).map(t => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.55rem 0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.025)' }}>
+                <Clock size={13} color="var(--text-muted)" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: '0.83rem', color: 'var(--text-primary)' }}>{t.title}</span>
+                  {t.due_date && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>Due {fmtDate(t.due_date)}</span>}
+                </div>
+                <StatusBadge status={t.status} />
+              </div>
+            ))}
           </div>
-        ) : (
-          <>
-            <svg className="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <div className="text-center">
-              <p className="text-xs text-white/80 font-medium">Click to upload or drag & drop</p>
-              <p className="text-[10px] text-white/40 mt-0.5">PNG, JPG, JPEG, WEBP or GIF</p>
-            </div>
-          </>
         )}
       </div>
     </div>
   );
 }
 
-export default function AdminPortal() {
-  const { user, hasPermission } = useAuth();
-  
-  // Dashboard & global state
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [emergencyKillActive, setEmergencyKillActive] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [commandSearch, setCommandSearch] = useState('');
-  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+// ─── Bookings Section ─────────────────────────────────────────────────────────
 
-  // DB Data
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [notifs, setNotifs] = useState<Notification[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [artists, setArtists] = useState<Artist[]>([]);
-  const [venues, setVenues] = useState<Venue[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([]);
-  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
-  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
-  const [adPlacements, setAdPlacements] = useState<AdPlacement[]>([]);
-  const [websiteSections, setWebsiteSections] = useState<WebsiteSection[]>([]);
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
+function BookingsSection({
+  bookings, leads, artists, onRefresh, showToast,
+}: {
+  bookings: Booking[]; leads: Lead[]; artists: Artist[];
+  onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [tab, setTab] = useState<'leads' | 'pipeline'>('leads');
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
 
-  // Modals & Builders
-  const [showEventBuilder, setShowEventBuilder] = useState(false);
-  const [eventBuilderStep, setEventBuilderStep] = useState(1);
-  const [showCreateLead, setShowCreateLead] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const STATUSES: Lead['status'][] = ['Lead Received', 'Qualified', 'Proposal Sent', 'Negotiation', 'Contract Sent', 'Deposit Received', 'Confirmed', 'Completed'];
+  const blankForm = { contact_name: '', company_name: '', email: '', phone: '', country: 'Jamaica', budget: '50000', preferred_date: new Date().toISOString().split('T')[0], artist_id: '', details: '', status: 'Lead Received' as Lead['status'] };
+  const [form, setForm] = useState(blankForm);
 
-  // Dynamic CRUD Panel State (Premium Drawer)
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [panelType, setPanelType] = useState<'event' | 'venue' | 'artist' | 'customer' | 'staff' | 'ticket' | 'promo' | 'order' | 'campaign' | 'ad' | 'section' | 'integration' | null>(null);
-  const [panelMode, setPanelMode] = useState<'create' | 'edit'>('create');
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-
-  // Form states for CRUD
-  const [eventForm, setEventForm] = useState({
-    artist_id: '',
-    event_title: '',
-    event_date: '',
-    event_venue: '',
-    event_country: '',
-    status: 'Inquiry' as Booking['status'],
-    total_amount: '50000',
-    deposit_amount: '25000',
-    client_name: '',
-    artist_image: ''
-  });
-
-  const [venueForm, setVenueForm] = useState({
-    name: '',
-    capacity: '',
-    location: '',
-    description: '',
-    parking: ''
-  });
-
-  const [artistForm, setArtistForm] = useState({
-    stage_name: '',
-    legal_name: '',
-    category: 'Reggae Artists',
-    genre: '',
-    bio: '',
-    profile_image: '/images/artist_reggae.jpg',
-    cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
-    booking_status: 'Available' as Artist['booking_status'],
-    availability_status: 'Active' as Artist['availability_status'],
-    technical_rider: '',
-    hospitality_rider: ''
-  });
-
-  const [customerForm, setCustomerForm] = useState({
-    name: '',
-    company: '',
-    email: '',
-    tier: 'Standard Client',
-    notes: ''
-  });
-
-  const [staffForm, setStaffForm] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    role: 'Booking Agent',
-    status: 'Active' as User['status']
-  });
-
-  const [ticketForm, setTicketForm] = useState({
-    name: '',
-    price: '85',
-    desc: '',
-    capacity: '1000'
-  });
-
-  const [promoForm, setPromoForm] = useState({
-    code: '',
-    discount: '20',
-    active: true,
-    expiry: ''
-  });
-
-  const [orderForm, setOrderForm] = useState({
-    booking_id: '',
-    amount: '50000',
-    status: 'Unpaid' as Invoice['status'],
-    due_date: ''
-  });
-
-  const [campaignForm, setCampaignForm] = useState({
-    name: '',
-    type: 'Email' as MarketingCampaign['type'],
-    subject: '',
-    segment: 'All Past Customers (12,504)',
-    content: ''
-  });
-
-  const [adForm, setAdForm] = useState({
-    name: '',
-    active: true,
-    image_url: ''
-  });
-
-  const [sectionForm, setSectionForm] = useState({
-    type: 'hero' as WebsiteSection['type'],
-    title: '',
-    subtitle: '',
-    content: '',
-    buttonText: '',
-    image_url: '',
-    active: true
-  });
-
-  const [integrationForm, setIntegrationForm] = useState({
-    name: '',
-    provider: 'Stripe' as Integration['provider'],
-    status: 'Connected' as Integration['status'],
-    api_key: ''
-  });
-
-  // Command palette focus index
-  const [paletteIndex, setPaletteIndex] = useState(0);
-
-  // Visual seat map state
-  const [selectedSeatZone, setSelectedSeatZone] = useState<'VVIP' | 'VIP' | 'GA'>('VIP');
-  const [seatMap, setSeatMap] = useState<boolean[]>(Array(64).fill(false)); // true = booked
-
-  // Website preview states
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
-  const [cmsSections, setCmsSections] = useState({
-    heroTitle: "Caribbean Talent Booking Platform",
-    announcement: "★ Reggae Sumfest 2026 Headliners Confirmed!",
-    footerCopyright: "© 2026 Showtime Services. All Rights Reserved."
-  });
-
-  // Marketing templates state
-  const [marketingType, setMarketingType] = useState<'email' | 'sms' | 'push'>('email');
-
-  // Integrations active keys
-  const [apiKeys, setApiKeys] = useState({
-    stripe: 'pk_live_51M...',
-    paypal: 'client_id_...',
-    twilio: 'AC...',
-    sendgrid: 'SG...'
-  });
-
-  // AI Operations helper states
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiOutput, setAiOutput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-
-  // Event builder form state
-  const [eventBuilderForm, setEventBuilderForm] = useState({
-    title: '',
-    subtitle: '',
-    description: '',
-    category: 'Reggae Artists',
-    venue: '',
-    artist: '',
-    ticketPriceGA: '85',
-    ticketPriceVIP: '250',
-    capacity: '1500',
-    seoTags: 'reggae, festival, live concert',
-    publishMode: 'Draft'
-  });
-
-  // New Lead form state
-  const [newLeadForm, setNewLeadForm] = useState({
-    contact_name: '',
-    company_name: '',
-    email: '',
-    phone: '',
-    country: 'Jamaica',
-    budget: '50000',
-    preferred_date: new Date().toISOString().split('T')[0],
-    artist_id: '',
-    details: ''
-  });
-
-  // Broadcast Campaign Form state
-  const [broadcastForm, setBroadcastForm] = useState({
-    name: '',
-    subject: '',
-    segment: 'All Past Customers (12,504)',
-    content: ''
-  });
-
-  // Settings states
-  const [primaryDomain, setPrimaryDomain] = useState('showtimeservices.com');
-  const [systemCurrency, setSystemCurrency] = useState('USD ($)');
-
-  // Analytics states
-  const [analyticsSubTab, setAnalyticsSubTab] = useState<'traffic' | 'funnel'>('traffic');
-  const [activeVisitors, setActiveVisitors] = useState(28);
-  const [liveActivities, setLiveActivities] = useState<string[]>([
-    "Visitor from Montego Bay viewed Koffee profile",
-    "Promo code EARLYBIRD10 applied to checkout cart",
-    "User from New York, US selected General Admission tier",
-    "Guest verified availability calendar for Beres Hammond",
-    "Visitor from London, UK landing on homepage cta banner"
-  ]);
-  const [trafficChartPeriod, setTrafficChartPeriod] = useState<'7d' | '30d' | '12m'>('30d');
-
-  // Load portal statistics
-  const loadPortalData = async () => {
-    try {
-      const allLeads = await db.getLeads();
-      const allBookings = await db.getBookings();
-      const allTasks = await db.getTasks();
-      const allInvoices = await db.getInvoices();
-      const allArtists = await db.getArtists();
-      const allVenues = await db.getVenues();
-      const allCustomers = await db.getCustomers();
-      const allUsers = await db.getUsers();
-
-      const allTiers = await db.getTicketTiers();
-      const allPromos = await db.getPromoCodes();
-      const allCamps = await db.getCampaigns();
-      const allAds = await db.getAdPlacements();
-      const allSecs = await db.getWebsiteSections();
-      const allInts = await db.getIntegrations();
-
-      if (user) {
-        const userNotifs = await db.getNotifications(user.id);
-        setNotifs(userNotifs);
-      }
-      setLeads(allLeads);
-      setBookings(allBookings);
-      setTasks(allTasks);
-      setInvoices(allInvoices);
-      setArtists(allArtists);
-      setVenues(allVenues);
-      setCustomers(allCustomers);
-      setUsers(allUsers);
-
-      setTicketTiers(allTiers);
-      setPromoCodes(allPromos);
-      setCampaigns(allCamps);
-      setAdPlacements(allAds);
-      setWebsiteSections(allSecs);
-      setIntegrations(allInts);
-    } catch (err) {
-      console.error('Failed to load portal data:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadPortalData();
-  }, [user]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDomain = localStorage.getItem('st_settings_domain');
-      if (savedDomain) setPrimaryDomain(savedDomain);
-      const savedCurrency = localStorage.getItem('st_settings_currency');
-      if (savedCurrency) setSystemCurrency(savedCurrency);
-    }
-  }, []);
-
-  // Web analytics activity simulator
-  useEffect(() => {
-    const RANDOM_EVENTS = [
-      "Visitor from Kingston viewed Shenseea profile",
-      "Ticket purchase checkout initiated by Guest",
-      "Promo code SUMFEST2026 verified",
-      "New event inquiry generated for David Rodigan",
-      "Visitor from Toronto, CA landing on ticket booking portal",
-      "Checkout completed for General Admission - $85",
-      "Checkout completed for VIP Deck Pass - $250",
-      "User verified availability calendar for Chronixx",
-      "Guest downloaded hospitality rider for Koffee"
-    ];
-
-    const interval = setInterval(() => {
-      // Jitter active visitor count
-      setActiveVisitors(prev => {
-        const delta = Math.floor(Math.random() * 5) - 2; // -2 to 2
-        return Math.max(15, Math.min(60, prev + delta));
-      });
-
-      // Push random visitor event
-      setLiveActivities(prev => {
-        const randEvent = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
-        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const newEvent = `[${timestamp}] ${randEvent}`;
-        return [newEvent, ...prev.slice(0, 9)];
-      });
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Open sliding panel and prepare state
-  const openCrudPanel = (type: typeof panelType, mode: 'create' | 'edit', itemId: string | null = null) => {
-    setPanelType(type);
-    setPanelMode(mode);
-    setSelectedItemId(itemId);
-    setPanelOpen(true);
-    
-    if (mode === 'edit' && itemId) {
-      if (type === 'event') {
-        const item = bookings.find(b => b.id === itemId);
-        if (item) {
-          setEventForm({
-            artist_id: item.artist_id,
-            event_title: item.event_title,
-            event_date: item.event_date,
-            event_venue: item.event_venue,
-            event_country: item.event_country,
-            status: item.status,
-            total_amount: String(item.total_amount),
-            deposit_amount: String(item.deposit_amount),
-            client_name: item.client_name,
-            artist_image: item.artist_image || ''
-          });
-        }
-      } else if (type === 'venue') {
-        const item = venues.find(v => v.id === itemId);
-        if (item) {
-          setVenueForm({
-            name: item.name,
-            capacity: item.capacity,
-            location: item.location,
-            description: item.description || '',
-            parking: item.parking || ''
-          });
-        }
-      } else if (type === 'artist') {
-        const item = artists.find(a => a.id === itemId);
-        if (item) {
-          setArtistForm({
-            stage_name: item.stage_name,
-            legal_name: item.legal_name,
-            category: item.category,
-            genre: item.genre,
-            bio: item.bio,
-            profile_image: item.profile_image,
-            cover_image: item.cover_image,
-            booking_status: item.booking_status,
-            availability_status: item.availability_status,
-            technical_rider: item.technical_rider || '',
-            hospitality_rider: item.hospitality_rider || ''
-          });
-        }
-      } else if (type === 'customer') {
-        const item = customers.find(c => c.id === itemId);
-        if (item) {
-          setCustomerForm({
-            name: item.name,
-            company: item.company,
-            email: item.email,
-            notes: item.notes,
-            tier: item.tier
-          });
-        }
-      } else if (type === 'staff') {
-        const item = users.find(u => u.id === itemId);
-        if (item) {
-          setStaffForm({
-            first_name: item.first_name,
-            last_name: item.last_name,
-            email: item.email,
-            role: item.role,
-            status: item.status
-          });
-        }
-      } else if (type === 'ticket') {
-        const item = ticketTiers.find(t => t.id === itemId);
-        if (item) {
-          setTicketForm({
-            name: item.name,
-            price: String(item.price),
-            desc: item.desc,
-            capacity: String(item.capacity || 1000)
-          });
-        }
-      } else if (type === 'promo') {
-        const item = promoCodes.find(p => p.id === itemId);
-        if (item) {
-          setPromoForm({
-            code: item.code,
-            discount: String(item.discount),
-            active: item.active,
-            expiry: item.expiry || ''
-          });
-        }
-      } else if (type === 'order') {
-        const item = invoices.find(i => i.id === itemId);
-        if (item) {
-          setOrderForm({
-            booking_id: item.booking_id,
-            amount: String(item.amount),
-            status: item.status,
-            due_date: item.due_date
-          });
-        }
-      } else if (type === 'campaign') {
-        const item = campaigns.find(c => c.id === itemId);
-        if (item) {
-          setCampaignForm({
-            name: item.name,
-            type: item.type,
-            subject: item.subject || '',
-            segment: item.segment,
-            content: item.content
-          });
-        }
-      } else if (type === 'ad') {
-        const item = adPlacements.find(a => a.id === itemId);
-        if (item) {
-          setAdForm({
-            name: item.name,
-            active: item.active,
-            image_url: item.image_url || ''
-          });
-        }
-      } else if (type === 'section') {
-        const item = websiteSections.find(s => s.id === itemId);
-        if (item) {
-          setSectionForm({
-            type: item.type,
-            title: item.title,
-            subtitle: item.subtitle || '',
-            content: item.content || '',
-            buttonText: item.buttonText || '',
-            image_url: item.image_url || '',
-            active: item.active
-          });
-        }
-      } else if (type === 'integration') {
-        const item = integrations.find(i => i.id === itemId);
-        if (item) {
-          setIntegrationForm({
-            name: item.name,
-            provider: item.provider,
-            status: item.status,
-            api_key: item.api_key
-          });
-        }
-      }
-    } else {
-      if (type === 'event') {
-        setEventForm({
-          artist_id: artists[0]?.id || '',
-          event_title: '',
-          event_date: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-          event_venue: '',
-          event_country: 'Jamaica',
-          status: 'Inquiry',
-          total_amount: '50000',
-          deposit_amount: '25000',
-          client_name: '',
-          artist_image: ''
-        });
-      } else if (type === 'venue') {
-        setVenueForm({ name: '', capacity: '', location: '', description: '', parking: '' });
-      } else if (type === 'artist') {
-        setArtistForm({
-          stage_name: '',
-          legal_name: '',
-          category: 'Reggae Artists',
-          genre: '',
-          bio: '',
-          profile_image: '/images/artist_reggae.jpg',
-          cover_image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
-          booking_status: 'Available',
-          availability_status: 'Active',
-          technical_rider: '',
-          hospitality_rider: ''
-        });
-      } else if (type === 'customer') {
-        setCustomerForm({ name: '', company: '', email: '', notes: '', tier: 'Standard Client' });
-      } else if (type === 'staff') {
-        setStaffForm({ first_name: '', last_name: '', email: '', role: 'Booking Agent', status: 'Active' });
-      } else if (type === 'ticket') {
-        setTicketForm({ name: '', price: '85', desc: '', capacity: '1000' });
-      } else if (type === 'promo') {
-        setPromoForm({ code: '', discount: '20', active: true, expiry: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] });
-      } else if (type === 'order') {
-        setOrderForm({ booking_id: bookings[0]?.id || '', amount: '50000', status: 'Unpaid', due_date: new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0] });
-      } else if (type === 'campaign') {
-        setCampaignForm({ name: '', type: 'Email', subject: '', segment: 'All Past Customers (12,504)', content: '' });
-      } else if (type === 'ad') {
-        setAdForm({ name: '', active: true, image_url: '' });
-      } else if (type === 'section') {
-        setSectionForm({ type: 'hero', title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true });
-      } else if (type === 'integration') {
-        setIntegrationForm({ name: '', provider: 'Stripe', status: 'Connected', api_key: '' });
-      }
-    }
+  const openCreate = () => { setEditLead(null); setForm({ ...blankForm, artist_id: artists[0]?.id || '' }); setShowModal(true); };
+  const openEdit = (l: Lead) => {
+    setEditLead(l);
+    setForm({ contact_name: l.contact_name, company_name: l.company_name || '', email: l.email, phone: l.phone || '', country: l.country, budget: String(l.budget), preferred_date: l.preferred_date, artist_id: l.artist_id || '', details: l.details, status: l.status });
+    setShowModal(true);
   };
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); setSaving(true);
     try {
-      if (panelType === 'event') {
-        const selectedArtist = artists.find(a => a.id === eventForm.artist_id);
-        const bookingData = {
-          artist_id: eventForm.artist_id,
-          artist_name: selectedArtist ? selectedArtist.stage_name : 'Unknown Artist',
-          artist_image: selectedArtist ? selectedArtist.profile_image : '/images/artist_reggae.jpg',
-          client_id: 'cli-user',
-          client_name: eventForm.client_name,
-          event_id: 'evt-' + Math.random().toString(36).substr(2, 9),
-          event_title: eventForm.event_title,
-          event_date: eventForm.event_date,
-          event_venue: eventForm.event_venue,
-          event_country: eventForm.event_country,
-          status: eventForm.status,
-          total_amount: parseFloat(eventForm.total_amount) || 0,
-          deposit_amount: parseFloat(eventForm.deposit_amount) || 0
-        };
-        if (panelMode === 'create') {
-          await db.createBooking(bookingData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateBooking(selectedItemId, bookingData);
-        }
-      } else if (panelType === 'venue') {
-        if (panelMode === 'create') {
-          await db.createVenue(venueForm);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateVenue(selectedItemId, venueForm);
-        }
-      } else if (panelType === 'artist') {
-        if (panelMode === 'create') {
-          await db.createArtist(artistForm);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateArtistProfile(selectedItemId, artistForm);
-        }
-      } else if (panelType === 'customer') {
-        if (panelMode === 'create') {
-          await db.createCustomer(customerForm);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateCustomer(selectedItemId, customerForm);
-        }
-      } else if (panelType === 'staff') {
-        if (panelMode === 'create') {
-          await db.createUser(staffForm);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateUser(selectedItemId, staffForm);
-        }
-      } else if (panelType === 'ticket') {
-        const ticketData = {
-          name: ticketForm.name,
-          price: parseFloat(ticketForm.price) || 0,
-          desc: ticketForm.desc,
-          capacity: parseInt(ticketForm.capacity) || 1000
-        };
-        if (panelMode === 'create') {
-          await db.createTicketTier(ticketData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateTicketTier(selectedItemId, ticketData);
-        }
-      } else if (panelType === 'promo') {
-        const promoData = {
-          code: promoForm.code,
-          discount: parseFloat(promoForm.discount) || 0,
-          active: promoForm.active,
-          expiry: promoForm.expiry
-        };
-        if (panelMode === 'create') {
-          await db.createPromoCode(promoData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updatePromoCode(selectedItemId, promoData);
-        }
-      } else if (panelType === 'order') {
-        const orderData = {
-          booking_id: orderForm.booking_id,
-          amount: parseFloat(orderForm.amount) || 0,
-          balance_due: orderForm.status === 'Paid' ? 0 : (parseFloat(orderForm.amount) || 0),
-          status: orderForm.status,
-          due_date: orderForm.due_date
-        };
-        if (panelMode === 'create') {
-          await db.createInvoice(orderData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateInvoice(selectedItemId, orderData);
-        }
-      } else if (panelType === 'campaign') {
-        const campaignData = {
-          name: campaignForm.name,
-          type: campaignForm.type,
-          subject: campaignForm.subject,
-          segment: campaignForm.segment,
-          content: campaignForm.content
-        };
-        if (panelMode === 'create') {
-          await db.createCampaign(campaignData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateCampaign(selectedItemId, campaignData);
-        }
-      } else if (panelType === 'ad') {
-        const adData = {
-          name: adForm.name,
-          active: adForm.active,
-          image_url: adForm.image_url
-        };
-        if (panelMode === 'create') {
-          await db.createAdPlacement(adData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateAdPlacement(selectedItemId, adData);
-        }
-      } else if (panelType === 'section') {
-        const sectionData = {
-          type: sectionForm.type,
-          title: sectionForm.title,
-          subtitle: sectionForm.subtitle,
-          content: sectionForm.content,
-          buttonText: sectionForm.buttonText,
-          image_url: sectionForm.image_url,
-          active: sectionForm.active
-        };
-        if (panelMode === 'create') {
-          await db.createWebsiteSection(sectionData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateWebsiteSection(selectedItemId, sectionData);
-        }
-      } else if (panelType === 'integration') {
-        const integrationData = {
-          name: integrationForm.name,
-          provider: integrationForm.provider,
-          status: integrationForm.status,
-          api_key: integrationForm.api_key
-        };
-        if (panelMode === 'create') {
-          await db.createIntegration(integrationData);
-        } else if (panelMode === 'edit' && selectedItemId) {
-          await db.updateIntegration(selectedItemId, integrationData);
-        }
-      }
-      setPanelOpen(false);
-      await loadPortalData();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save record.');
-    }
+      const data = { ...form, budget: parseFloat(form.budget) || 0, source: 'Admin Portal' };
+      if (editLead) await db.updateLead(editLead.id, data);
+      else await db.createLead(data);
+      setShowModal(false); onRefresh();
+      showToast(editLead ? 'Lead updated.' : 'Lead created.', 'success');
+    } catch { showToast('Failed to save lead.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteLead(id); onRefresh(); showToast('Lead removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
   };
 
-  const handleDelete = async (type: typeof panelType, id: string) => {
-    if (!confirm('Are you sure you want to delete this record?')) return;
-    try {
-      if (type === 'event') {
-        await db.deleteBooking(id);
-      } else if (type === 'venue') {
-        await db.deleteVenue(id);
-      } else if (type === 'artist') {
-        await db.deleteArtist(id);
-      } else if (type === 'customer') {
-        await db.deleteCustomer(id);
-      } else if (type === 'staff') {
-        await db.deleteUser(id);
-      } else if (type === 'ticket') {
-        await db.deleteTicketTier(id);
-      } else if (type === 'promo') {
-        await db.deletePromoCode(id);
-      } else if (type === 'order') {
-        await db.deleteInvoice(id);
-      } else if (type === 'campaign') {
-        await db.deleteCampaign(id);
-      } else if (type === 'ad') {
-        await db.deleteAdPlacement(id);
-      } else if (type === 'section') {
-        await db.deleteWebsiteSection(id);
-      } else if (type === 'integration') {
-        await db.deleteIntegration(id);
-      }
-      await loadPortalData();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete record.');
-    }
-  };
-
-  const handleSendBroadcast = async () => {
-    if (!broadcastForm.name || !broadcastForm.subject || !broadcastForm.content) {
-      alert("Please fill in Campaign Name, Subject Line, and Broadcast Copy.");
-      return;
-    }
-    try {
-      await db.createCampaign({
-        name: broadcastForm.name,
-        type: (marketingType.charAt(0).toUpperCase() + marketingType.slice(1)) as any,
-        subject: broadcastForm.subject,
-        segment: broadcastForm.segment,
-        content: broadcastForm.content
-      });
-      alert("Broadcast campaign sent successfully!");
-      setBroadcastForm({
-        name: '',
-        subject: '',
-        segment: 'All Past Customers (12,504)',
-        content: ''
-      });
-      await loadPortalData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to send broadcast campaign.");
-    }
-  };
-
-  // Auto-collapse sidebar on mobile screen loads & window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setSidebarCollapsed(true);
-      } else {
-        setSidebarCollapsed(false);
-      }
-    };
-    handleResize(); // run initially
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Command palette hotkeys listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setCommandPaletteOpen(prev => !prev);
-      }
-      if (e.key === 'Escape') {
-        setCommandPaletteOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Filter command palette options
-  const getCommandOptions = () => {
-    const defaultActions = NAV_ITEMS.map(item => ({
-      type: 'navigation',
-      label: `Go to ${item.label}`,
-      action: () => { setActiveTab(item.id); setCommandPaletteOpen(false); }
-    }));
-
-    const quickActions = [
-      { type: 'action', label: 'Create New Event Wizard', action: () => { setShowEventBuilder(true); setCommandPaletteOpen(false); } },
-      { type: 'action', label: 'Log Inbound CRM Inquiry', action: () => { setShowCreateLead(true); setCommandPaletteOpen(false); } },
-      { type: 'action', label: 'Emergency System Kill Switch', action: () => { setActiveTab('settings'); setEmergencyKillActive(true); setCommandPaletteOpen(false); } }
-    ];
-
-    const artistSearches = artists.map(a => ({
-      type: 'artist',
-      label: `Inspect Artist: ${a.stage_name}`,
-      action: () => { setActiveTab('artists'); setCommandPaletteOpen(false); }
-    }));
-
-    const all = [...defaultActions, ...quickActions, ...artistSearches];
-    return all.filter(item => item.label.toLowerCase().includes(commandSearch.toLowerCase()));
-  };
-
-  // Handle Command Palette arrow keys
-  const handlePaletteKeyDown = (e: React.KeyboardEvent) => {
-    const options = getCommandOptions();
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setPaletteIndex(prev => (prev + 1) % options.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setPaletteIndex(prev => (prev - 1 + options.length) % options.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (options[paletteIndex]) {
-        options[paletteIndex].action();
-      }
-    }
-  };
-
-  // Access checking
-  if (!user) {
-    return (
-      <div className="container py-24 text-center">
-        <Shield className="w-16 h-16 mx-auto text-[#d4af37] mb-4 animate-pulse" />
-        <h2 className="text-2xl font-bold mb-2">Access Unauthorized</h2>
-        <p className="text-white/60 mb-6">Please log in to access the Showtime Administration Portal.</p>
-        <Link href="/" className="btn bg-[#d4af37] text-[#07050e] px-8 py-3 rounded-full font-semibold">
-          Return Home
-        </Link>
-      </div>
-    );
-  }
-
-  // Role permissions checking
-  const userRole = user.role || 'Booking Agent';
-  const allowedTabs = ROLE_PERMISSIONS[userRole] || ['dashboard'];
-  const hasTabAccess = (tab: TabId) => allowedTabs.includes(tab);
-
-  // Execute Event Builder Submit
-  const handleEventPublish = async () => {
-    // Contract a mock booking in DB representing our published event
-    const mockLead: Omit<Lead, 'id' | 'created_at' | 'status' | 'source'> = {
-      contact_name: `Promoter Office (${eventBuilderForm.publishMode})`,
-      company_name: eventBuilderForm.subtitle || 'Showtime Production Group',
-      email: 'events@showtime.com',
-      country: 'Jamaica',
-      budget: parseFloat(eventBuilderForm.ticketPriceVIP) * parseInt(eventBuilderForm.capacity) * 0.1, // mock budget
-      preferred_date: new Date(Date.now() + 60*24*60*60*1000).toISOString().split('T')[0],
-      artist_id: eventBuilderForm.artist || 'art-chronixx',
-      details: eventBuilderForm.description || 'Staged showtime production booking event.'
-    };
-    
-    await db.createLead(mockLead);
-    await loadPortalData();
-    setShowEventBuilder(false);
-    setEventBuilderStep(1);
-    setActiveTab('dashboard');
-  };
-
-  // Metrics
-  const calculatedTotalRevenue = bookings
-    .filter(b => b.status !== 'Cancelled')
-    .reduce((sum, b) => sum + b.total_amount, 0);
-
-  const calculatedBalanceDue = invoices
-    .filter(i => i.status !== 'Paid')
-    .reduce((sum, i) => sum + i.balance_due, 0);
+  const filteredLeads = leads.filter(l =>
+    l.contact_name.toLowerCase().includes(search.toLowerCase()) ||
+    (l.company_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    l.email.toLowerCase().includes(search.toLowerCase())
+  );
+  const filteredBookings = bookings.filter(b =>
+    b.event_title.toLowerCase().includes(search.toLowerCase()) ||
+    b.artist_name.toLowerCase().includes(search.toLowerCase()) ||
+    b.client_name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="admin-portal-wrapper min-h-screen text-white bg-[#07050e] flex flex-col font-sans">
-      
-      {/* ── EMERGENCY OVERLAY SWITCH ── */}
-      {emergencyKillActive && (
-        <div className="fixed inset-0 z-[9999] bg-red-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-fade">
-          <AlertOctagon className="w-24 h-24 text-red-500 mb-6 animate-bounce" />
-          <h1 className="text-4xl md:text-6xl font-black text-red-500 uppercase tracking-wider mb-2">SYSTEM SUSPENDED</h1>
-          <p className="text-xl md:text-2xl font-bold text-white mb-6">EMERGENCY KILL SWITCH ACTIVE &bull; AUDIT IN PROGRESS</p>
-          <p className="max-w-xl text-white/60 mb-8">
-            All API routes, user booking portals, and contract releases have been temporarily locked by administration command. To restore operations, please enter the master recovery code.
-          </p>
-          <div className="flex gap-4">
-            <button 
-              className="bg-white text-red-950 font-bold px-8 py-3.5 rounded-full hover:scale-105 transition"
-              onClick={() => { setEmergencyKillActive(false); }}
-            >
-              Deactivate Emergency Lock
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['leads', 'pipeline'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none', background: tab === t ? 'rgba(212,175,55,0.15)' : 'transparent', color: tab === t ? 'var(--accent)' : 'var(--text-muted)', fontSize: '0.83rem', fontWeight: tab === t ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+              {t === 'leads' ? `Leads (${leads.length})` : `Pipeline (${bookings.length})`}
             </button>
-          </div>
+          ))}
         </div>
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ ...iStyle, paddingLeft: 30, width: 200, fontSize: '0.82rem', height: 34 }} />
+          </div>
+          {tab === 'leads' && <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />New Lead</ABtn>}
+        </div>
+      </div>
+
+      {tab === 'leads' ? (
+        <Tbl>
+          <TH cols={['Contact', 'Company', 'Status', 'Budget', 'Date', 'Artist', '']} />
+          <tbody>
+            {filteredLeads.length === 0 ? (
+              <tr><td colSpan={7}><Empty icon={Activity} msg="No leads found" /></td></tr>
+            ) : filteredLeads.map(l => (
+              <TR key={l.id}>
+                <TD><div style={{ fontWeight: 500 }}>{l.contact_name}</div><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{l.email}</div></TD>
+                <TD muted>{l.company_name || '—'}</TD>
+                <TD><StatusBadge status={l.status} /></TD>
+                <TD>{fmtCurrency(l.budget)}</TD>
+                <TD muted>{fmtDate(l.preferred_date)}</TD>
+                <TD muted>{l.artist_name || '—'}</TD>
+                <TD>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <ABtn variant="ghost" size="sm" onClick={() => openEdit(l)}><Edit2 size={12} /></ABtn>
+                    <ABtn variant="danger" size="sm" onClick={() => setConfirm(l.id)}><Trash2 size={12} /></ABtn>
+                  </div>
+                </TD>
+              </TR>
+            ))}
+          </tbody>
+        </Tbl>
+      ) : (
+        <Tbl>
+          <TH cols={['Event', 'Artist', 'Client', 'Date', 'Venue', 'Amount', 'Status', '']} />
+          <tbody>
+            {filteredBookings.length === 0 ? (
+              <tr><td colSpan={8}><Empty icon={Calendar} msg="No bookings found" /></td></tr>
+            ) : filteredBookings.map(b => (
+              <TR key={b.id}>
+                <TD><div style={{ fontWeight: 500 }}>{b.event_title}</div></TD>
+                <TD muted>{b.artist_name}</TD>
+                <TD muted>{b.client_name}</TD>
+                <TD muted>{fmtDate(b.event_date)}</TD>
+                <TD muted>{b.event_venue}</TD>
+                <TD>{fmtCurrency(b.total_amount)}</TD>
+                <TD><StatusBadge status={b.status} /></TD>
+                <TD><ABtn variant="ghost" size="sm"><MoreHorizontal size={13} /></ABtn></TD>
+              </TR>
+            ))}
+          </tbody>
+        </Tbl>
       )}
 
-      {/* ── CORE SAAS HEADER ── */}
-      <header className="border-b border-white/5 bg-[#0c0a17]/90 sticky top-0 z-[100] backdrop-blur-md">
-        <div className="h-16 px-6 flex items-center justify-between gap-4">
-          
-          <div className="flex items-center gap-4">
-            <button 
-              className="text-white/60 hover:text-white lg:hidden"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              <Menu className="w-5 h-5" />
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editLead ? 'Edit Lead' : 'New Lead'} width={580}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Contact Name"><FInput value={form.contact_name} onChange={v => setForm(f => ({ ...f, contact_name: v }))} placeholder="Full name" /></Field>
+            <Field label="Company"><FInput value={form.company_name} onChange={v => setForm(f => ({ ...f, company_name: v }))} /></Field>
+            <Field label="Email"><FInput value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" /></Field>
+            <Field label="Phone"><FInput value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} /></Field>
+            <Field label="Country"><FInput value={form.country} onChange={v => setForm(f => ({ ...f, country: v }))} /></Field>
+            <Field label="Budget (USD)"><FInput value={form.budget} onChange={v => setForm(f => ({ ...f, budget: v }))} type="number" /></Field>
+            <Field label="Preferred Date"><FInput value={form.preferred_date} onChange={v => setForm(f => ({ ...f, preferred_date: v }))} type="date" /></Field>
+            <Field label="Status">
+              <FSelect value={form.status} onChange={v => setForm(f => ({ ...f, status: v as Lead['status'] }))} options={STATUSES.map(s => ({ value: s, label: s }))} />
+            </Field>
+            <Field label="Artist">
+              <FSelect value={form.artist_id} onChange={v => setForm(f => ({ ...f, artist_id: v }))} options={[{ value: '', label: 'Not assigned' }, ...artists.map(a => ({ value: a.id, label: a.stage_name }))]} />
+            </Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem' }}>
+            <Field label="Details / Notes"><FTextarea value={form.details} onChange={v => setForm(f => ({ ...f, details: v }))} rows={3} placeholder="Booking inquiry details…" /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Lead" message="This will permanently delete the lead." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Artists Section ──────────────────────────────────────────────────────────
+
+function ArtistsSection({ artists, onRefresh, showToast }: {
+  artists: Artist[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Artist | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const blank = { stage_name: '', legal_name: '', category: 'Reggae Artists', genre: '', bio: '', profile_image: '', cover_image: '', booking_status: 'Available' as Artist['booking_status'], availability_status: 'Active' as Artist['availability_status'], technical_rider: '', hospitality_rider: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (a: Artist) => {
+    setEditItem(a);
+    setForm({ stage_name: a.stage_name, legal_name: a.legal_name, category: a.category, genre: a.genre, bio: a.bio, profile_image: a.profile_image, cover_image: a.cover_image, booking_status: a.booking_status, availability_status: a.availability_status, technical_rider: a.technical_rider || '', hospitality_rider: a.hospitality_rider || '' });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateArtistProfile(editItem.id, form);
+      else await db.createArtist(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Artist updated.' : 'Artist added.', 'success');
+    } catch { showToast('Failed to save artist.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteArtist(id); onRefresh(); showToast('Artist removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  const filtered = artists.filter(a =>
+    a.stage_name.toLowerCase().includes(search.toLowerCase()) ||
+    a.genre.toLowerCase().includes(search.toLowerCase()) ||
+    a.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search artists…" style={{ ...iStyle, paddingLeft: 30, width: 220, fontSize: '0.82rem', height: 34 }} />
+        </div>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Artist</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Artist', 'Category', 'Genre', 'Booking Status', 'Availability', '']} />
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={Music} msg="No artists found" /></td></tr>
+          ) : filtered.map(a => (
+            <TR key={a.id}>
+              <TD>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+                    {a.stage_name[0]}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{a.stage_name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{a.legal_name}</div>
+                  </div>
+                </div>
+              </TD>
+              <TD muted>{a.category}</TD>
+              <TD muted>{a.genre}</TD>
+              <TD><StatusBadge status={a.booking_status} /></TD>
+              <TD><StatusBadge status={a.availability_status} /></TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Artist' : 'Add Artist'} width={600}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Stage Name"><FInput value={form.stage_name} onChange={v => setForm(f => ({ ...f, stage_name: v }))} /></Field>
+            <Field label="Legal Name"><FInput value={form.legal_name} onChange={v => setForm(f => ({ ...f, legal_name: v }))} /></Field>
+            <Field label="Category">
+              <FSelect value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={['Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'].map(c => ({ value: c, label: c }))} />
+            </Field>
+            <Field label="Genre"><FInput value={form.genre} onChange={v => setForm(f => ({ ...f, genre: v }))} /></Field>
+            <Field label="Booking Status">
+              <FSelect value={form.booking_status} onChange={v => setForm(f => ({ ...f, booking_status: v as Artist['booking_status'] }))} options={['Available', 'Booked', 'On Tour', 'On Hold'].map(s => ({ value: s, label: s }))} />
+            </Field>
+            <Field label="Availability">
+              <FSelect value={form.availability_status} onChange={v => setForm(f => ({ ...f, availability_status: v as Artist['availability_status'] }))} options={[{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }]} />
+            </Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <Field label="Bio"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
+            <Field label="Technical Rider"><FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={2} /></Field>
+            <Field label="Hospitality Rider"><FTextarea value={form.hospitality_rider} onChange={v => setForm(f => ({ ...f, hospitality_rider: v }))} rows={2} /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Artist" message="This will permanently delete the artist profile." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Events Section ───────────────────────────────────────────────────────────
+
+function EventsSection({ bookings, artists, venues, onRefresh, showToast }: {
+  bookings: Booking[]; artists: Artist[]; venues: Venue[];
+  onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Booking | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const BSTATUSES: Booking['status'][] = ['Inquiry', 'Proposal Generated', 'Contract Sent', 'Deposit Paid', 'Confirmed', 'Completed', 'Cancelled'];
+  const blank = { artist_id: artists[0]?.id || '', event_title: '', event_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0], event_venue: '', event_country: 'Jamaica', status: 'Inquiry' as Booking['status'], total_amount: '50000', deposit_amount: '25000', client_name: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm({ ...blank, artist_id: artists[0]?.id || '' }); setShowModal(true); };
+  const openEdit = (b: Booking) => {
+    setEditItem(b);
+    setForm({ artist_id: b.artist_id, event_title: b.event_title, event_date: b.event_date, event_venue: b.event_venue, event_country: b.event_country, status: b.status, total_amount: String(b.total_amount), deposit_amount: String(b.deposit_amount), client_name: b.client_name });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const sel = artists.find(a => a.id === form.artist_id);
+      const data = {
+        artist_id: form.artist_id, artist_name: sel?.stage_name || 'Unknown', artist_image: sel?.profile_image || '',
+        client_id: 'cli-001', client_name: form.client_name,
+        event_id: 'evt-' + Math.random().toString(36).substr(2, 9),
+        event_title: form.event_title, event_date: form.event_date,
+        event_venue: form.event_venue, event_country: form.event_country,
+        status: form.status, total_amount: parseFloat(form.total_amount) || 0,
+        deposit_amount: parseFloat(form.deposit_amount) || 0,
+      };
+      if (editItem) await db.updateBooking(editItem.id, data);
+      else await db.createBooking(data);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Event updated.' : 'Event created.', 'success');
+    } catch { showToast('Failed to save event.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteBooking(id); onRefresh(); showToast('Event removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  const filtered = bookings.filter(b =>
+    b.event_title.toLowerCase().includes(search.toLowerCase()) ||
+    b.artist_name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events…" style={{ ...iStyle, paddingLeft: 30, width: 220, fontSize: '0.82rem', height: 34 }} />
+        </div>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />New Event</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Event Title', 'Artist', 'Client', 'Date', 'Venue', 'Amount', 'Status', '']} />
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr><td colSpan={8}><Empty icon={Star} msg="No events found" /></td></tr>
+          ) : filtered.map(b => (
+            <TR key={b.id}>
+              <TD><div style={{ fontWeight: 500 }}>{b.event_title}</div></TD>
+              <TD muted>{b.artist_name}</TD>
+              <TD muted>{b.client_name}</TD>
+              <TD muted>{fmtDate(b.event_date)}</TD>
+              <TD muted>{b.event_venue || '—'}</TD>
+              <TD>{fmtCurrency(b.total_amount)}</TD>
+              <TD><StatusBadge status={b.status} /></TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(b)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(b.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Event' : 'New Event'} width={580}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Event Title"><FInput value={form.event_title} onChange={v => setForm(f => ({ ...f, event_title: v }))} /></Field>
+            <Field label="Client Name"><FInput value={form.client_name} onChange={v => setForm(f => ({ ...f, client_name: v }))} /></Field>
+            <Field label="Artist">
+              <FSelect value={form.artist_id} onChange={v => setForm(f => ({ ...f, artist_id: v }))} options={artists.map(a => ({ value: a.id, label: a.stage_name }))} />
+            </Field>
+            <Field label="Event Date"><FInput value={form.event_date} onChange={v => setForm(f => ({ ...f, event_date: v }))} type="date" /></Field>
+            <Field label="Venue">
+              <FSelect value={form.event_venue} onChange={v => setForm(f => ({ ...f, event_venue: v }))} options={[{ value: '', label: 'Select venue…' }, ...venues.map(v => ({ value: v.name, label: v.name }))]} />
+            </Field>
+            <Field label="Country"><FInput value={form.event_country} onChange={v => setForm(f => ({ ...f, event_country: v }))} /></Field>
+            <Field label="Total Amount (USD)"><FInput value={form.total_amount} onChange={v => setForm(f => ({ ...f, total_amount: v }))} type="number" /></Field>
+            <Field label="Deposit Amount (USD)"><FInput value={form.deposit_amount} onChange={v => setForm(f => ({ ...f, deposit_amount: v }))} type="number" /></Field>
+            <Field label="Status">
+              <FSelect value={form.status} onChange={v => setForm(f => ({ ...f, status: v as Booking['status'] }))} options={BSTATUSES.map(s => ({ value: s, label: s }))} />
+            </Field>
+          </FGrid>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Delete Event" message="This will permanently delete the event booking." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Venues Section ───────────────────────────────────────────────────────────
+
+function VenuesSection({ venues, onRefresh, showToast }: {
+  venues: Venue[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Venue | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const blank = { name: '', capacity: '', location: '', description: '', parking: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (v: Venue) => {
+    setEditItem(v);
+    setForm({ name: v.name, capacity: v.capacity, location: v.location, description: v.description || '', parking: v.parking || '' });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateVenue(editItem.id, form);
+      else await db.createVenue(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Venue updated.' : 'Venue added.', 'success');
+    } catch { showToast('Failed to save venue.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteVenue(id); onRefresh(); showToast('Venue removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  const filtered = venues.filter(v =>
+    v.name.toLowerCase().includes(search.toLowerCase()) ||
+    v.location.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search venues…" style={{ ...iStyle, paddingLeft: 30, width: 220, fontSize: '0.82rem', height: 34 }} />
+        </div>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Venue</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Venue', 'Location', 'Capacity', 'Parking', '']} />
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr><td colSpan={5}><Empty icon={MapPin} msg="No venues found" /></td></tr>
+          ) : filtered.map(v => (
+            <TR key={v.id}>
+              <TD><div style={{ fontWeight: 500 }}>{v.name}</div><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{v.description?.slice(0, 50)}</div></TD>
+              <TD muted>{v.location}</TD>
+              <TD muted>{v.capacity}</TD>
+              <TD muted>{v.parking || '—'}</TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(v)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(v.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Venue' : 'Add Venue'} width={500}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Venue Name"><FInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Location"><FInput value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} /></Field>
+            <Field label="Capacity"><FInput value={form.capacity} onChange={v => setForm(f => ({ ...f, capacity: v }))} placeholder="e.g. 5,000" /></Field>
+            <Field label="Parking"><FInput value={form.parking} onChange={v => setForm(f => ({ ...f, parking: v }))} /></Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem' }}>
+            <Field label="Description"><FTextarea value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} rows={2} /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Venue" message="This will permanently delete the venue record." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Customers Section ────────────────────────────────────────────────────────
+
+function CustomersSection({ customers, onRefresh, showToast }: {
+  customers: Customer[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Customer | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const blank = { name: '', company: '', email: '', tier: 'Standard Client', notes: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (c: Customer) => {
+    setEditItem(c);
+    setForm({ name: c.name, company: c.company, email: c.email, tier: c.tier, notes: c.notes });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateCustomer(editItem.id, form);
+      else await db.createCustomer(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Customer updated.' : 'Customer added.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteCustomer(id); onRefresh(); showToast('Customer removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  const filtered = customers.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    c.company.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers…" style={{ ...iStyle, paddingLeft: 30, width: 220, fontSize: '0.82rem', height: 34 }} />
+        </div>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Customer</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Customer', 'Company', 'Email', 'Tier', 'Notes', '']} />
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={Users} msg="No customers found" /></td></tr>
+          ) : filtered.map(c => (
+            <TR key={c.id}>
+              <TD><div style={{ fontWeight: 500 }}>{c.name}</div></TD>
+              <TD muted>{c.company || '—'}</TD>
+              <TD muted>{c.email}</TD>
+              <TD><StatusBadge status={c.tier} /></TD>
+              <TD muted>{c.notes?.slice(0, 40) || '—'}</TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(c.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Customer' : 'Add Customer'} width={500}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Name"><FInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Company"><FInput value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} /></Field>
+            <Field label="Email"><FInput value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" /></Field>
+            <Field label="Tier">
+              <FSelect value={form.tier} onChange={v => setForm(f => ({ ...f, tier: v }))} options={['Standard Client', 'VIP Client', 'Corporate', 'Premium Partner', 'Festival Organizer'].map(t => ({ value: t, label: t }))} />
+            </Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem' }}>
+            <Field label="Notes"><FTextarea value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} rows={2} /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Customer" message="This will permanently delete the customer record." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Finance Section ──────────────────────────────────────────────────────────
+
+function FinanceSection({ invoices, bookings }: { invoices: Invoice[]; bookings: Booking[] }) {
+  const totalRevenue = invoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
+  const outstanding = invoices.filter(i => i.status !== 'Paid' && i.status !== 'Cancelled').reduce((s, i) => s + i.balance_due, 0);
+  const overdue = invoices.filter(i => i.status === 'Overdue').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px,1fr))', gap: '1rem' }}>
+        <StatCard label="Total Collected" value={fmtCurrency(totalRevenue)} icon={DollarSign} trend="+8.2%" trendUp />
+        <StatCard label="Outstanding" value={fmtCurrency(outstanding)} icon={CreditCard} sub="pending collection" />
+        <StatCard label="Overdue Invoices" value={String(overdue)} icon={AlertCircle} sub="require action" />
+        <StatCard label="Total Invoices" value={String(invoices.length)} icon={Receipt} />
+      </div>
+      <Tbl>
+        <TH cols={['Invoice ID', 'Booking', 'Amount', 'Balance Due', 'Status', 'Due Date']} />
+        <tbody>
+          {invoices.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={Receipt} msg="No invoices found" /></td></tr>
+          ) : invoices.slice(0, 25).map(inv => {
+            const bk = bookings.find(b => b.id === inv.booking_id);
+            return (
+              <TR key={inv.id}>
+                <TD><span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{inv.id.slice(0, 12)}</span></TD>
+                <TD muted>{bk?.event_title || inv.booking_id}</TD>
+                <TD>{fmtCurrency(inv.amount)}</TD>
+                <TD>{fmtCurrency(inv.balance_due)}</TD>
+                <TD><StatusBadge status={inv.status} /></TD>
+                <TD muted>{fmtDate(inv.due_date)}</TD>
+              </TR>
+            );
+          })}
+        </tbody>
+      </Tbl>
+    </div>
+  );
+}
+
+// ─── Orders Section ───────────────────────────────────────────────────────────
+
+function OrdersSection({ invoices, bookings, onRefresh, showToast }: {
+  invoices: Invoice[]; bookings: Booking[];
+  onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Invoice | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const ISTATUSES: Invoice['status'][] = ['Unpaid', 'Partially Paid', 'Paid', 'Overdue', 'Cancelled'];
+  const blank = { booking_id: bookings[0]?.id || '', amount: '50000', status: 'Unpaid' as Invoice['status'], due_date: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0] };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm({ ...blank, booking_id: bookings[0]?.id || '' }); setShowModal(true); };
+  const openEdit = (i: Invoice) => {
+    setEditItem(i);
+    setForm({ booking_id: i.booking_id, amount: String(i.amount), status: i.status, due_date: i.due_date });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const data = { booking_id: form.booking_id, amount: parseFloat(form.amount) || 0, balance_due: form.status === 'Paid' ? 0 : (parseFloat(form.amount) || 0), status: form.status, due_date: form.due_date };
+      if (editItem) await db.updateInvoice(editItem.id, data);
+      else await db.createInvoice(data);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Order updated.' : 'Order created.', 'success');
+    } catch { showToast('Failed to save order.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteInvoice(id); onRefresh(); showToast('Order removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />New Order</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['ID', 'Booking', 'Amount', 'Balance', 'Status', 'Due', '']} />
+        <tbody>
+          {invoices.length === 0 ? (
+            <tr><td colSpan={7}><Empty icon={Package} msg="No orders found" /></td></tr>
+          ) : invoices.map(inv => {
+            const bk = bookings.find(b => b.id === inv.booking_id);
+            return (
+              <TR key={inv.id}>
+                <TD><span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{inv.id.slice(0, 12)}</span></TD>
+                <TD muted>{bk?.event_title || inv.booking_id}</TD>
+                <TD>{fmtCurrency(inv.amount)}</TD>
+                <TD>{fmtCurrency(inv.balance_due)}</TD>
+                <TD><StatusBadge status={inv.status} /></TD>
+                <TD muted>{fmtDate(inv.due_date)}</TD>
+                <TD>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <ABtn variant="ghost" size="sm" onClick={() => openEdit(inv)}><Edit2 size={12} /></ABtn>
+                    <ABtn variant="danger" size="sm" onClick={() => setConfirm(inv.id)}><Trash2 size={12} /></ABtn>
+                  </div>
+                </TD>
+              </TR>
+            );
+          })}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Order' : 'New Order'} width={480}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Booking">
+              <FSelect value={form.booking_id} onChange={v => setForm(f => ({ ...f, booking_id: v }))} options={bookings.map(b => ({ value: b.id, label: b.event_title }))} />
+            </Field>
+            <Field label="Amount (USD)"><FInput value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} type="number" /></Field>
+            <Field label="Status">
+              <FSelect value={form.status} onChange={v => setForm(f => ({ ...f, status: v as Invoice['status'] }))} options={ISTATUSES.map(s => ({ value: s, label: s }))} />
+            </Field>
+            <Field label="Due Date"><FInput value={form.due_date} onChange={v => setForm(f => ({ ...f, due_date: v }))} type="date" /></Field>
+          </FGrid>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Order" message="This will permanently delete the order/invoice." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Tickets Section ──────────────────────────────────────────────────────────
+
+function TicketsSection({ tiers, promoCodes, onRefresh, showToast }: {
+  tiers: TicketTier[]; promoCodes: PromoCode[];
+  onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [tab, setTab] = useState<'tiers' | 'promos'>('tiers');
+  const [showModal, setShowModal] = useState(false);
+  const [editTier, setEditTier] = useState<TicketTier | null>(null);
+  const [editPromo, setEditPromo] = useState<PromoCode | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<{ id: string; type: 'tier' | 'promo' } | null>(null);
+
+  const [tierForm, setTierForm] = useState({ name: '', price: '85', desc: '', capacity: '1000' });
+  const [promoForm, setPromoForm] = useState({ code: '', discount: '15', active: true, expiry: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] });
+
+  const openCreateTier = () => { setEditTier(null); setTierForm({ name: '', price: '85', desc: '', capacity: '1000' }); setShowModal(true); };
+  const openEditTier = (t: TicketTier) => { setEditTier(t); setTierForm({ name: t.name, price: String(t.price), desc: t.desc, capacity: String(t.capacity || 1000) }); setShowModal(true); };
+  const openCreatePromo = () => { setEditPromo(null); setPromoForm({ code: '', discount: '15', active: true, expiry: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] }); setShowModal(true); };
+  const openEditPromo = (p: PromoCode) => { setEditPromo(p); setPromoForm({ code: p.code, discount: String(p.discount), active: p.active, expiry: p.expiry }); setShowModal(true); };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (tab === 'tiers') {
+        const data = { name: tierForm.name, price: parseFloat(tierForm.price) || 0, desc: tierForm.desc, capacity: parseInt(tierForm.capacity) || 1000 };
+        if (editTier) await db.updateTicketTier(editTier.id, data);
+        else await db.createTicketTier(data);
+        showToast(editTier ? 'Tier updated.' : 'Tier created.', 'success');
+      } else {
+        const data = { code: promoForm.code, discount: parseFloat(promoForm.discount) || 0, active: promoForm.active, expiry: promoForm.expiry };
+        if (editPromo) await db.updatePromoCode(editPromo.id, data);
+        else await db.createPromoCode(data);
+        showToast(editPromo ? 'Promo updated.' : 'Promo created.', 'success');
+      }
+      setShowModal(false); onRefresh();
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async () => {
+    if (!confirm) return;
+    try {
+      if (confirm.type === 'tier') await db.deleteTicketTier(confirm.id);
+      else await db.deletePromoCode(confirm.id);
+      onRefresh(); showToast('Deleted successfully.', 'success');
+    } catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['tiers', 'promos'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none', background: tab === t ? 'rgba(212,175,55,0.15)' : 'transparent', color: tab === t ? 'var(--accent)' : 'var(--text-muted)', fontSize: '0.83rem', fontWeight: tab === t ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+              {t === 'tiers' ? `Tiers (${tiers.length})` : `Promo Codes (${promoCodes.length})`}
             </button>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-xl tracking-tight" style={{ background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                SHOWTIME
-              </span>
-              <span className="text-[10px] font-semibold bg-white/5 border border-white/10 px-2 py-0.5 rounded text-white/50 tracking-wider">
-                v{NAV_ITEMS[0] ? '2026.1' : '1.0'}
-              </span>
+          ))}
+        </div>
+        <ABtn variant="primary" size="sm" onClick={tab === 'tiers' ? openCreateTier : openCreatePromo}>
+          <Plus size={13} />{tab === 'tiers' ? 'Add Tier' : 'Add Promo'}
+        </ABtn>
+      </div>
+
+      {tab === 'tiers' ? (
+        <Tbl>
+          <TH cols={['Tier Name', 'Price', 'Capacity', 'Description', '']} />
+          <tbody>
+            {tiers.length === 0 ? (
+              <tr><td colSpan={5}><Empty icon={Ticket} msg="No ticket tiers" /></td></tr>
+            ) : tiers.map(t => (
+              <TR key={t.id}>
+                <TD><div style={{ fontWeight: 500 }}>{t.name}</div></TD>
+                <TD>{fmtCurrency(t.price)}</TD>
+                <TD muted>{t.capacity?.toLocaleString()}</TD>
+                <TD muted>{t.desc?.slice(0, 60)}</TD>
+                <TD>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <ABtn variant="ghost" size="sm" onClick={() => openEditTier(t)}><Edit2 size={12} /></ABtn>
+                    <ABtn variant="danger" size="sm" onClick={() => setConfirm({ id: t.id, type: 'tier' })}><Trash2 size={12} /></ABtn>
+                  </div>
+                </TD>
+              </TR>
+            ))}
+          </tbody>
+        </Tbl>
+      ) : (
+        <Tbl>
+          <TH cols={['Code', 'Discount', 'Active', 'Expiry', '']} />
+          <tbody>
+            {promoCodes.length === 0 ? (
+              <tr><td colSpan={5}><Empty icon={Tag} msg="No promo codes" /></td></tr>
+            ) : promoCodes.map(p => (
+              <TR key={p.id}>
+                <TD><span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--accent)' }}>{p.code}</span></TD>
+                <TD>{p.discount}% off</TD>
+                <TD><StatusBadge status={p.active ? 'Active' : 'Inactive'} /></TD>
+                <TD muted>{fmtDate(p.expiry)}</TD>
+                <TD>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <ABtn variant="ghost" size="sm" onClick={() => openEditPromo(p)}><Edit2 size={12} /></ABtn>
+                    <ABtn variant="danger" size="sm" onClick={() => setConfirm({ id: p.id, type: 'promo' })}><Trash2 size={12} /></ABtn>
+                  </div>
+                </TD>
+              </TR>
+            ))}
+          </tbody>
+        </Tbl>
+      )}
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={tab === 'tiers' ? (editTier ? 'Edit Tier' : 'Add Tier') : (editPromo ? 'Edit Promo' : 'Add Promo')} width={440}>
+        <form onSubmit={handleSave}>
+          {tab === 'tiers' ? (
+            <FGrid>
+              <Field label="Tier Name"><FInput value={tierForm.name} onChange={v => setTierForm(f => ({ ...f, name: v }))} /></Field>
+              <Field label="Price (USD)"><FInput value={tierForm.price} onChange={v => setTierForm(f => ({ ...f, price: v }))} type="number" /></Field>
+              <Field label="Capacity"><FInput value={tierForm.capacity} onChange={v => setTierForm(f => ({ ...f, capacity: v }))} type="number" /></Field>
+              <div style={{ gridColumn: '1/-1' }}><Field label="Description"><FTextarea value={tierForm.desc} onChange={v => setTierForm(f => ({ ...f, desc: v }))} rows={2} /></Field></div>
+            </FGrid>
+          ) : (
+            <FGrid>
+              <Field label="Code"><FInput value={promoForm.code} onChange={v => setPromoForm(f => ({ ...f, code: v.toUpperCase() }))} placeholder="EARLYBIRD25" /></Field>
+              <Field label="Discount %"><FInput value={promoForm.discount} onChange={v => setPromoForm(f => ({ ...f, discount: v }))} type="number" /></Field>
+              <Field label="Expiry Date"><FInput value={promoForm.expiry} onChange={v => setPromoForm(f => ({ ...f, expiry: v }))} type="date" /></Field>
+              <Field label="Status">
+                <FSelect value={promoForm.active ? 'active' : 'inactive'} onChange={v => setPromoForm(f => ({ ...f, active: v === 'active' }))} options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
+              </Field>
+            </FGrid>
+          )}
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Delete Item" message="This will permanently delete this record." onConfirm={handleDelete} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Marketing Section ────────────────────────────────────────────────────────
+
+function MarketingSection({ campaigns, onRefresh, showToast }: {
+  campaigns: MarketingCampaign[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<MarketingCampaign | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const blank = { name: '', type: 'Email' as MarketingCampaign['type'], subject: '', segment: 'All Customers', content: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (c: MarketingCampaign) => {
+    setEditItem(c);
+    setForm({ name: c.name, type: c.type, subject: c.subject, segment: c.segment, content: c.content });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateCampaign(editItem.id, form);
+      else await db.createCampaign(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Campaign updated.' : 'Campaign created.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteCampaign(id); onRefresh(); showToast('Campaign removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />New Campaign</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Campaign', 'Type', 'Segment', 'Open Rate', 'Created', '']} />
+        <tbody>
+          {campaigns.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={Megaphone} msg="No campaigns yet" /></td></tr>
+          ) : campaigns.map(c => (
+            <TR key={c.id}>
+              <TD><div style={{ fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{c.subject}</div></TD>
+              <TD><StatusBadge status={c.type} /></TD>
+              <TD muted>{c.segment}</TD>
+              <TD muted>{c.openRate}</TD>
+              <TD muted>{fmtDate(c.created_at)}</TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(c.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Campaign' : 'New Campaign'} width={540}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Campaign Name"><FInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Type">
+              <FSelect value={form.type} onChange={v => setForm(f => ({ ...f, type: v as MarketingCampaign['type'] }))} options={['Email', 'SMS', 'Push'].map(t => ({ value: t, label: t }))} />
+            </Field>
+            <Field label="Subject / Title"><FInput value={form.subject} onChange={v => setForm(f => ({ ...f, subject: v }))} /></Field>
+            <Field label="Audience Segment"><FInput value={form.segment} onChange={v => setForm(f => ({ ...f, segment: v }))} /></Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem' }}>
+            <Field label="Message Content"><FTextarea value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} rows={4} /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} label="Save Campaign" />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Delete Campaign" message="This will permanently remove the campaign." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Advertising Section ──────────────────────────────────────────────────────
+
+function AdvertisingSection({ ads, onRefresh, showToast }: {
+  ads: AdPlacement[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<AdPlacement | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const blank = { name: '', active: true, image_url: '' };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (a: AdPlacement) => {
+    setEditItem(a);
+    setForm({ name: a.name, active: a.active, image_url: a.image_url || '' });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateAdPlacement(editItem.id, form);
+      else await db.createAdPlacement(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Ad updated.' : 'Ad created.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteAdPlacement(id); onRefresh(); showToast('Ad removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />New Placement</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Ad Name', 'Impressions', 'CTR', 'Revenue', 'Status', '']} />
+        <tbody>
+          {ads.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={Radio} msg="No ad placements" /></td></tr>
+          ) : ads.map(a => (
+            <TR key={a.id}>
+              <TD><div style={{ fontWeight: 500 }}>{a.name}</div></TD>
+              <TD muted>{a.impressions.toLocaleString()}</TD>
+              <TD muted>{a.clickRate}</TD>
+              <TD>{fmtCurrency(a.revenue)}</TD>
+              <TD><StatusBadge status={a.active ? 'Active' : 'Inactive'} /></TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Ad' : 'New Ad Placement'} width={440}>
+        <form onSubmit={handleSave}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <Field label="Ad Name"><FInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Image URL"><FInput value={form.image_url} onChange={v => setForm(f => ({ ...f, image_url: v }))} placeholder="https://…" /></Field>
+            <Field label="Status">
+              <FSelect value={form.active ? 'active' : 'inactive'} onChange={v => setForm(f => ({ ...f, active: v === 'active' }))} options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
+            </Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Delete Ad Placement" message="This will permanently remove the ad placement." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Content CMS Section ──────────────────────────────────────────────────────
+
+function ContentSection({ sections, onRefresh, showToast }: {
+  sections: WebsiteSection[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<WebsiteSection | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const TYPES: WebsiteSection['type'][] = ['hero', 'announcement', 'features', 'cta', 'footer'];
+  const blank = { type: 'hero' as WebsiteSection['type'], title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (s: WebsiteSection) => {
+    setEditItem(s);
+    setForm({ type: s.type, title: s.title, subtitle: s.subtitle || '', content: s.content || '', buttonText: s.buttonText || '', image_url: s.image_url || '', active: s.active });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateWebsiteSection(editItem.id, form);
+      else await db.createWebsiteSection(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'Section updated.' : 'Section created.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteWebsiteSection(id); onRefresh(); showToast('Section removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Section</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Section ID', 'Type', 'Title', 'Active', '']} />
+        <tbody>
+          {sections.length === 0 ? (
+            <tr><td colSpan={5}><Empty icon={FileText} msg="No website sections" /></td></tr>
+          ) : sections.map(s => (
+            <TR key={s.id}>
+              <TD><span style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{s.id}</span></TD>
+              <TD><StatusBadge status={s.type} /></TD>
+              <TD><div style={{ fontWeight: 500 }}>{s.title}</div><div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{s.subtitle?.slice(0, 50)}</div></TD>
+              <TD><StatusBadge status={s.active ? 'Active' : 'Inactive'} /></TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(s)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(s.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Section' : 'Add Section'} width={560}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="Section Type">
+              <FSelect value={form.type} onChange={v => setForm(f => ({ ...f, type: v as WebsiteSection['type'] }))} options={TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))} />
+            </Field>
+            <Field label="Status">
+              <FSelect value={form.active ? 'active' : 'inactive'} onChange={v => setForm(f => ({ ...f, active: v === 'active' }))} options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
+            </Field>
+            <Field label="Title"><FInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} /></Field>
+            <Field label="Subtitle"><FInput value={form.subtitle} onChange={v => setForm(f => ({ ...f, subtitle: v }))} /></Field>
+            <Field label="Button Text"><FInput value={form.buttonText} onChange={v => setForm(f => ({ ...f, buttonText: v }))} /></Field>
+            <Field label="Image URL"><FInput value={form.image_url} onChange={v => setForm(f => ({ ...f, image_url: v }))} placeholder="https://…" /></Field>
+          </FGrid>
+          <div style={{ marginTop: '0.9rem' }}>
+            <Field label="Content"><FTextarea value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} rows={3} /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Staff Section ────────────────────────────────────────────────────────────
+
+function StaffSection({ users, onRefresh, showToast }: {
+  users: User[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<User | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  const ROLES = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager', 'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent', 'Promoter', 'Venue Manager', 'Artist', 'Client'];
+  const blank = { first_name: '', last_name: '', email: '', role: 'Booking Agent', status: 'Active' as User['status'] };
+  const [form, setForm] = useState(blank);
+
+  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
+  const openEdit = (u: User) => {
+    setEditItem(u);
+    setForm({ first_name: u.first_name, last_name: u.last_name, email: u.email, role: u.role, status: u.status });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateUser(editItem.id, form);
+      else await db.createUser(form);
+      setShowModal(false); onRefresh();
+      showToast(editItem ? 'User updated.' : 'User created.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+  const handleDelete = async (id: string) => {
+    try { await db.deleteUser(id); onRefresh(); showToast('User removed.', 'success'); }
+    catch { showToast('Failed to delete.', 'error'); }
+    finally { setConfirm(null); }
+  };
+
+  const filtered = users.filter(u =>
+    `${u.first_name} ${u.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase()) ||
+    u.role.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search staff…" style={{ ...iStyle, paddingLeft: 30, width: 220, fontSize: '0.82rem', height: 34 }} />
+        </div>
+        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Staff</ABtn>
+      </div>
+      <Tbl>
+        <TH cols={['Name', 'Email', 'Role', 'Status', 'Created', '']} />
+        <tbody>
+          {filtered.length === 0 ? (
+            <tr><td colSpan={6}><Empty icon={ShieldCheck} msg="No staff found" /></td></tr>
+          ) : filtered.map(u => (
+            <TR key={u.id}>
+              <TD>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+                    {initials(u.first_name, u.last_name)}
+                  </div>
+                  <span style={{ fontWeight: 500 }}>{u.first_name} {u.last_name}</span>
+                </div>
+              </TD>
+              <TD muted>{u.email}</TD>
+              <TD><StatusBadge status={u.role} /></TD>
+              <TD><StatusBadge status={u.status} /></TD>
+              <TD muted>{fmtDate(u.created_at)}</TD>
+              <TD>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(u)}><Edit2 size={12} /></ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(u.id)}><Trash2 size={12} /></ABtn>
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Tbl>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Staff Member' : 'Add Staff Member'} width={500}>
+        <form onSubmit={handleSave}>
+          <FGrid>
+            <Field label="First Name"><FInput value={form.first_name} onChange={v => setForm(f => ({ ...f, first_name: v }))} /></Field>
+            <Field label="Last Name"><FInput value={form.last_name} onChange={v => setForm(f => ({ ...f, last_name: v }))} /></Field>
+            <Field label="Email"><FInput value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" /></Field>
+            <Field label="Role">
+              <FSelect value={form.role} onChange={v => setForm(f => ({ ...f, role: v }))} options={ROLES.map(r => ({ value: r, label: r }))} />
+            </Field>
+            <Field label="Status">
+              <FSelect value={form.status} onChange={v => setForm(f => ({ ...f, status: v as User['status'] }))} options={['Active', 'Inactive', 'Suspended'].map(s => ({ value: s, label: s }))} />
+            </Field>
+          </FGrid>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+        </form>
+      </Modal>
+      <ConfirmDlg open={!!confirm} title="Remove Staff Member" message="This will permanently delete this user account." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+    </div>
+  );
+}
+
+// ─── Integrations Section ─────────────────────────────────────────────────────
+
+function IntegrationsSection({ integrations, onRefresh, showToast }: {
+  integrations: Integration[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState<Integration | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const PROVIDER_ICONS: Record<string, React.ElementType> = { Stripe: CreditCard, PayPal: Globe, Twilio: Phone, SendGrid: Mail };
+  const blank = { name: '', provider: 'Stripe' as Integration['provider'], status: 'Connected' as Integration['status'], api_key: '' };
+  const [form, setForm] = useState(blank);
+
+  const openEdit = (i: Integration) => {
+    setEditItem(i);
+    setForm({ name: i.name, provider: i.provider, status: i.status, api_key: i.api_key });
+    setShowModal(true);
+  };
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      if (editItem) await db.updateIntegration(editItem.id, form);
+      else await db.createIntegration(form);
+      setShowModal(false); onRefresh();
+      showToast('Integration updated.', 'success');
+    } catch { showToast('Failed to save.', 'error'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px,1fr))', gap: '1rem' }}>
+        {integrations.map(int => {
+          const Icon = PROVIDER_ICONS[int.provider] || Link2;
+          const ok = int.status === 'Connected';
+          return (
+            <div key={int.id} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${ok ? 'rgba(48,209,88,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 'var(--radius-lg)', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: ok ? 'rgba(48,209,88,0.1)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={16} color={ok ? '#30d158' : 'var(--text-muted)'} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{int.provider}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{int.name}</div>
+                  </div>
+                </div>
+                <StatusBadge status={int.status} />
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'monospace', background: 'rgba(255,255,255,0.03)', padding: '0.4rem 0.65rem', borderRadius: 6, letterSpacing: '0.05em' }}>
+                {int.api_key ? `${int.api_key.slice(0, 8)}••••••••` : 'No key set'}
+              </div>
+              <ABtn variant="secondary" size="sm" onClick={() => openEdit(int)}><Edit2 size={12} />Configure</ABtn>
             </div>
+          );
+        })}
+        {integrations.length === 0 && <Empty icon={Cable} msg="No integrations configured" />}
+      </div>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="Configure Integration" width={440}>
+        <form onSubmit={handleSave}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <Field label="Display Name"><FInput value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} /></Field>
+            <Field label="Provider">
+              <FSelect value={form.provider} onChange={v => setForm(f => ({ ...f, provider: v as Integration['provider'] }))} options={['Stripe', 'PayPal', 'Twilio', 'SendGrid'].map(p => ({ value: p, label: p }))} />
+            </Field>
+            <Field label="Status">
+              <FSelect value={form.status} onChange={v => setForm(f => ({ ...f, status: v as Integration['status'] }))} options={[{ value: 'Connected', label: 'Connected' }, { value: 'Disconnected', label: 'Disconnected' }]} />
+            </Field>
+            <Field label="API Key"><FInput value={form.api_key} onChange={v => setForm(f => ({ ...f, api_key: v }))} placeholder="sk_live_…" /></Field>
+          </div>
+          <FActions onCancel={() => setShowModal(false)} saving={saving} label="Save Configuration" />
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Settings Section ─────────────────────────────────────────────────────────
+
+function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 'error') => void }) {
+  const [domain, setDomain] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('st_settings_domain') || 'showtimeservices.com' : 'showtimeservices.com');
+  const [currency, setCurrency] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('st_settings_currency') || 'USD ($)' : 'USD ($)');
+  const [timezone, setTimezone] = useState('America/Jamaica');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSaving(true);
+    await new Promise(r => setTimeout(r, 600));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('st_settings_domain', domain);
+      localStorage.setItem('st_settings_currency', currency);
+    }
+    setSaving(false);
+    showToast('Settings saved.', 'success');
+  };
+
+  const handleReset = () => {
+    if (typeof window === 'undefined') return;
+    if (!confirm('Are you sure you want to reset all data? This will revert the entire system to its default seed data.')) return;
+    
+    const keys = [
+      'st_users', 'st_artists_v2', 'st_artists', 'st_leads', 'st_bookings', 'st_contracts',
+      'st_invoices', 'st_tasks', 'st_notifs', 'st_venues', 'st_customers', 'st_ticket_tiers',
+      'st_promo_codes', 'st_campaigns', 'st_ad_placements', 'st_website_sections', 'st_integrations',
+      'st_settings_domain', 'st_settings_currency', 'st_active_user_id'
+    ];
+    
+    keys.forEach(k => localStorage.removeItem(k));
+    showToast('System data has been reset to defaults.', 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', maxWidth: 600 }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.4rem' }}>
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--text-primary)' }}>System Configuration</h4>
+        <form onSubmit={handleSave}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <Field label="Primary Domain"><FInput value={domain} onChange={setDomain} /></Field>
+            <Field label="Default Currency">
+              <FSelect value={currency} onChange={setCurrency} options={['USD ($)', 'EUR (€)', 'GBP (£)', 'JMD (J$)', 'CAD (C$)', 'AUD (A$)'].map(c => ({ value: c, label: c }))} />
+            </Field>
+            <Field label="Timezone">
+              <FSelect value={timezone} onChange={setTimezone} options={['America/Jamaica', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo'].map(t => ({ value: t, label: t }))} />
+            </Field>
+          </div>
+          <div style={{ marginTop: '1.2rem' }}>
+            <ABtn variant="primary" disabled={saving}>
+              {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+              {saving ? 'Saving…' : 'Save Settings'}
+            </ABtn>
+          </div>
+        </form>
+      </div>
+      <div style={{ background: 'rgba(255,69,58,0.04)', border: '1px solid rgba(255,69,58,0.15)', borderRadius: 'var(--radius-lg)', padding: '1.4rem' }}>
+        <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.5rem', color: '#ff453a' }}>Danger Zone</h4>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>These actions are permanent and cannot be undone.</p>
+        <ABtn variant="danger" size="sm" onClick={handleReset}><AlertCircle size={13} />Reset All Data</ABtn>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function AdminPortal() {
+  const { user, profile, loading, signOut, hasPermission, isAdmin, isStaff } = useAuth();
+  const router = useRouter();
+
+  const [activeTab, setActiveTab]   = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notifOpen, setNotifOpen]   = useState(false);
+  const [toast, setToast]           = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const [leads, setLeads]                     = useState<Lead[]>([]);
+  const [bookings, setBookings]               = useState<Booking[]>([]);
+  const [tasks, setTasks]                     = useState<Task[]>([]);
+  const [notifs, setNotifs]                   = useState<Notification[]>([]);
+  const [invoices, setInvoices]               = useState<Invoice[]>([]);
+  const [artists, setArtists]                 = useState<Artist[]>([]);
+  const [venues, setVenues]                   = useState<Venue[]>([]);
+  const [customers, setCustomers]             = useState<Customer[]>([]);
+  const [users, setUsers]                     = useState<User[]>([]);
+  const [ticketTiers, setTicketTiers]         = useState<TicketTier[]>([]);
+  const [promoCodes, setPromoCodes]           = useState<PromoCode[]>([]);
+  const [campaigns, setCampaigns]             = useState<MarketingCampaign[]>([]);
+  const [adPlacements, setAdPlacements]       = useState<AdPlacement[]>([]);
+  const [websiteSections, setWebsiteSections] = useState<WebsiteSection[]>([]);
+  const [integrations, setIntegrations]       = useState<Integration[]>([]);
+  const [dataLoading, setDataLoading]         = useState(true);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error') => setToast({ message, type }), []);
+
+  const loadData = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [
+        aLeads, aBookings, aTasks, aInvoices, aArtists,
+        aVenues, aCustomers, aUsers, aTiers, aPromos,
+        aCamps, aAds, aSecs, aInts,
+      ] = await Promise.all([
+        db.getLeads(), db.getBookings(), db.getTasks(), db.getInvoices(), db.getArtists(),
+        db.getVenues(), db.getCustomers(), db.getUsers(), db.getTicketTiers(), db.getPromoCodes(),
+        db.getCampaigns(), db.getAdPlacements(), db.getWebsiteSections(), db.getIntegrations(),
+      ]);
+      setLeads(aLeads); setBookings(aBookings); setTasks(aTasks); setInvoices(aInvoices);
+      setArtists(aArtists); setVenues(aVenues); setCustomers(aCustomers); setUsers(aUsers);
+      setTicketTiers(aTiers); setPromoCodes(aPromos); setCampaigns(aCamps);
+      setAdPlacements(aAds); setWebsiteSections(aSecs); setIntegrations(aInts);
+      if (user?.id) {
+        const n = await db.getNotifications(user.id);
+        setNotifs(n);
+      }
+    } catch { showToast('Failed to load data. Please refresh.', 'error'); }
+    finally { setDataLoading(false); }
+  }, [user, showToast]);
+
+  useEffect(() => { if (!loading && !user) router.push('/auth/signin'); }, [loading, user, router]);
+  useEffect(() => { if (user) loadData(); }, [user, loadData]);
+
+  const handleSignOut = async () => { await signOut(); router.push('/auth/signin'); };
+
+  const PAGE_TITLES: Record<string, string> = {
+    dashboard: 'Dashboard', bookings: 'Bookings', artists: 'Artists', events: 'Events',
+    venues: 'Venues', customers: 'Customers', finance: 'Finance', orders: 'Orders',
+    tickets: 'Tickets & Promos', marketing: 'Marketing', advertising: 'Advertising',
+    content: 'Content CMS', staff: 'Staff & Roles', integrations: 'Integrations', settings: 'Settings',
+  };
+
+  const unreadNotifs = notifs.filter(n => !n.read_status).length;
+
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    if (item.adminOnly) return isAdmin;
+    if (item.permission) return hasPermission(item.permission) || isAdmin;
+    return true;
+  });
+
+  const grouped = NAV_SECTIONS
+    .map(s => ({ ...s, items: visibleNavItems.filter(i => i.section === s.id) }))
+    .filter(s => s.items.length > 0);
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        <Loader2 size={28} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Loading portal…</span>
+      </div>
+    </div>
+  );
+
+  if (!user || !profile) return null;
+
+  if (!isStaff && !isAdmin) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <AccessDenied />
+    </div>
+  );
+
+  const renderContent = () => {
+    if (dataLoading) return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <Loader2 size={24} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />
+      </div>
+    );
+    switch (activeTab) {
+      case 'dashboard':    return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} />;
+      case 'bookings':     return <BookingsSection bookings={bookings} leads={leads} artists={artists} onRefresh={loadData} showToast={showToast} />;
+      case 'artists':      return !hasPermission('view_artists') && !isAdmin    ? <AccessDenied /> : <ArtistsSection artists={artists} onRefresh={loadData} showToast={showToast} />;
+      case 'events':       return !hasPermission('view_events') && !isAdmin     ? <AccessDenied /> : <EventsSection bookings={bookings} artists={artists} venues={venues} onRefresh={loadData} showToast={showToast} />;
+      case 'venues':       return !hasPermission('manage_venues') && !isAdmin   ? <AccessDenied /> : <VenuesSection venues={venues} onRefresh={loadData} showToast={showToast} />;
+      case 'customers':    return !hasPermission('view_customers') && !isAdmin  ? <AccessDenied /> : <CustomersSection customers={customers} onRefresh={loadData} showToast={showToast} />;
+      case 'finance':      return !hasPermission('view_finance') && !isAdmin    ? <AccessDenied /> : <FinanceSection invoices={invoices} bookings={bookings} />;
+      case 'orders':       return !hasPermission('view_orders') && !isAdmin     ? <AccessDenied /> : <OrdersSection invoices={invoices} bookings={bookings} onRefresh={loadData} showToast={showToast} />;
+      case 'tickets':      return !hasPermission('view_tickets') && !isAdmin    ? <AccessDenied /> : <TicketsSection tiers={ticketTiers} promoCodes={promoCodes} onRefresh={loadData} showToast={showToast} />;
+      case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={loadData} showToast={showToast} />;
+      case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={loadData} showToast={showToast} />;
+      case 'content':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} />;
+      case 'staff':        return !isAdmin ? <AccessDenied /> : <StaffSection users={users} onRefresh={loadData} showToast={showToast} />;
+      case 'integrations': return !isAdmin ? <AccessDenied /> : <IntegrationsSection integrations={integrations} onRefresh={loadData} showToast={showToast} />;
+      case 'settings':     return !isAdmin ? <AccessDenied /> : <SettingsSection showToast={showToast} />;
+      default:             return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} />;
+    }
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+      `}</style>
+
+      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)', fontFamily: 'var(--font-body)' }}>
+
+        {/* ── Sidebar ── */}
+        <aside style={{
+          width: sidebarOpen ? 220 : 58,
+          minHeight: '100vh',
+          background: 'var(--bg-secondary)',
+          borderRight: '1px solid var(--border-color)',
+          display: 'flex', flexDirection: 'column',
+          transition: 'width 0.28s cubic-bezier(0.25,0.46,0.45,0.94)',
+          overflow: 'hidden', flexShrink: 0,
+          position: 'sticky', top: 0, height: '100vh', zIndex: 100,
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: sidebarOpen ? '1rem 1rem 0.75rem' : '1rem 0.65rem 0.75rem', borderBottom: '1px solid var(--border-color)', gap: '0.5rem', flexShrink: 0 }}>
+            {sidebarOpen && (
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Showtime</div>
+                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 2 }}>Admin Portal</div>
+              </div>
+            )}
+            <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6, marginLeft: sidebarOpen ? 'auto' : 0 }}>
+              {sidebarOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+            </button>
           </div>
 
-          {/* Search bar wrapper focused opens cmd+k */}
-          <div 
-            className="hidden md:flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 w-96 cursor-pointer hover:border-white/20 transition"
-            onClick={() => setCommandPaletteOpen(true)}
-          >
-            <Search className="w-4 h-4 text-white/40" />
-            <span className="text-sm text-white/40 flex-1">Search portal...</span>
-            <kbd className="text-[10px] bg-white/10 border border-white/10 px-1.5 py-0.5 rounded text-white/50 font-mono">⌘K</kbd>
-          </div>
+          {/* Nav */}
+          <nav style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0.5rem', scrollbarWidth: 'thin' }}>
+            {grouped.map((section, si) => (
+              <div key={section.id} style={{ marginBottom: si < grouped.length - 1 ? '0.25rem' : 0 }}>
+                {sidebarOpen && (
+                  <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.5rem 0.5rem 0.25rem' }}>
+                    {section.label}
+                  </div>
+                )}
+                {section.items.map(item => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      title={!sidebarOpen ? item.label : undefined}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center',
+                        gap: sidebarOpen ? '0.55rem' : 0,
+                        justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                        padding: sidebarOpen ? '0.5rem 0.65rem' : '0.55rem',
+                        borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: isActive ? 'rgba(212,175,55,0.12)' : 'transparent',
+                        color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                        fontSize: '0.82rem', fontWeight: isActive ? 600 : 400,
+                        transition: 'all 0.15s', whiteSpace: 'nowrap',
+                        overflow: 'hidden', marginBottom: 1,
+                      }}
+                    >
+                      <Icon size={15} style={{ flexShrink: 0 }} />
+                      {sidebarOpen && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>}
+                    </button>
+                  );
+                })}
+                {si < grouped.length - 1 && sidebarOpen && (
+                  <div style={{ height: 1, background: 'var(--border-color)', margin: '0.4rem 0.5rem' }} />
+                )}
+              </div>
+            ))}
+          </nav>
 
-          <div className="flex items-center gap-4">
-            
-            {/* Alerts Center Bell */}
-            <div className="relative">
-              <button 
-                className="relative text-white/60 hover:text-white p-2 rounded-full hover:bg-white/5"
-                onClick={() => setNotifPanelOpen(!notifPanelOpen)}
-              >
-                <Activity className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#d4af37]" />
-              </button>
-              
-              {notifPanelOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#0c0a17] border border-white/10 rounded-2xl p-4 shadow-2xl z-[200]">
-                  <div className="flex justify-between items-center border-b border-white/10 pb-2 mb-2">
-                    <span className="font-bold text-sm text-[#d4af37]">Agency Alerts</span>
-                    <button className="text-white/40 hover:text-white text-xs" onClick={() => setNotifPanelOpen(false)}>Close</button>
+          {/* User footer */}
+          <div style={{ borderTop: '1px solid var(--border-color)', padding: sidebarOpen ? '0.75rem' : '0.65rem 0.5rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: sidebarOpen ? '0.6rem' : 0, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+                {initials(profile.first_name, profile.last_name)}
+              </div>
+              {sidebarOpen && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {profile.first_name} {profile.last_name}
                   </div>
-                  <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                    {notifs.map(n => (
-                      <div key={n.id} className="p-2 bg-white/5 rounded-lg border border-white/5 text-xs">
-                        <strong className="block text-white/80">{n.title}</strong>
-                        <span className="text-white/50">{n.message}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{profile.role}</div>
                 </div>
               )}
             </div>
-
-            {/* Profile badge with active role visibility */}
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <div className="text-right hidden sm:block">
-                <span className="block text-sm font-semibold text-white">{user.first_name} {user.last_name}</span>
-                <span className="block text-[10px] font-bold text-[#d4af37] uppercase tracking-wider">{userRole}</span>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f5d061] to-[#d4af37] flex items-center justify-center text-[#07050e] font-bold text-sm">
-                {user.first_name[0]}{user.last_name[0]}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </header>
-
-      {/* ── CORE SAAS BODY GRID ── */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* Mobile Sidebar backdrop */}
-        {!sidebarCollapsed && (
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[140] lg:hidden animate-fade"
-            onClick={() => setSidebarCollapsed(true)}
-          />
-        )}
-
-        {/* Collapsible Sidebar */}
-        <aside className={`border-r border-white/5 bg-[#0c0a17]/95 lg:bg-[#0c0a17]/50 flex flex-col transition-all duration-300 fixed lg:static inset-y-0 left-0 z-[150] h-full lg:h-auto ${
-          sidebarCollapsed 
-            ? '-translate-x-full lg:translate-x-0 lg:w-16 overflow-hidden' 
-            : 'translate-x-0 lg:w-64'
-        }`}>
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-            
-            {/* Group Navigation items by Category */}
-            {['Core Operations', 'Website Management', 'Growth & Promo', 'Administration', 'Settings'].map((category, catIdx) => {
-              const items = NAV_ITEMS.filter(i => i.category === category);
-              const isCollapsed = sidebarCollapsed;
-              return (
-                <div key={category} className="flex flex-col gap-1">
-                  {!isCollapsed && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 px-3 py-1.5 mt-2">
-                      {category}
-                    </span>
-                  )}
-                  {items.map(item => {
-                    const IconComp = item.icon;
-                    const active = activeTab === item.id;
-                    const hasAccess = hasTabAccess(item.id);
-                    
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          if (hasAccess) {
-                            setActiveTab(item.id);
-                            // Auto-close on mobile when item clicked
-                            if (window.innerWidth < 1024) {
-                              setSidebarCollapsed(true);
-                            }
-                          }
-                        }}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition ${
-                          active ? 'bg-[#d4af37] text-[#07050e] font-semibold' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                        } ${!hasAccess ? 'opacity-30 cursor-not-allowed' : ''}`}
-                        title={item.label}
-                      >
-                        <IconComp className="w-4 h-4 flex-shrink-0" />
-                        {!isCollapsed && <span className="text-sm">{item.label}</span>}
-                        {!hasAccess && !isCollapsed && (
-                          <span className="text-[8px] bg-red-500/20 text-red-400 px-1 py-0.5 rounded ml-auto">Lock</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                  {catIdx < 4 && <hr className="border-white/5 my-2" />}
-                </div>
-              );
-            })}
-
+            {sidebarOpen && (
+              <button
+                onClick={handleSignOut}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.65rem', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', marginTop: '0.5rem', transition: 'all 0.15s' }}
+                onMouseEnter={e => { (e.currentTarget.style.color = '#ff453a'); (e.currentTarget.style.background = 'rgba(255,69,58,0.08)'); }}
+                onMouseLeave={e => { (e.currentTarget.style.color = 'var(--text-muted)'); (e.currentTarget.style.background = 'transparent'); }}
+              >
+                <LogOut size={13} />Sign Out
+              </button>
+            )}
           </div>
         </aside>
 
-        {/* Tab content area */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
-          
-          {/* TAB 1: DASHBOARD VIEW */}
-          {activeTab === 'dashboard' && (
-            <div className="flex flex-col gap-8 animate-fade">
-              
-              <div className="flex justify-between items-start flex-wrap gap-4 border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Executive Dashboard</h2>
-                  <p className="text-white/50 text-sm">Centralized live metrics, platform volume statistics, and operational triggers.</p>
-                </div>
-                <div className="flex gap-3">
-                  <button className="btn bg-white/5 border border-white/10 hover:bg-white/10 px-5 py-2 rounded-full font-medium text-sm transition" onClick={() => setShowCreateLead(true)}>
-                    Log Lead Inbound
-                  </button>
-                  <button className="btn bg-[#d4af37] text-[#07050e] hover:scale-105 px-5 py-2 rounded-full font-bold text-sm transition flex items-center gap-2" onClick={() => setShowEventBuilder(true)}>
-                    <Plus className="w-4 h-4" /> Create Event
-                  </button>
-                </div>
-              </div>
+        {/* ── Main ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
 
-              {/* Stat widgets list */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col gap-1">
-                  <span className="text-xs text-white/50 font-bold uppercase tracking-wider">Revenue Today</span>
-                  <span className="text-2xl font-bold text-[#d4af37]">${(calculatedTotalRevenue * 0.05).toLocaleString()}</span>
-                  <span className="text-[10px] text-emerald-500 font-semibold mt-1">▲ +12% vs yesterday</span>
-                </div>
-
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col gap-1">
-                  <span className="text-xs text-white/50 font-bold uppercase tracking-wider">Total Sales Vol.</span>
-                  <span className="text-2xl font-bold">${calculatedTotalRevenue.toLocaleString()}</span>
-                  <span className="text-[10px] text-emerald-500 font-semibold mt-1">▲ +8.2% vs last month</span>
-                </div>
-
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col gap-1">
-                  <span className="text-xs text-white/50 font-bold uppercase tracking-wider">Invoices Pending</span>
-                  <span className="text-2xl font-bold text-[#a855f7]">${calculatedBalanceDue.toLocaleString()}</span>
-                  <span className="text-[10px] text-white/40 mt-1">Deposits due in 14 days</span>
-                </div>
-
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col gap-1">
-                  <span className="text-xs text-white/50 font-bold uppercase tracking-wider">Audience Reach</span>
-                  <span className="text-2xl font-bold">7.2M+</span>
-                  <span className="text-[10px] text-[#d4af37] font-semibold mt-1">Across 35 countries</span>
-                </div>
-
-              </div>
-
-              {/* Extra specifications widgets row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-[#0c0a17] border border-white/5 p-4 rounded-xl flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-400">
-                    <Activity className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] uppercase font-bold text-white/30">Platform Health</span>
-                    <strong className="block text-sm text-white">99.98% uptime</strong>
-                  </div>
-                </div>
-                
-                <div className="bg-[#0c0a17] border border-white/5 p-4 rounded-xl flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-[#a855f7]/10 text-[#a855f7]">
-                    <Ticket className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] uppercase font-bold text-white/30">Tickets Sold</span>
-                    <strong className="block text-sm text-white">12,504 tickets</strong>
-                  </div>
-                </div>
-
-                <div className="bg-[#0c0a17] border border-white/5 p-4 rounded-xl flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-[#d4af37]/10 text-[#d4af37]">
-                    <Brain className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] uppercase font-bold text-white/30">AI Operations</span>
-                    <strong className="block text-sm text-white">4 active automation suggestions</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dashboard sections split */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* CRM list inside dashboard */}
-                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                    <h3 className="font-extrabold text-lg text-[#d4af37]">CRM Inbound Requests</h3>
-                    <button className="text-white/40 hover:text-white text-xs" onClick={() => setActiveTab('events')}>View all events</button>
-                  </div>
-                  <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
-                    {leads.map(l => (
-                      <div key={l.id} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition flex justify-between items-center gap-4">
-                        <div>
-                          <strong className="block text-white text-sm">{l.contact_name} &middot; <span className="text-[#d4af37]">{l.artist_name}</span></strong>
-                          <span className="text-xs text-white/50">{l.company_name || 'Individual Promoter'} &bull; {l.country}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="block text-xs font-bold text-[#d4af37]">${l.budget.toLocaleString()}</span>
-                          <span className="inline-block text-[9px] font-bold uppercase bg-white/5 border border-white/10 px-2 py-0.5 rounded text-white/50 mt-1">{l.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quick actions panel */}
-                <div className="lg:col-span-4 bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
-                  <h3 className="font-extrabold text-lg text-[#d4af37] border-b border-white/5 pb-3">Quick Operations</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button className="p-3 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl text-center text-xs hover:bg-white/10 transition flex flex-col items-center gap-2" onClick={() => setShowEventBuilder(true)}>
-                      <Calendar className="w-5 h-5 text-[#d4af37]" />
-                      Create Event
-                    </button>
-                    <button className="p-3 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl text-center text-xs hover:bg-white/10 transition flex flex-col items-center gap-2" onClick={() => setActiveTab('venues')}>
-                      <MapPin className="w-5 h-5 text-[#a855f7]" />
-                      Create Venue
-                    </button>
-                    <button className="p-3 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl text-center text-xs hover:bg-white/10 transition flex flex-col items-center gap-2" onClick={() => setActiveTab('artists')}>
-                      <Users className="w-5 h-5 text-[#d4af37]" />
-                      Add Artist
-                    </button>
-                    <button className="p-3 bg-white/5 border border-white/5 hover:border-white/10 rounded-xl text-center text-xs hover:bg-white/10 transition flex flex-col items-center gap-2" onClick={() => setActiveTab('marketing')}>
-                      <Megaphone className="w-5 h-5 text-[#a855f7]" />
-                      Campaign builder
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
+          {/* Header */}
+          <header style={{
+            height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0 1.5rem', borderBottom: '1px solid var(--border-color)',
+            background: 'rgba(12,10,23,0.85)', backdropFilter: 'blur(12px)',
+            position: 'sticky', top: 0, zIndex: 50, gap: '1rem', flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}>
+                <Menu size={16} />
+              </button>
+              <h1 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>
+                {PAGE_TITLES[activeTab] || 'Dashboard'}
+              </h1>
             </div>
-          )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button
+                onClick={loadData}
+                title="Refresh"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6, borderRadius: 8, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                <RefreshCw size={15} />
+              </button>
 
-          {/* TAB 2: EVENTS */}
-          {activeTab === 'events' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Events Management</h2>
-                  <p className="text-white/50 text-sm">Schedule events, archive, duplicate, and adjust pricing categories.</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn bg-white/5 border border-white/10 hover:bg-white/10 px-4 py-2 rounded-full font-semibold text-xs transition flex items-center gap-1.5" onClick={() => openCrudPanel('event', 'create')}>
-                    <Plus className="w-3.5 h-3.5" /> Quick Add
-                  </button>
-                  <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1.5 text-xs" onClick={() => setShowEventBuilder(true)}>
-                    <Sparkles className="w-3.5 h-3.5" /> 8-Step Wizard
-                  </button>
-                </div>
-              </div>
-
-              {/* Grid lists of current simulated bookings/events */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {bookings.map(bk => (
-                  <div key={bk.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl overflow-hidden hover:border-[#d4af37]/35 transition shadow-2xl">
-                    <div className="relative aspect-[16/10] bg-zinc-900">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={bk.artist_image} alt={bk.artist_name} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0c0a17] to-transparent" />
-                      <span className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-semibold uppercase">
-                        {bk.status}
-                      </span>
-                    </div>
-                    <div className="p-5 flex flex-col gap-3">
-                      <div>
-                        <h4 className="font-extrabold text-lg text-white">{bk.event_title}</h4>
-                        <span className="text-xs text-white/50 flex items-center gap-1.5 mt-1">
-                          <MapPin className="w-3.5 h-3.5 text-[#d4af37]" /> {bk.event_venue}, {bk.event_country}
-                        </span>
-                        <span className="text-[10px] text-white/40 block mt-1">Client: {bk.client_name}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs text-white/60 pt-3 border-t border-white/5">
-                        <span>Date: {bk.event_date}</span>
-                        <strong className="text-white font-bold">${bk.total_amount.toLocaleString()}</strong>
-                      </div>
-                      <div className="flex gap-2 mt-4">
-                        <button 
-                          className="btn flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
-                          onClick={() => openCrudPanel('event', 'edit', bk.id)}
-                        >
-                          <FileEdit className="w-3 h-3 text-[#d4af37]" /> Edit
-                        </button>
-                        <button 
-                          className="btn flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
-                          onClick={() => handleDelete('event', bk.id)}
-                        >
-                          <Trash2 className="w-3 h-3" /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: VENUES */}
-          {activeTab === 'venues' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Venue Manager &amp; Seat Maps</h2>
-                  <p className="text-white/50 text-sm">Assign capacity settings, parking, and paint booking seats zones.</p>
-                </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('venue', 'create')}>
-                  <Plus className="w-3.5 h-3.5" /> Add Venue
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Side: Seat map config */}
-                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                    <h3 className="font-bold text-lg">Interactive Seat Map Builder</h3>
-                    <div className="flex gap-2">
-                      {['VVIP', 'VIP', 'GA'].map(zone => (
-                        <button 
-                          key={zone} 
-                          className={`px-3 py-1 rounded text-xs font-semibold transition ${selectedSeatZone === zone ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
-                          onClick={() => setSelectedSeatZone(zone as any)}
-                        >
-                          {zone} Zone
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Seat Grid visual SVG map builder */}
-                  <div className="p-8 bg-black/40 rounded-xl border border-white/5 flex flex-col items-center justify-center gap-6">
-                    <span className="text-xs text-white/40 uppercase tracking-widest">Stage Direction Front</span>
-                    <div className="w-full max-w-sm aspect-square bg-[#07050e] border border-white/10 rounded-xl p-4 grid grid-cols-8 gap-2.5">
-                      {seatMap.map((booked, idx) => {
-                        let color = 'bg-white/10 border-white/10 hover:bg-[#d4af37]/30';
-                        if (booked) {
-                          color = 'bg-red-500/20 border-red-500/35 cursor-not-allowed';
-                        } else if (idx < 16) {
-                          color = 'bg-[#a855f7]/20 border-[#a855f7]/30 hover:bg-[#a855f7]/40';
-                        }
-                        return (
-                          <div 
-                            key={idx}
-                            className={`aspect-square rounded border transition duration-150 cursor-pointer ${color}`}
-                            onClick={() => {
-                              const copy = [...seatMap];
-                              copy[idx] = !copy[idx];
-                              setSeatMap(copy);
-                            }}
-                            title={`Seat ${idx + 1}`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="flex gap-6 text-xs text-white/50">
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-[#a855f7]/20 border border-[#a855f7]/30 rounded" /> VVIP Front Row</span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-white/10 border border-white/10 rounded" /> Standard VIP</span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-red-500/20 border border-red-500/35 rounded" /> Reserved / Booked</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Venue Profiles list */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                  <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                    <h3 className="font-bold text-lg border-b border-white/5 pb-2">Active Venues</h3>
-                    <div className="flex flex-col gap-3">
-                      {venues.map((venue) => (
-                        <div key={venue.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
-                          <div className="flex justify-between items-start gap-3">
-                            <div>
-                              <strong className="block text-sm text-white">{venue.name}</strong>
-                              <span className="text-xs text-white/50">{venue.location}</span>
-                            </div>
-                            <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-white/60">{venue.capacity}</span>
-                          </div>
-                          {venue.description && <p className="text-xs text-white/40 line-clamp-2">{venue.description}</p>}
-                          <div className="flex justify-between items-center text-[10px] text-white/50 border-t border-white/5 pt-2 mt-1">
-                            <span>Parking: {venue.parking || 'N/A'}</span>
-                            <div className="flex gap-2">
-                              <button className="text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('venue', 'edit', venue.id)}>
-                                <FileEdit className="w-3 h-3" /> Edit
-                              </button>
-                              <button className="text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('venue', venue.id)}>
-                                <Trash2 className="w-3 h-3" /> Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: ARTISTS */}
-          {activeTab === 'artists' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Artist CRM Profiles</h2>
-                  <p className="text-white/50 text-sm">Configure technical riders, biographies, and tour schedules.</p>
-                </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('artist', 'create')}>
-                  <Plus className="w-3.5 h-3.5" /> Add Artist
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {artists.map(art => (
-                  <div key={art.id} className="bg-[#0c0a17] border border-white/10 rounded-3xl p-6 flex flex-col gap-4 shadow-xl">
-                    <div className="flex items-center gap-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={art.profile_image} alt={art.stage_name} className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
-                      <div>
-                        <h4 className="font-extrabold text-xl">{art.stage_name}</h4>
-                        <span className="text-xs text-[#d4af37] font-semibold">{art.genre}</span>
-                      </div>
-                      <span className="ml-auto text-xs bg-white/5 border border-white/10 px-3 py-1 rounded-full text-white/70 uppercase font-mono">
-                        {art.booking_status}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-white/60 leading-relaxed line-clamp-3">{art.bio}</p>
-                    
-                    <div className="border-t border-white/5 pt-3 mt-2 flex flex-col gap-2 text-xs text-white/50">
-                      <span><strong>Technical:</strong> {art.technical_rider?.substring(0, 75)}...</span>
-                      <span><strong>Hospitality:</strong> {art.hospitality_rider?.substring(0, 75)}...</span>
-                    </div>
-
-                    <div className="flex gap-2 mt-4 border-t border-white/5 pt-4">
-                      <button 
-                        className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 rounded-lg text-xs transition font-semibold"
-                        onClick={() => {
-                          alert(`Technical Rider: \n${art.technical_rider}\n\nHospitality Rider: \n${art.hospitality_rider}`);
-                        }}
-                      >
-                        Inspect Riders
-                      </button>
-                      <button 
-                        className="btn flex-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
-                        onClick={() => openCrudPanel('artist', 'edit', art.id)}
-                      >
-                        <FileEdit className="w-3 h-3 text-[#d4af37]" /> Edit Profile
-                      </button>
-                      <button 
-                        className="btn flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2 rounded-lg text-xs transition flex items-center justify-center gap-1 font-semibold"
-                        onClick={() => handleDelete('artist', art.id)}
-                      >
-                        <Trash2 className="w-3 h-3" /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: TICKETS */}
-          {activeTab === 'tickets' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Ticketing Operations</h2>
-                  <p className="text-white/50 text-sm">Issue promo codes, check QR tickets, and design dynamic tier pricing.</p>
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn bg-white/5 border border-white/10 hover:bg-white/10 px-4 py-2 rounded-full font-semibold text-xs transition flex items-center gap-1.5" onClick={() => openCrudPanel('ticket', 'create')}>
-                    <Plus className="w-3.5 h-3.5" /> Add Ticket Tier
-                  </button>
-                  <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1.5 text-xs" onClick={() => openCrudPanel('promo', 'create')}>
-                    <Plus className="w-3.5 h-3.5" /> Add Promo Code
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Promo Codes list */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="font-bold text-lg text-[#d4af37]">Promo Codes</h3>
-                  </div>
-                  <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto">
-                    {promoCodes.map((promo) => (
-                      <div key={promo.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
-                        <div className="flex justify-between items-center">
-                          <strong className="text-sm font-mono text-white">{promo.code}</strong>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${promo.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {promo.active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-white/50">
-                          <span>Discount: <strong className="text-white">{promo.discount}%</strong></span>
-                          <span>Expires: {promo.expiry}</span>
-                        </div>
-                        <div className="flex justify-end gap-2 border-t border-white/5 pt-2 mt-1">
-                          <button className="text-[10px] text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('promo', 'edit', promo.id)}>
-                            <FileEdit className="w-3 h-3" /> Edit
-                          </button>
-                          <button className="text-[10px] text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('promo', promo.id)}>
-                            <Trash2 className="w-3 h-3" /> Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ticket pricing categories list */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                  <h3 className="font-bold text-lg border-b border-white/5 pb-2 text-[#a855f7]">Available Tiers</h3>
-                  <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto">
-                    {ticketTiers.map((tier) => (
-                      <div key={tier.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-2">
-                        <div className="flex justify-between items-start gap-3">
-                          <div>
-                            <strong className="block text-sm text-white">{tier.name}</strong>
-                            <span className="text-[10px] text-white/50">{tier.desc}</span>
-                          </div>
-                          <span className="text-sm font-bold text-[#d4af37]">${tier.price}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] text-white/50 border-t border-white/5 pt-2">
-                          <span>Capacity: {tier.capacity}</span>
-                          <div className="flex gap-2">
-                            <button className="text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('ticket', 'edit', tier.id)}>
-                              <FileEdit className="w-3 h-3" /> Edit
-                            </button>
-                            <button className="text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('ticket', tier.id)}>
-                              <Trash2 className="w-3 h-3" /> Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* QR scanning Simulator */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 text-center">
-                  <h3 className="font-bold text-lg border-b border-white/5 pb-2 text-[#d4af37]">Scan Simulator</h3>
-                  <div className="w-32 h-32 bg-white/10 border border-white/10 rounded-xl mx-auto flex items-center justify-center my-4">
-                    <Ticket className="w-16 h-16 text-[#d4af37]" />
-                  </div>
-                  <p className="text-xs text-white/60 mb-2">Simulate scanning customer tickets at physical venue gates.</p>
-                  <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2 rounded-lg text-xs font-semibold transition" onClick={() => alert("Scanner Initialized. Camera permissions active.")}>
-                    Launch Scanner Cam
-                  </button>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* TAB 6: ORDERS */}
-          {activeTab === 'orders' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Order Management &amp; Fraud</h2>
-                  <p className="text-white/50 text-sm">Monitor purchases, review fraud risks, and issue refunds.</p>
-                </div>
-                <button 
-                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
-                  onClick={() => openCrudPanel('order', 'create')}
+              {/* Notifications */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setNotifOpen(o => !o)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6, borderRadius: 8, display: 'flex', alignItems: 'center', position: 'relative', transition: 'color 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add Order
+                  <Bell size={16} />
+                  {unreadNotifs > 0 && <span style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: '50%', background: 'var(--color-error)', border: '1.5px solid var(--bg-secondary)' }} />}
                 </button>
-              </div>
-
-              {/* Order Search & Grid table */}
-              <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-full px-4 py-2 w-full max-w-sm mb-4">
-                  <Search className="w-4 h-4 text-white/40" />
-                  <input type="text" placeholder="Search orders by invoice ID or client..." className="bg-transparent border-none outline-none text-sm text-white flex-1" />
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/40 font-semibold text-xs uppercase">
-                        <th className="pb-3">Invoice / ID</th>
-                        <th className="pb-3">Client</th>
-                        <th className="pb-3">Staged Artist</th>
-                        <th className="pb-3">Total Amount</th>
-                        <th className="pb-3">Status</th>
-                        <th className="pb-3">Fraud Risk</th>
-                        <th className="pb-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {invoices.map((inv) => {
-                        const booking = bookings.find(b => b.id === inv.booking_id);
-                        const clientName = booking ? booking.client_name : 'Walk-in Customer';
-                        const artistName = booking ? booking.artist_name : 'Festival Admission';
-                        return (
-                          <tr key={inv.id} className="text-white/80">
-                            <td className="py-3.5 font-mono text-xs">{inv.id}</td>
-                            <td className="py-3.5">{clientName}</td>
-                            <td className="py-3.5 text-[#d4af37]">{artistName}</td>
-                            <td className="py-3.5 font-bold">${inv.amount.toLocaleString()}</td>
-                            <td className="py-3.5">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                inv.status === 'Paid' ? 'bg-emerald-500/25 text-emerald-400' : 
-                                inv.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' :
-                                'bg-amber-500/20 text-amber-400'
-                              }`}>
-                                {inv.status}
-                              </span>
-                            </td>
-                            <td className="py-3.5">
-                              <span className="text-[10px] font-bold text-emerald-500 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Low (0.02%)
-                              </span>
-                            </td>
-                            <td className="py-3.5 text-right flex justify-end gap-2">
-                              <button 
-                                className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-2.5 py-1 rounded text-xs transition flex items-center gap-1"
-                                onClick={() => openCrudPanel('order', 'edit', inv.id)}
-                              >
-                                <FileEdit className="w-3.5 h-3.5 text-[#d4af37]" /> Edit
-                              </button>
-                              <button 
-                                className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs transition flex items-center gap-1"
-                                onClick={() => handleDelete('order', inv.id)}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 7: CUSTOMERS */}
-          {activeTab === 'customers' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Customer CRM Directory</h2>
-                  <p className="text-white/50 text-sm">Assign VIP tiers, manage support notes, and track behaviors.</p>
-                </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('customer', 'create')}>
-                  <Plus className="w-3.5 h-3.5" /> Add Customer
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {customers.map((customer) => (
-                  <div key={customer.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-3 shadow-xl">
-                    <div className="flex justify-between items-start gap-3">
-                      <div>
-                        <strong className="block text-lg text-white">{customer.name}</strong>
-                        <span className="text-xs text-white/50">{customer.company} &middot; {customer.email}</span>
-                      </div>
-                      <span className="text-[10px] bg-[#d4af37]/20 border border-[#d4af37]/35 text-[#d4af37] px-2.5 py-1 rounded-full font-bold uppercase">
-                        {customer.tier}
-                      </span>
+                {notifOpen && (
+                  <div style={{ position: 'absolute', right: 0, top: '110%', width: 300, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 200, animation: 'scaleIn 0.18s ease', overflow: 'hidden' }}>
+                    <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.83rem', fontWeight: 600 }}>Notifications</span>
+                      {unreadNotifs > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{unreadNotifs} unread</span>}
                     </div>
-                    <p className="text-xs text-white/60 bg-black/30 p-3 rounded-lg border border-white/5 mt-2">
-                      <strong>CRM Behavior Log:</strong> {customer.notes}
-                    </p>
-                    <div className="flex justify-between items-center mt-2 border-t border-white/5 pt-2">
-                      <div className="flex gap-3">
-                        <button className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5" onClick={() => openCrudPanel('customer', 'edit', customer.id)}>
-                          <FileEdit className="w-3 h-3" /> Edit
-                        </button>
-                        <button className="text-xs text-red-400 hover:underline flex items-center gap-0.5" onClick={() => handleDelete('customer', customer.id)}>
-                          <Trash2 className="w-3 h-3" /> Delete
-                        </button>
-                      </div>
-                      <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5 rounded-lg text-xs transition" onClick={() => alert(`Opening conversation with ${customer.name}`)}>
-                        Contact Client
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 8: CONTENT CMS */}
-          {activeTab === 'content' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Content CMS Editors</h2>
-                  <p className="text-white/50 text-sm">Drag and drop page blocks, edit homepage titles, and schedule announcements.</p>
-                </div>
-              </div>
-
-              <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                <h3 className="font-bold text-lg text-[#d4af37] border-b border-white/5 pb-2">Homepage Editable Sections</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  <div className="field-group flex flex-col gap-2">
-                    <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Homepage Hero Title Text</label>
-                    <input 
-                      type="text" 
-                      value={cmsSections.heroTitle}
-                      onChange={e => setCmsSections({ ...cmsSections, heroTitle: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white" 
-                    />
-                  </div>
-
-                  <div className="field-group flex flex-col gap-2">
-                    <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Header Announcement Bar</label>
-                    <input 
-                      type="text" 
-                      value={cmsSections.announcement}
-                      onChange={e => setCmsSections({ ...cmsSections, announcement: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white" 
-                    />
-                  </div>
-
-                </div>
-
-                <div className="flex justify-between items-center pt-4 border-t border-white/5">
-                  <span className="text-xs text-white/40">Draft published 2 hours ago. Version 2026.11</span>
-                  <button className="btn bg-[#d4af37] text-[#07050e] font-bold px-6 py-2 rounded-full hover:scale-105 transition" onClick={() => alert("Homepage published successfully!")}>
-                    Publish Homepage Banner
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 9: WEBSITE BUILDER */}
-          {activeTab === 'builder' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Visual Block Website Builder</h2>
-                  <p className="text-white/50 text-sm">Drag component layouts, preview frame modes, and roll back versions.</p>
-                </div>
-                <button 
-                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
-                  onClick={() => openCrudPanel('section', 'create')}
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Section Block
-                </button>
-              </div>
-
-              {/* Viewport frames preview controls */}
-              <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                  <div className="flex gap-2">
-                    {['desktop', 'tablet', 'mobile'].map(device => (
-                      <button 
-                        key={device} 
-                        onClick={() => setPreviewDevice(device as any)}
-                        className={`px-3 py-1 rounded text-xs font-semibold capitalize transition ${previewDevice === device ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
-                      >
-                        {device} Preview
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setPreviewTheme(previewTheme === 'dark' ? 'light' : 'dark')}
-                      className="bg-white/5 border border-white/10 hover:bg-white/10 px-3 py-1 rounded text-xs font-semibold transition"
-                    >
-                      Swap Theme: {previewTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Simulated frame viewport */}
-                <div className="flex justify-center bg-black/45 p-6 rounded-xl border border-white/5">
-                  <div className={`border border-white/15 rounded-xl overflow-hidden transition-all duration-300 ${
-                    previewDevice === 'desktop' ? 'w-full max-w-4xl' :
-                    previewDevice === 'tablet' ? 'w-[640px]' : 'w-[360px]'
-                  }`}>
-                    {/* Simulated website frame header bar */}
-                    <div className="bg-[#0c0a17] px-4 py-2 border-b border-white/5 flex items-center justify-between">
-                      <span className="text-[10px] text-white/40 font-mono">https://showtimeservices.com</span>
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    </div>
-
-                    {/* Simulated website content body */}
-                    <div className={`p-4 md:p-6 min-h-[400px] flex flex-col gap-4 transition ${previewTheme === 'dark' ? 'bg-[#07050e] text-white' : 'bg-slate-50 text-slate-900'}`}>
-                      {websiteSections.map(sec => (
-                        <div 
-                          key={sec.id} 
-                          className={`relative group border rounded-xl p-4 transition-all duration-300 ${
-                            sec.active 
-                              ? 'border-white/10 bg-white/5 hover:border-[#d4af37]/50' 
-                              : 'border-white/5 bg-white/5 opacity-50'
-                          }`}
-                        >
-                          {/* Hover Action Overlay */}
-                          <div className="absolute inset-0 bg-black/80 rounded-xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-3 z-10">
-                            <span className="absolute top-2 left-3 text-[10px] font-mono uppercase text-[#d4af37] font-semibold">{sec.type} Block</span>
-                            <button 
-                              onClick={() => openCrudPanel('section', 'edit', sec.id)}
-                              className="btn bg-[#d4af37] text-[#07050e] font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-1 hover:scale-105 transition"
-                            >
-                              <FileEdit className="w-3.5 h-3.5" /> Edit
-                            </button>
-                            <button 
-                              onClick={() => handleDelete('section', sec.id)}
-                              className="btn bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 text-xs px-3 py-1.5 rounded-full flex items-center gap-1 hover:scale-105 transition"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Delete
-                            </button>
-                          </div>
-
-                          {/* Block Contents based on block type */}
-                          {sec.type === 'announcement' && (
-                            <div className="text-center py-2">
-                              <span className="text-xs uppercase font-extrabold tracking-wider text-[#d4af37]">{sec.title}</span>
-                              {sec.content && <p className="text-[10px] opacity-75 mt-1">{sec.content}</p>}
-                            </div>
-                          )}
-
-                          {sec.type === 'hero' && (
-                            <div className="flex flex-col md:flex-row items-center gap-4 py-4 text-left">
-                              <div className="flex-1 flex flex-col gap-2">
-                                <h1 className="text-xl md:text-2xl font-black leading-tight">{sec.title}</h1>
-                                {sec.subtitle && <p className="text-xs opacity-75">{sec.subtitle}</p>}
-                                {sec.content && <p className="text-[10px] opacity-50 leading-relaxed">{sec.content}</p>}
-                                {sec.buttonText && (
-                                  <button className="bg-[#d4af37] text-[#07050e] font-extrabold text-[10px] uppercase tracking-wide px-4 py-1.5 rounded-full w-fit mt-1">
-                                    {sec.buttonText}
-                                  </button>
-                                )}
-                              </div>
-                              {sec.image_url && (
-                                <div className="w-24 h-24 md:w-32 md:h-32 rounded-lg overflow-hidden border border-white/10 shrink-0">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={sec.image_url} alt="Hero block image" className="w-full h-full object-cover" />
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {sec.type === 'cta' && (
-                            <div className="bg-gradient-to-r from-[#d4af37]/10 to-transparent p-4 rounded-lg flex flex-col md:flex-row items-center justify-between gap-4 text-left">
-                              <div className="flex flex-col gap-1">
-                                <h2 className="text-base md:text-lg font-extrabold text-[#d4af37]">{sec.title}</h2>
-                                {sec.subtitle && <p className="text-xs opacity-75">{sec.subtitle}</p>}
-                              </div>
-                              {sec.buttonText && (
-                                <button className="bg-white/10 hover:bg-[#d4af37] hover:text-[#07050e] border border-[#d4af37]/20 text-[#d4af37] font-extrabold text-xs px-4 py-2 rounded-full transition shrink-0">
-                                  {sec.buttonText}
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Fallback general block for other types */}
-                          {sec.type !== 'announcement' && sec.type !== 'hero' && sec.type !== 'cta' && (
-                            <div className="py-2 text-left">
-                              <h3 className="text-sm font-bold text-[#d4af37]">{sec.title}</h3>
-                              {sec.subtitle && <p className="text-xs opacity-75 mt-1">{sec.subtitle}</p>}
-                              {sec.content && <p className="text-xs opacity-60 mt-1">{sec.content}</p>}
-                            </div>
-                          )}
-
+                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                      {notifs.length === 0 ? (
+                        <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.825rem' }}>No notifications</div>
+                      ) : notifs.slice(0, 8).map(n => (
+                        <div key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: !n.read_status ? 'rgba(212,175,55,0.04)' : 'transparent' }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>{n.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{n.message}</div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 10: MARKETING */}
-          {activeTab === 'marketing' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Marketing Campaign Center</h2>
-                  <p className="text-white/50 text-sm">Design marketing templates, run segment A/B testing, and send push alerts.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left: Campaign builder */}
-                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="font-bold text-lg">Broadcast Builder</h3>
-                    <div className="flex gap-2">
-                      {['email', 'sms', 'push'].map(type => (
-                        <button 
-                          key={type} 
-                          className={`px-3 py-1 rounded text-xs font-semibold capitalize transition ${marketingType === type ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
-                          onClick={() => setMarketingType(type as any)}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Campaign Name</label>
-                      <input 
-                        type="text" 
-                        value={broadcastForm.name}
-                        onChange={e => setBroadcastForm({ ...broadcastForm, name: e.target.value })}
-                        placeholder="e.g. Koffee Tour Announcement" 
-                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
-                      />
-                    </div>
-
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Campaign Subject Line</label>
-                      <input 
-                        type="text" 
-                        value={broadcastForm.subject}
-                        onChange={e => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
-                        placeholder="e.g. Special Offer: 20% Off Reggae Sumfest VIP passes" 
-                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
-                      />
-                    </div>
-
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">User Audience Segment</label>
-                      <select 
-                        value={broadcastForm.segment}
-                        onChange={e => setBroadcastForm({ ...broadcastForm, segment: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition"
-                      >
-                        <option value="All Past Customers (12,504)">All Past Customers (12,504)</option>
-                        <option value="VIP Ticket Buyers Only (2,100)">VIP Ticket Buyers Only (2,100)</option>
-                        <option value="Jamaica-Based Customers (6,400)">Jamaica-Based Customers (6,400)</option>
-                      </select>
-                    </div>
-
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">Broadcast Copy</label>
-                      <textarea 
-                        rows={4} 
-                        value={broadcastForm.content}
-                        onChange={e => setBroadcastForm({ ...broadcastForm, content: e.target.value })}
-                        placeholder="Draft your email or push message here..." 
-                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-3 mt-4">
-                      <button className="btn bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-2 rounded-full text-sm font-semibold transition" onClick={() => alert("A/B campaign drafted.")}>
-                        Schedule A/B Test
-                      </button>
-                      <button className="btn bg-[#d4af37] text-[#07050e] font-bold px-8 py-2 rounded-full hover:scale-105 transition" onClick={handleSendBroadcast}>
-                        Send Instant Broadcast
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Campaigns History */}
-                <div className="lg:col-span-4 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="font-bold text-lg">Active Campaigns</h3>
-                    <button 
-                      onClick={() => openCrudPanel('campaign', 'create')}
-                      className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5"
-                    >
-                      <Plus className="w-3 h-3" /> Add Custom
+                    <button onClick={() => setNotifOpen(false)} style={{ width: '100%', padding: '0.6rem', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)' }}>
+                      Close
                     </button>
                   </div>
-                  <div className="flex flex-col gap-3 max-h-[480px] overflow-y-auto pr-1">
-                    {campaigns.map((camp) => (
-                      <div key={camp.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex justify-between items-center group relative">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <strong className="block text-sm text-white truncate">{camp.name}</strong>
-                          <span className="text-xs text-white/55">{camp.type} Broadcast</span>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span className="text-xs font-bold text-emerald-500">{camp.openRate || '0%'} open</span>
-                          {/* Edit/Delete Actions */}
-                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition duration-200">
-                            <button 
-                              onClick={() => openCrudPanel('campaign', 'edit', camp.id)}
-                              className="text-[10px] text-[#d4af37] hover:underline"
-                            >
-                              Edit
-                            </button>
-                            <button 
-                              onClick={() => handleDelete('campaign', camp.id)}
-                              className="text-[10px] text-red-400 hover:underline"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
+              </div>
+
+              {/* Avatar */}
+              <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 700, color: 'var(--accent)', border: '1.5px solid rgba(212,175,55,0.3)' }}>
+                {initials(profile.first_name, profile.last_name)}
               </div>
             </div>
-          )}
+          </header>
 
-          {/* TAB 11: ADVERTISING */}
-          {activeTab === 'advertising' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Advertising Placements &amp; Analytics</h2>
-                  <p className="text-white/50 text-sm">Review banner placements, track impressions, CTR (Click-Through Rates), and ad revenue.</p>
-                </div>
-                <button 
-                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
-                  onClick={() => openCrudPanel('ad', 'create')}
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Ad Placement
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {adPlacements.map((placement) => (
-                  <div key={placement.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl relative group">
-                    <div className="border-b border-white/5 pb-2">
-                      <strong className="block text-lg text-white">{placement.name}</strong>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit inline-block mt-1 ${placement.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {placement.active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-
-                    {placement.image_url && (
-                      <div className="w-full h-32 rounded-xl overflow-hidden border border-white/10 bg-black/40">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={placement.image_url} alt={placement.name} className="w-full h-full object-cover" />
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs bg-white/5 p-3 rounded-xl">
-                      <div>
-                        <span className="block text-white/40 text-[10px]">Impressions</span>
-                        <strong className="block text-white mt-1">{placement.impressions.toLocaleString()}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-white/40 text-[10px]">Clicks</span>
-                        <strong className="block text-[#d4af37] mt-1">{placement.clickRate}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-white/40 text-[10px]">Ad Revenue</span>
-                        <strong className="block text-white mt-1">${placement.revenue.toLocaleString()}</strong>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 mt-2">
-                      <button 
-                        onClick={() => openCrudPanel('ad', 'edit', placement.id)}
-                        className="btn bg-white/5 hover:bg-white/10 border border-white/10 py-1.5 rounded-lg text-xs font-semibold transition flex-1 flex items-center justify-center gap-1"
-                      >
-                        <FileEdit className="w-3.5 h-3.5" /> Edit Placement
-                      </button>
-                      <button 
-                        onClick={() => handleDelete('ad', placement.id)}
-                        className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-1.5 rounded-lg text-xs font-semibold transition flex-1 flex items-center justify-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Page Content */}
+          <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+            <div style={{ maxWidth: 1200, margin: '0 auto', animation: 'fadeInUp 0.25s ease' }}>
+              {renderContent()}
             </div>
-          )}
-
-          {/* TAB 12: ANALYTICS */}
-          {activeTab === 'analytics' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              
-              {/* Header with Live Visitor Pulse */}
-              <div className="flex justify-between items-start flex-wrap gap-4 border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Sales &amp; Traffic Analytics</h2>
-                  <p className="text-white/50 text-sm">Visualize traffic conversions, tickets sale stats, and revenue growth graphs.</p>
-                </div>
-                
-                {/* Real-time visitor panel */}
-                <div className="bg-[#0c0a17] border border-[#d4af37]/35 px-5 py-3 rounded-2xl flex items-center gap-4 shadow-lg">
-                  <div className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] text-white/40 font-bold uppercase tracking-wider">Live Visitors</span>
-                    <strong className="text-xl font-bold text-white font-mono">{activeVisitors}</strong>
-                    <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">Active on Site</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* KPI cards grid with sparklines */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                {/* KPI Card 1: Sessions */}
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Sessions</span>
-                      <strong className="text-2xl font-bold text-white mt-1 block">48,250</strong>
-                    </div>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
-                      ▲ +14.2%
-                    </span>
-                  </div>
-                  {/* Inline Sparkline SVG */}
-                  <div className="w-full h-10 mt-2">
-                    <svg className="w-full h-full text-emerald-400" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <path d="M 0 25 Q 15 20 30 22 T 60 10 T 90 5 L 100 2" fill="none" stroke="currentColor" strokeWidth="2" />
-                      <path d="M 0 25 Q 15 20 30 22 T 60 10 T 90 5 L 100 2 L 100 30 L 0 30 Z" fill="rgba(52, 211, 153, 0.05)" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* KPI Card 2: Goal Conversions */}
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Conversions</span>
-                      <strong className="text-2xl font-bold text-[#d4af37] mt-1 block">3.65%</strong>
-                    </div>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
-                      ▲ +0.8%
-                    </span>
-                  </div>
-                  {/* Inline Sparkline SVG */}
-                  <div className="w-full h-10 mt-2">
-                    <svg className="w-full h-full text-[#d4af37]" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <path d="M 0 20 Q 20 28 40 18 T 80 5 L 100 3" fill="none" stroke="currentColor" strokeWidth="2" />
-                      <path d="M 0 20 Q 20 28 40 18 T 80 5 L 100 3 L 100 30 L 0 30 Z" fill="rgba(212, 175, 55, 0.05)" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* KPI Card 3: Bounce Rate */}
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Bounce Rate</span>
-                      <strong className="text-2xl font-bold text-white mt-1 block">34.8%</strong>
-                    </div>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
-                      ▼ -2.1%
-                    </span>
-                  </div>
-                  {/* Inline Sparkline SVG */}
-                  <div className="w-full h-10 mt-2">
-                    <svg className="w-full h-full text-indigo-400" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <path d="M 0 5 Q 30 25 50 15 T 80 28 L 100 25" fill="none" stroke="currentColor" strokeWidth="2" />
-                      <path d="M 0 5 Q 30 25 50 15 T 80 28 L 100 25 L 100 30 L 0 30 Z" fill="rgba(129, 140, 248, 0.05)" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* KPI Card 4: Avg Session Duration */}
-                <div className="bg-[#0c0a17] border border-white/10 p-5 rounded-2xl shadow-xl flex flex-col justify-between gap-3 relative overflow-hidden group hover:border-white/20 transition">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-white/50 font-bold uppercase tracking-wider block">Session Duration</span>
-                      <strong className="text-2xl font-bold text-[#a855f7] mt-1 block">3m 12s</strong>
-                    </div>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-bold">
-                      ▲ +18s
-                    </span>
-                  </div>
-                  {/* Inline Sparkline SVG */}
-                  <div className="w-full h-10 mt-2">
-                    <svg className="w-full h-full text-purple-400" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <path d="M 0 22 Q 25 10 50 20 T 75 8 L 100 4" fill="none" stroke="currentColor" strokeWidth="2" />
-                      <path d="M 0 22 Q 25 10 50 20 T 75 8 L 100 4 L 100 30 L 0 30 Z" fill="rgba(168, 85, 247, 0.05)" />
-                    </svg>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Main Analytics Row: Interactive Graph & Geography */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* Traffic / Conversion Charts Block */}
-                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-6">
-                  
-                  {/* Chart header & controls */}
-                  <div className="flex justify-between items-center border-b border-white/5 pb-4 flex-wrap gap-3">
-                    <div className="flex gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => setAnalyticsSubTab('traffic')}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${analyticsSubTab === 'traffic' ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
-                      >
-                        Web Traffic (Sessions)
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setAnalyticsSubTab('funnel')}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${analyticsSubTab === 'funnel' ? 'bg-[#d4af37] text-[#07050e]' : 'bg-white/5 text-white/60 hover:text-white'}`}
-                      >
-                        Checkout Funnel (Conversion)
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1">
-                      {['7d', '30d', '12m'].map((period) => (
-                        <button 
-                          key={period} 
-                          type="button"
-                          onClick={() => setTrafficChartPeriod(period as any)}
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase transition ${trafficChartPeriod === period ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'}`}
-                        >
-                          {period}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dynamic SVG chart panel */}
-                  <div className="relative bg-black/40 rounded-xl border border-white/5 p-4 flex items-end justify-center min-h-[260px] overflow-hidden">
-                    {analyticsSubTab === 'traffic' ? (
-                      <div className="w-full h-full flex flex-col justify-between">
-                        <div className="h-44 w-full flex items-end relative">
-                          {/* Animated gradient area SVG */}
-                          <svg className="w-full h-full text-[#d4af37]" viewBox="0 0 500 150" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id="gradient-gold" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#d4af37" stopOpacity="0.25" />
-                                <stop offset="100%" stopColor="#d4af37" stopOpacity="0.0" />
-                              </linearGradient>
-                            </defs>
-                            <path 
-                              d="M 0 130 C 50 120 80 80 120 70 C 180 55 220 110 280 85 C 340 60 380 30 420 40 C 460 50 480 20 500 15 L 500 150 L 0 150 Z" 
-                              fill="url(#gradient-gold)" 
-                            />
-                            <path 
-                              d="M 0 130 C 50 120 80 80 120 70 C 180 55 220 110 280 85 C 340 60 380 30 420 40 C 460 50 480 20 500 15" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="3"
-                            />
-                          </svg>
-                          {/* Overlay lines for grid */}
-                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 border-b border-white/10">
-                            <hr className="border-white/10 w-full" />
-                            <hr className="border-white/10 w-full" />
-                            <hr className="border-white/10 w-full" />
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] text-white/30 pt-3 border-t border-white/5">
-                          <span>01 Jun</span>
-                          <span>08 Jun</span>
-                          <span>15 Jun</span>
-                          <span>22 Jun</span>
-                          <span>29 Jun</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full flex flex-col gap-4 py-2">
-                        {/* Simulated Checkout Funnel progress bars */}
-                        {[
-                          { step: '1. Landing Page Views', count: '48,250 users', pct: 100, color: 'bg-[#d4af37]' },
-                          { step: '2. Artist Profile Inspect', count: '18,520 users', pct: 38.3, color: 'bg-[#a855f7]' },
-                          { step: '3. Cart Addition', count: '4,280 users', pct: 8.8, color: 'bg-indigo-500' },
-                          { step: '4. Paid Checkout Complete', count: '1,760 users', pct: 3.65, color: 'bg-emerald-500' }
-                        ].map((funnelStep, idx) => (
-                          <div key={idx} className="flex flex-col gap-1.5">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>{funnelStep.step}</span>
-                              <span className="text-white/50">{funnelStep.count} ({funnelStep.pct}%)</span>
-                            </div>
-                            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                              <div className={`h-full ${funnelStep.color} rounded-full transition-all duration-1000`} style={{ width: `${funnelStep.pct}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Geographical & Device Split */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                  
-                  {/* Geo Distribution */}
-                  <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col gap-4">
-                    <h3 className="font-bold text-base text-[#d4af37] border-b border-white/5 pb-2">Geographics</h3>
-                    <div className="flex flex-col gap-3.5 text-xs">
-                      {[
-                        { country: 'Jamaica (HQ)', share: '45%', pct: 45 },
-                        { country: 'United States', share: '28%', pct: 28 },
-                        { country: 'United Kingdom', share: '15%', pct: 15 },
-                        { country: 'Canada', share: '8%', pct: 8 },
-                        { country: 'Rest of World', share: '4%', pct: 4 }
-                      ].map((geo, idx) => (
-                        <div key={idx} className="flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-white/80">{geo.country}</span>
-                            <span className="text-[#d4af37] font-bold">{geo.share}</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-[#d4af37] to-[#a855f7] rounded-full" style={{ width: `${geo.pct}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Device Mix */}
-                  <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col gap-4">
-                    <h3 className="font-bold text-base text-[#a855f7] border-b border-white/5 pb-2">Device Distribution</h3>
-                    <div className="flex gap-4 items-center justify-between">
-                      {/* Segmented meter bar */}
-                      <div className="w-full flex h-5 rounded-lg overflow-hidden border border-white/5 text-[9px] font-bold text-center">
-                        <div className="bg-[#d4af37] text-[#07050e] flex items-center justify-center transition-all duration-300" style={{ width: '55%' }} title="Desktop: 55%">55%</div>
-                        <div className="bg-[#a855f7] text-white flex items-center justify-center transition-all duration-300" style={{ width: '40%' }} title="Mobile: 40%">40%</div>
-                        <div className="bg-white/10 text-white/60 flex items-center justify-center transition-all duration-300" style={{ width: '5%' }} title="Tablet: 5%">5%</div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-white/40">
-                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#d4af37] rounded-sm" /> Desktop</span>
-                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-[#a855f7] rounded-sm" /> Mobile</span>
-                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 bg-white/10 rounded-sm" /> Tablet</span>
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* Event Stream / Web activity ticker logs */}
-              <div className="bg-[#0c0a17] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
-                <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d4af37] opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#d4af37]"></span>
-                    </span>
-                    <h3 className="font-extrabold text-lg text-white">Live Website Event Feed</h3>
-                  </div>
-                  <span className="text-[10px] text-white/40 font-mono tracking-widest uppercase">Simulator active</span>
-                </div>
-                {/* Event terminal screen */}
-                <div className="bg-black/60 border border-white/5 rounded-2xl p-5 font-mono text-xs text-white/80 min-h-[160px] flex flex-col gap-2.5 max-h-60 overflow-y-auto">
-                  {liveActivities.map((log, idx) => {
-                    let color = 'text-white/70';
-                    if (log.includes('checkout') || log.includes('Checkout')) color = 'text-emerald-400 font-semibold';
-                    else if (log.includes('applied') || log.includes('verified')) color = 'text-[#d4af37]';
-                    else if (log.includes('viewed') || log.includes('inspect')) color = 'text-sky-400';
-                    return (
-                      <div key={idx} className={`animate-fade ${color}`}>
-                        {log}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 13: FINANCE */}
-          {activeTab === 'finance' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Finance &amp; Payouts Ledger</h2>
-                  <p className="text-white/50 text-sm">Review promoter payout statements, track tax withholdings, and export CSV ledger sheets.</p>
-                </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2.5 px-6 rounded-full hover:scale-105 transition flex items-center gap-2" onClick={() => alert("Finance ledger CSV report downloaded.")}>
-                  <FileText className="w-4 h-4" /> Export Financials
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Promoter Payout Ledger Card */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-                  <div className="border-b border-white/5 pb-2">
-                    <strong className="block text-lg text-white">Promoter Payout Status</strong>
-                    <span className="text-xs text-white/50">Settlement Ledger</span>
-                  </div>
-                  <div className="flex flex-col gap-2 text-xs">
-                    <div className="flex justify-between">
-                      <span>Gross Contract Volume:</span>
-                      <strong className="text-white">${calculatedTotalRevenue.toLocaleString()}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Agency Commission (10%):</span>
-                      <strong className="text-[#d4af37]">${(calculatedTotalRevenue * 0.1).toLocaleString()}</strong>
-                    </div>
-                    <div className="flex justify-between border-t border-white/5 pt-2">
-                      <span>Promoter Share Due:</span>
-                      <strong className="text-white">${(calculatedTotalRevenue * 0.9).toLocaleString()}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tax withholdings logs */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-                  <div className="border-b border-white/5 pb-2">
-                    <strong className="block text-lg text-white">Withholdings &amp; Tax logs</strong>
-                    <span className="text-xs text-white/50">Compliance Reports</span>
-                  </div>
-                  <div className="flex flex-col gap-2 text-xs">
-                    <div className="flex justify-between">
-                      <span>US Withholdings (30%):</span>
-                      <strong className="text-white">${(calculatedTotalRevenue * 0.3).toLocaleString()}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>UK VAT (20%):</span>
-                      <strong className="text-white">${(calculatedTotalRevenue * 0.2).toLocaleString()}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bank payout simulator */}
-                <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-5 flex flex-col gap-4 shadow-xl text-center items-center justify-center">
-                  <span className="text-xs text-white/40 uppercase tracking-widest">Bank Settlement Gateway</span>
-                  <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-full my-2">
-                    <CircleDollarSign className="w-8 h-8" />
-                  </div>
-                  <button className="btn bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg text-xs hover:scale-105 transition" onClick={() => alert("Payout transaction dispatched to promoter clearing account.")}>
-                    Dispatch Promoter Payouts
-                  </button>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* TAB 14: AI OPERATIONS */}
-          {activeTab === 'ai-ops' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">AI Operations Staging</h2>
-                  <p className="text-white/50 text-sm">Generate event descriptions, artist profiles, and pricing tips via AI models.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left: AI actions panel */}
-                <div className="lg:col-span-7 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-[#d4af37]">AI Text Copilot</h3>
-                  <div className="flex flex-col gap-3">
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-bold uppercase tracking-wider">AI Generation Prompt</label>
-                      <input 
-                        type="text" 
-                        value={aiPrompt}
-                        onChange={e => setAiPrompt(e.target.value)}
-                        placeholder="e.g. Write a bio for Beres Hammond celebrating 40 years of lovers rock reggae"
-                        className="bg-white/5 border border-white/10 rounded px-4 py-2 text-sm text-white" 
-                      />
-                    </div>
-                    
-                    <button 
-                      className="btn bg-[#d4af37] text-[#07050e] font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-2"
-                      onClick={() => {
-                        setAiLoading(true);
-                        setTimeout(() => {
-                          setAiLoading(false);
-                          setAiOutput(`[AI-Copilot Result]:\nHugh Beresford Hammond O.D. (born 28 August 1954, Annotto Bay, Saint Mary, Jamaica) is a Jamaican reggae singer known for his lovers rock. While his career has spanned reggae genres, Hammond has dedicated much of his soulful discography to romantic reggae classics. His signature raspy vocals have fronted hits such as "Tempted to Touch" and "Rockaway" across 40 iconic years on live global stages.`);
-                        }, 1500);
-                      }}
-                    >
-                      {aiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      Generate AI Content
-                    </button>
-                  </div>
-                </div>
-
-                {/* Right: AI output */}
-                <div className="lg:col-span-5 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-[#a855f7]">AI Output Terminal</h3>
-                  <div className="bg-black/40 border border-white/5 p-4 rounded-xl min-h-[160px] font-mono text-xs text-white/80 whitespace-pre-wrap">
-                    {aiOutput || "Ready for prompt input..."}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 15: STAFF & ROLES */}
-          {activeTab === 'staff' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">Staff Directories &amp; RBAC Roles</h2>
-                  <p className="text-white/50 text-sm">Review staff roles and configure access matrices (RBAC).</p>
-                </div>
-                <button className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" onClick={() => openCrudPanel('staff', 'create')}>
-                  <Plus className="w-3.5 h-3.5" /> Add Staff Member
-                </button>
-              </div>
-
-              <div className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
-                <h3 className="font-bold text-lg text-[#d4af37] border-b border-white/5 pb-2">Active Staff Directory</h3>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/40 font-semibold text-xs uppercase">
-                        <th className="pb-3">Staff Name</th>
-                        <th className="pb-3">Email Address</th>
-                        <th className="pb-3">Assigned Role</th>
-                        <th className="pb-3">Status</th>
-                        <th className="pb-3 text-right font-semibold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {users.map((staff) => (
-                        <tr key={staff.id} className="text-white/80">
-                          <td className="py-3.5 font-bold">{staff.first_name} {staff.last_name}</td>
-                          <td className="py-3.5 font-mono text-xs">{staff.email}</td>
-                          <td className="py-3.5">
-                            <span className="text-xs bg-[#d4af37]/20 text-[#d4af37] px-2 py-0.5 rounded font-semibold">{staff.role}</span>
-                          </td>
-                          <td className="py-3.5 text-xs text-white/60">
-                            Status: <span className={staff.status === 'Active' ? 'text-emerald-400' : staff.status === 'Suspended' ? 'text-red-500' : 'text-white/40'}>{staff.status}</span>
-                          </td>
-                          <td className="py-3.5 text-right flex justify-end gap-2">
-                            <button className="btn bg-white/5 hover:bg-white/10 border border-white/5 px-2.5 py-1 rounded text-xs transition" onClick={() => openCrudPanel('staff', 'edit', staff.id)}>
-                              <FileEdit className="w-3.5 h-3.5" />
-                            </button>
-                            <button className="btn bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-2.5 py-1 rounded text-xs transition" onClick={() => handleDelete('staff', staff.id)}>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 16: INTEGRATIONS */}
-          {activeTab === 'integrations' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">API &amp; Platform Integrations</h2>
-                  <p className="text-white/50 text-sm">Maintain third-party API keys, communication pipelines, and pixels.</p>
-                </div>
-                <button 
-                  className="btn bg-[#d4af37] text-[#07050e] font-semibold py-2 px-5 rounded-full hover:scale-105 transition flex items-center gap-1 text-xs" 
-                  onClick={() => openCrudPanel('integration', 'create')}
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Integration
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {integrations.map((item) => (
-                  <div key={item.id} className="bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl relative group">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="text-sm font-semibold text-white">{item.name}</span>
-                      <span className={`text-[10px] border px-2 py-0.5 rounded uppercase font-bold ${
-                        item.status === 'Connected' 
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                          : 'bg-white/5 text-white/40 border-white/10'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </div>
-                    <div className="field-group flex flex-col gap-1">
-                      <label className="text-[10px] text-white/40 uppercase">{item.provider} API Token / Key</label>
-                      <input 
-                        type="text" 
-                        value={item.api_key}
-                        onChange={async (e) => {
-                          const updatedVal = e.target.value;
-                          setIntegrations(prev => prev.map(i => i.id === item.id ? { ...i, api_key: updatedVal } : i));
-                          await db.updateIntegration(item.id, { api_key: updatedVal });
-                        }}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-white font-mono" 
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2 mt-2 opacity-0 group-hover:opacity-100 transition duration-200">
-                      <button 
-                        onClick={() => openCrudPanel('integration', 'edit', item.id)}
-                        className="text-xs text-[#d4af37] hover:underline flex items-center gap-0.5"
-                      >
-                        <FileEdit className="w-3 h-3" /> Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDelete('integration', item.id)}
-                        className="text-xs text-red-400 hover:underline flex items-center gap-0.5"
-                      >
-                        <Trash2 className="w-3 h-3" /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 17: SYSTEM SETTINGS */}
-          {activeTab === 'settings' && (
-            <div className="flex flex-col gap-6 animate-fade">
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <div>
-                  <h2 className="text-3xl font-extrabold tracking-tight">System Settings &amp; Emergency Controls</h2>
-                  <p className="text-white/50 text-sm">Configure brand domains, currency structures, and trigger kill-switches.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* Domain & timezone configs */}
-                <div className="lg:col-span-8 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-[#d4af37] border-b border-white/5 pb-2">Global Domain Settings</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-semibold">Primary Domain</label>
-                      <input 
-                        type="text" 
-                        value={primaryDomain}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setPrimaryDomain(val);
-                          localStorage.setItem('st_settings_domain', val);
-                        }}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition" 
-                      />
-                    </div>
-                    <div className="field-group flex flex-col gap-2">
-                      <label className="text-xs text-white/50 font-semibold">System Currency</label>
-                      <select 
-                        value={systemCurrency}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setSystemCurrency(val);
-                          localStorage.setItem('st_settings_currency', val);
-                        }}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-[#d4af37] outline-none transition"
-                      >
-                        <option value="USD ($)">USD ($)</option>
-                        <option value="JMD ($)">JMD ($)</option>
-                        <option value="GBP (£)">GBP (£)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Emergency controls */}
-                <div className="lg:col-span-4 bg-[#0c0a17] border border-white/10 rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
-                  <h3 className="font-bold text-lg text-red-500 border-b border-white/5 pb-2">Emergency Hub</h3>
-                  <p className="text-xs text-white/60 mb-2">Activating the system kill switch locks down all customer transactions instantly.</p>
-                  
-                  <div className="flex flex-col gap-3">
-                    <button 
-                      className="btn bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg text-xs hover:scale-105 transition flex items-center justify-center gap-2"
-                      onClick={() => {
-                        if (confirm("WARNING: Are you sure you want to trigger the master Kill Switch? This will block all access immediately.")) {
-                          setEmergencyKillActive(true);
-                        }
-                      }}
-                    >
-                      <AlertOctagon className="w-4 h-4" /> Trigger Master Kill Switch
-                    </button>
-                    
-                    <button 
-                      className="btn bg-white/5 hover:bg-white/10 border border-white/10 text-white py-2 rounded-lg text-xs font-semibold transition"
-                      onClick={() => {
-                        setMaintenanceMode(!maintenanceMode);
-                        alert(`Maintenance Mode: ${!maintenanceMode ? 'ENABLED' : 'DISABLED'}`);
-                      }}
-                    >
-                      Toggle Maintenance Mode
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-        </main>
+          </main>
+        </div>
       </div>
 
-      {/* ── COMMAND PALETTE OVERLAY ── */}
-      {commandPaletteOpen && (
-        <div className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm flex items-start justify-center pt-[10vh]">
-          <div className="bg-[#0c0a17] border border-white/15 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col gap-3">
-            
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5">
-              <Search className="w-5 h-5 text-white/40" />
-              <input
-                type="text"
-                placeholder="Type a command or query..."
-                value={commandSearch}
-                onChange={e => { setCommandSearch(e.target.value); setPaletteIndex(0); }}
-                onKeyDown={handlePaletteKeyDown}
-                className="bg-transparent border-none outline-none text-white text-sm flex-1"
-                autoFocus
-              />
-              <button 
-                className="text-white/40 hover:text-white"
-                onClick={() => setCommandPaletteOpen(false)}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-2 flex flex-col gap-1 max-h-80 overflow-y-auto">
-              {getCommandOptions().map((opt, idx) => (
-                <div 
-                  key={idx}
-                  onClick={opt.action}
-                  className={`px-3 py-2.5 rounded-lg text-sm flex justify-between items-center cursor-pointer transition ${
-                    idx === paletteIndex ? 'bg-[#d4af37] text-[#07050e] font-semibold' : 'text-white/70 hover:bg-white/5'
-                  }`}
-                >
-                  <span>{opt.label}</span>
-                  <span className="text-[10px] opacity-60 uppercase tracking-widest font-mono">
-                    {opt.type}
-                  </span>
-                </div>
-              ))}
-              {getCommandOptions().length === 0 && (
-                <p className="text-center text-xs text-white/40 py-4">No matching commands found.</p>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ── EVENT BUILDER WIZARD DIALOG ── */}
-      {showEventBuilder && (
-        <div className="fixed inset-0 z-[4000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#0c0a17] border border-white/15 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
-            {/* Wizard Header */}
-            <div className="bg-white/5 border-b border-white/10 px-6 py-4 flex justify-between items-center">
-              <div>
-                <span className="text-[10px] text-[#d4af37] font-bold uppercase tracking-widest">Step {eventBuilderStep} of 8</span>
-                <h3 className="font-extrabold text-xl">Event Builder Wizard</h3>
-              </div>
-              <button className="text-white/40 hover:text-white" onClick={() => setShowEventBuilder(false)}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Stepper Progress Indicator */}
-            <div className="px-6 py-3 bg-[#07050e] border-b border-white/5 flex gap-2 justify-between text-[10px] font-bold text-white/40">
-              {['Details', 'Media', 'Venue', 'Artist', 'Tickets', 'Pricing', 'SEO', 'Publish'].map((stepName, idx) => (
-                <span key={idx} className={idx + 1 === eventBuilderStep ? 'text-[#d4af37]' : idx + 1 < eventBuilderStep ? 'text-white/80' : ''}>
-                  {stepName}
-                </span>
-              ))}
-            </div>
-
-            {/* Wizard step contents */}
-            <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-4">
-              
-              {/* STEP 1: Basic Details */}
-              {eventBuilderStep === 1 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">Basic Details</h4>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-white/50">Event Title *</label>
-                    <input 
-                      type="text" 
-                      value={eventBuilderForm.title}
-                      onChange={e => setEventBuilderForm({ ...eventBuilderForm, title: e.target.value })}
-                      placeholder="e.g. Reggae Sumfest 2026 Night 2" 
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-white/50">Event Subtitle</label>
-                    <input 
-                      type="text" 
-                      value={eventBuilderForm.subtitle}
-                      onChange={e => setEventBuilderForm({ ...eventBuilderForm, subtitle: e.target.value })}
-                      placeholder="e.g. The Greatest Reggae Show on Earth" 
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-white/50">Description</label>
-                    <textarea 
-                      rows={3} 
-                      value={eventBuilderForm.description}
-                      onChange={e => setEventBuilderForm({ ...eventBuilderForm, description: e.target.value })}
-                      placeholder="Specify event summaries..." 
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2: Media Upload */}
-              {eventBuilderStep === 2 && (
-                <div className="flex flex-col gap-4 animate-fade text-center items-center justify-center py-6">
-                  <h4 className="font-bold text-base text-[#d4af37] w-full text-left">Media Upload</h4>
-                  <div className="w-full max-w-md border-2 border-dashed border-white/10 rounded-xl p-8 bg-white/5 flex flex-col items-center gap-3">
-                    <FileText className="w-10 h-10 text-[#d4af37]" />
-                    <span className="text-sm font-semibold">Drag cover images or gallery files here</span>
-                    <span className="text-[10px] text-white/40">Supported formats: JPG, PNG, MP4 (Max 50MB)</span>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: Venue Selection */}
-              {eventBuilderStep === 3 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">Venue Selection</h4>
-                  <select 
-                    value={eventBuilderForm.venue}
-                    onChange={e => setEventBuilderForm({ ...eventBuilderForm, venue: e.target.value })}
-                    className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">-- Select Venue --</option>
-                    <option value="Catherine Hall Montego Bay">Catherine Hall (Montego Bay, Jamaica)</option>
-                    <option value="National Arena Kingston">National Arena (Kingston, Jamaica)</option>
-                    <option value="O2 Arena London">O2 Arena (London, United Kingdom)</option>
-                  </select>
-                </div>
-              )}
-
-              {/* STEP 4: Artist Assignment */}
-              {eventBuilderStep === 4 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">Artist Assignment</h4>
-                  <select 
-                    value={eventBuilderForm.artist}
-                    onChange={e => setEventBuilderForm({ ...eventBuilderForm, artist: e.target.value })}
-                    className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white"
-                  >
-                    <option value="">-- Choose Artist --</option>
-                    {artists.map(art => (
-                      <option key={art.id} value={art.id}>{art.stage_name} ({art.genre})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* STEP 5: Ticket Configuration */}
-              {eventBuilderStep === 5 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">Ticket Configuration</h4>
-                  <div className="flex flex-col gap-2 text-xs text-white/60">
-                    <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> General Admission Pass (GA)</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> VIP Raised Platform Pass</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" /> VVIP Backstage Table packages</label>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 6: Pricing Rules */}
-              {eventBuilderStep === 6 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">Pricing &amp; Capacity Rules</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-white/50">GA Ticket Price (USD) *</label>
-                      <input 
-                        type="number" 
-                        value={eventBuilderForm.ticketPriceGA}
-                        onChange={e => setEventBuilderForm({ ...eventBuilderForm, ticketPriceGA: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-white/50">VIP Ticket Price (USD) *</label>
-                      <input 
-                        type="number" 
-                        value={eventBuilderForm.ticketPriceVIP}
-                        onChange={e => setEventBuilderForm({ ...eventBuilderForm, ticketPriceVIP: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-white/50">Target Capacity Limit *</label>
-                    <input 
-                      type="number" 
-                      value={eventBuilderForm.capacity}
-                      onChange={e => setEventBuilderForm({ ...eventBuilderForm, capacity: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 7: SEO Settings */}
-              {eventBuilderStep === 7 && (
-                <div className="flex flex-col gap-4 animate-fade">
-                  <h4 className="font-bold text-base text-[#d4af37]">SEO &amp; Tag Settings</h4>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-white/50">SEO Tags (comma separated)</label>
-                    <input 
-                      type="text" 
-                      value={eventBuilderForm.seoTags}
-                      onChange={e => setEventBuilderForm({ ...eventBuilderForm, seoTags: e.target.value })}
-                      className="bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white" 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 8: Publishing */}
-              {eventBuilderStep === 8 && (
-                <div className="flex flex-col gap-4 animate-fade text-center items-center justify-center py-6">
-                  <h4 className="font-bold text-base text-[#d4af37] w-full text-left">Publishing Controls</h4>
-                  <p className="text-sm mb-4 max-w-md">Verify all steps are complete before pushing the event live to the ticketing platform.</p>
-                  <div className="flex gap-4">
-                    <button 
-                      className={`px-5 py-2.5 rounded-full font-bold border transition ${eventBuilderForm.publishMode === 'Draft' ? 'bg-[#d4af37] border-[#d4af37] text-[#07050e]' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'}`}
-                      onClick={() => setEventBuilderForm({ ...eventBuilderForm, publishMode: 'Draft' })}
-                    >
-                      Save as Draft
-                    </button>
-                    <button 
-                      className={`px-5 py-2.5 rounded-full font-bold border transition ${eventBuilderForm.publishMode === 'Live' ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white/5 border-white/10 text-white/70 hover:text-white'}`}
-                      onClick={() => setEventBuilderForm({ ...eventBuilderForm, publishMode: 'Live' })}
-                    >
-                      Publish Live
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Wizard actions */}
-            <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex justify-between">
-              <button 
-                className="btn bg-white/5 border border-white/10 px-4 py-2 rounded-full text-xs font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={() => setEventBuilderStep(prev => prev - 1)}
-                disabled={eventBuilderStep === 1}
-              >
-                Previous Step
-              </button>
-              {eventBuilderStep < 8 ? (
-                <button 
-                  className="btn bg-[#d4af37] text-[#07050e] px-6 py-2 rounded-full text-xs font-bold transition"
-                  onClick={() => setEventBuilderStep(prev => prev + 1)}
-                >
-                  Next Step
-                </button>
-              ) : (
-                <button 
-                  className="btn bg-emerald-500 text-white px-8 py-2 rounded-full text-xs font-extrabold transition"
-                  onClick={handleEventPublish}
-                >
-                  Finalize &amp; Save
-                </button>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* --- CREATE CRM LEAD MODAL --- */}
-      {showCreateLead && (
-        <div className="fixed inset-0 z-[4000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0c0a17] border border-white/15 rounded-3xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
-              <h3 className="font-bold text-lg text-[#d4af37]">Log Inbound CRM Inquiries</h3>
-              <button className="text-white/40 hover:text-white" onClick={() => setShowCreateLead(false)}><X className="w-5 h-5" /></button>
-            </div>
-            
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              await db.createLead({
-                contact_name: newLeadForm.contact_name,
-                company_name: newLeadForm.company_name || undefined,
-                email: newLeadForm.email,
-                phone: newLeadForm.phone || undefined,
-                country: newLeadForm.country,
-                budget: parseFloat(newLeadForm.budget) || 50000,
-                preferred_date: newLeadForm.preferred_date,
-                artist_id: newLeadForm.artist_id,
-                details: newLeadForm.details
-              });
-              setShowCreateLead(false);
-              await loadPortalData();
-            }} className="flex flex-col gap-3 text-xs">
-              <div className="flex flex-col gap-1">
-                <label>Contact Name *</label>
-                <input type="text" required onChange={e => setNewLeadForm({ ...newLeadForm, contact_name: e.target.value })} className="bg-white/5 border border-white/10 rounded p-2 text-white" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label>Email Address *</label>
-                <input type="email" required onChange={e => setNewLeadForm({ ...newLeadForm, email: e.target.value })} className="bg-white/5 border border-white/10 rounded p-2 text-white" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label>Select Artist *</label>
-                <select required onChange={e => setNewLeadForm({ ...newLeadForm, artist_id: e.target.value })} className="bg-white/5 border border-white/10 rounded p-2 text-white">
-                  <option value="">-- Select --</option>
-                  {artists.map(a => <option key={a.id} value={a.id}>{a.stage_name}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label>Preferred Date</label>
-                <input type="date" onChange={e => setNewLeadForm({ ...newLeadForm, preferred_date: e.target.value })} className="bg-white/5 border border-white/10 rounded p-2 text-white" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label>Budget (USD)</label>
-                <input type="number" defaultValue="50000" onChange={e => setNewLeadForm({ ...newLeadForm, budget: e.target.value })} className="bg-white/5 border border-white/10 rounded p-2 text-white" />
-              </div>
-              
-              <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-white/10">
-                <button type="button" className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full font-bold" onClick={() => setShowCreateLead(false)}>Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-[#d4af37] text-[#07050e] rounded-full font-bold">Log Inquiry</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* ── DYNAMIC CRUD SLIDE-OVER DRAWER ── */}
-      {panelOpen && panelType && (
-        <div className="fixed inset-0 z-[4500] bg-black/60 backdrop-blur-sm flex justify-end">
-          {/* Backdrop Click Dismiss */}
-          <div className="absolute inset-0" onClick={() => setPanelOpen(false)} />
-          
-          <div className="relative w-full max-w-md bg-[#0c0a17] border-l border-white/10 h-full overflow-y-auto p-6 md:p-8 flex flex-col gap-6 shadow-2xl animate-slide-in">
-            
-            <div className="flex justify-between items-center border-b border-white/10 pb-4">
-              <div>
-                <h3 className="font-extrabold text-xl capitalize text-[#d4af37]">{panelMode} {panelType}</h3>
-                <p className="text-xs text-white/50">Ensure all details are accurate before saving.</p>
-              </div>
-              <button 
-                className="text-white/40 hover:text-white p-1 rounded-full hover:bg-white/5"
-                onClick={() => setPanelOpen(false)}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSave} className="flex-1 flex flex-col justify-between gap-8">
-              <div className="flex flex-col gap-4 overflow-y-auto text-xs">
-                
-                {/* ── EVENT FORM FIELDS ── */}
-                {panelType === 'event' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Event Title *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={eventForm.event_title} 
-                        onChange={e => setEventForm({ ...eventForm, event_title: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Client / Promoter Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={eventForm.client_name} 
-                        onChange={e => setEventForm({ ...eventForm, client_name: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Select Assigned Artist *</label>
-                      <select 
-                        required 
-                        value={eventForm.artist_id}
-                        onChange={e => setEventForm({ ...eventForm, artist_id: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="">-- Choose Artist --</option>
-                        {artists.map(a => <option key={a.id} value={a.id}>{a.stage_name}</option>)}
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Event Date *</label>
-                        <input 
-                          type="date" 
-                          required 
-                          value={eventForm.event_date} 
-                          onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Country *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={eventForm.event_country} 
-                          onChange={e => setEventForm({ ...eventForm, event_country: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Venue Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={eventForm.event_venue} 
-                        onChange={e => setEventForm({ ...eventForm, event_venue: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Total Amount (USD) *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={eventForm.total_amount} 
-                          onChange={e => setEventForm({ ...eventForm, total_amount: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Deposit Amount (USD) *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={eventForm.deposit_amount} 
-                          onChange={e => setEventForm({ ...eventForm, deposit_amount: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Status *</label>
-                      <select 
-                        required 
-                        value={eventForm.status} 
-                        onChange={e => setEventForm({ ...eventForm, status: e.target.value as any })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="Inquiry">Inquiry</option>
-                        <option value="Proposal Generated">Proposal Generated</option>
-                        <option value="Contract Sent">Contract Sent</option>
-                        <option value="Deposit Paid">Deposit Paid</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                    <ImageUploader 
-                      label="Event Banner Image" 
-                      value={eventForm.artist_image} 
-                      onChange={base64 => setEventForm({ ...eventForm, artist_image: base64 })} 
-                    />
-                  </>
-                )}
-
-                {/* ── VENUE FORM FIELDS ── */}
-                {panelType === 'venue' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Venue Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={venueForm.name} 
-                        onChange={e => setVenueForm({ ...venueForm, name: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Capacity *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={venueForm.capacity} 
-                        onChange={e => setVenueForm({ ...venueForm, capacity: e.target.value })}
-                        placeholder="e.g. 15,000 seats"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Location / City *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={venueForm.location} 
-                        onChange={e => setVenueForm({ ...venueForm, location: e.target.value })}
-                        placeholder="e.g. Kingston, Jamaica"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Parking Details</label>
-                      <input 
-                        type="text" 
-                        value={venueForm.parking} 
-                        onChange={e => setVenueForm({ ...venueForm, parking: e.target.value })}
-                        placeholder="e.g. 2,000 cars"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Description</label>
-                      <textarea 
-                        rows={3} 
-                        value={venueForm.description} 
-                        onChange={e => setVenueForm({ ...venueForm, description: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* ── ARTIST FORM FIELDS ── */}
-                {panelType === 'artist' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Stage Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={artistForm.stage_name} 
-                        onChange={e => setArtistForm({ ...artistForm, stage_name: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Legal Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={artistForm.legal_name} 
-                        onChange={e => setArtistForm({ ...artistForm, legal_name: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Category *</label>
-                        <select 
-                          required 
-                          value={artistForm.category}
-                          onChange={e => setArtistForm({ ...artistForm, category: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Reggae Artists">Reggae</option>
-                          <option value="Dancehall Artists">Dancehall</option>
-                          <option value="DJs">DJs &amp; Selectors</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Genre *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={artistForm.genre} 
-                          onChange={e => setArtistForm({ ...artistForm, genre: e.target.value })}
-                          placeholder="e.g. Roots Reggae"
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Bio *</label>
-                      <textarea 
-                        rows={3} 
-                        required 
-                        value={artistForm.bio} 
-                        onChange={e => setArtistForm({ ...artistForm, bio: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Booking Status *</label>
-                        <select 
-                          required 
-                          value={artistForm.booking_status}
-                          onChange={e => setArtistForm({ ...artistForm, booking_status: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Available">Available</option>
-                          <option value="Booked">Booked</option>
-                          <option value="On Tour">On Tour</option>
-                          <option value="On Hold">On Hold</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Availability *</label>
-                        <select 
-                          required 
-                          value={artistForm.availability_status}
-                          onChange={e => setArtistForm({ ...artistForm, availability_status: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Technical Rider Details</label>
-                      <textarea 
-                        rows={2} 
-                        value={artistForm.technical_rider} 
-                        onChange={e => setArtistForm({ ...artistForm, technical_rider: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Hospitality Rider Details</label>
-                      <textarea 
-                        rows={2} 
-                        value={artistForm.hospitality_rider} 
-                        onChange={e => setArtistForm({ ...artistForm, hospitality_rider: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <ImageUploader 
-                        label="Profile Image" 
-                        value={artistForm.profile_image} 
-                        onChange={base64 => setArtistForm({ ...artistForm, profile_image: base64 })} 
-                      />
-                      <ImageUploader 
-                        label="Cover Image" 
-                        value={artistForm.cover_image} 
-                        onChange={base64 => setArtistForm({ ...artistForm, cover_image: base64 })} 
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* ── CUSTOMER FORM FIELDS ── */}
-                {panelType === 'customer' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Customer Contact Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={customerForm.name} 
-                        onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Company Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={customerForm.company} 
-                        onChange={e => setCustomerForm({ ...customerForm, company: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Email Address *</label>
-                      <input 
-                        type="email" 
-                        required 
-                        value={customerForm.email} 
-                        onChange={e => setCustomerForm({ ...customerForm, email: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">VIP Group / Tier *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={customerForm.tier} 
-                        onChange={e => setCustomerForm({ ...customerForm, tier: e.target.value })}
-                        placeholder="e.g. VIP Organizer"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">CRM / Booking Log Notes</label>
-                      <textarea 
-                        rows={4} 
-                        value={customerForm.notes} 
-                        onChange={e => setCustomerForm({ ...customerForm, notes: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* ── STAFF FORM FIELDS ── */}
-                {panelType === 'staff' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">First Name *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={staffForm.first_name} 
-                          onChange={e => setStaffForm({ ...staffForm, first_name: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Last Name *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={staffForm.last_name} 
-                          onChange={e => setStaffForm({ ...staffForm, last_name: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Email Address *</label>
-                      <input 
-                        type="email" 
-                        required 
-                        value={staffForm.email} 
-                        onChange={e => setStaffForm({ ...staffForm, email: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Assigned Role *</label>
-                        <select 
-                          required 
-                          value={staffForm.role}
-                          onChange={e => setStaffForm({ ...staffForm, role: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Super Admin">Super Admin</option>
-                          <option value="Owner">Owner</option>
-                          <option value="Finance Manager">Finance Manager</option>
-                          <option value="Marketing Manager">Marketing Manager</option>
-                          <option value="Content Manager">Content Manager</option>
-                          <option value="Support Agent">Support Agent</option>
-                          <option value="Promoter">Promoter</option>
-                          <option value="Venue Manager">Venue Manager</option>
-                          <option value="Booking Agent">Booking Agent</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Status *</label>
-                        <select 
-                          required 
-                          value={staffForm.status}
-                          onChange={e => setStaffForm({ ...staffForm, status: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                          <option value="Suspended">Suspended</option>
-                        </select>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* ── TICKET FORM FIELDS ── */}
-                {panelType === 'ticket' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Tier Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={ticketForm.name} 
-                        onChange={e => setTicketForm({ ...ticketForm, name: e.target.value })}
-                        placeholder="e.g. General Admission"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Price (USD) *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={ticketForm.price} 
-                          onChange={e => setTicketForm({ ...ticketForm, price: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Capacity *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={ticketForm.capacity} 
-                          onChange={e => setTicketForm({ ...ticketForm, capacity: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Description *</label>
-                      <textarea 
-                        rows={3} 
-                        required 
-                        value={ticketForm.desc} 
-                        onChange={e => setTicketForm({ ...ticketForm, desc: e.target.value })}
-                        placeholder="Standard gate access..."
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* ── PROMO CODE FORM FIELDS ── */}
-                {panelType === 'promo' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Promo Code Title *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={promoForm.code} 
-                        onChange={e => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
-                        placeholder="e.g. SUMFEST2026"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono uppercase" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Discount Value (%) *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={promoForm.discount} 
-                          onChange={e => setPromoForm({ ...promoForm, discount: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Expiry Date *</label>
-                        <input 
-                          type="date" 
-                          required 
-                          value={promoForm.expiry} 
-                          onChange={e => setPromoForm({ ...promoForm, expiry: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Active Status</label>
-                      <select 
-                        value={promoForm.active ? 'true' : 'false'} 
-                        onChange={e => setPromoForm({ ...promoForm, active: e.target.value === 'true' })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="true">Active</option>
-                        <option value="false">Inactive</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {/* ── ORDER/INVOICE FORM FIELDS ── */}
-                {panelType === 'order' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Select Event/Booking Link *</label>
-                      <select 
-                        required 
-                        value={orderForm.booking_id} 
-                        onChange={e => setOrderForm({ ...orderForm, booking_id: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="">-- Choose Booking --</option>
-                        {bookings.map(b => <option key={b.id} value={b.id}>{b.event_title} ({b.client_name})</option>)}
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Total Amount (USD) *</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={orderForm.amount} 
-                          onChange={e => setOrderForm({ ...orderForm, amount: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Due Date *</label>
-                        <input 
-                          type="date" 
-                          required 
-                          value={orderForm.due_date} 
-                          onChange={e => setOrderForm({ ...orderForm, due_date: e.target.value })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Invoice Status *</label>
-                      <select 
-                        value={orderForm.status} 
-                        onChange={e => setOrderForm({ ...orderForm, status: e.target.value as any })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="Paid">Paid</option>
-                        <option value="Unpaid">Unpaid</option>
-                        <option value="Partially Paid">Partially Paid</option>
-                        <option value="Overdue">Overdue</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {/* ── CAMPAIGN FORM FIELDS ── */}
-                {panelType === 'campaign' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Campaign Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={campaignForm.name} 
-                        onChange={e => setCampaignForm({ ...campaignForm, name: e.target.value })}
-                        placeholder="e.g. Koffee Sumfest Promotion"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Broadcast Channel *</label>
-                        <select 
-                          value={campaignForm.type} 
-                          onChange={e => setCampaignForm({ ...campaignForm, type: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Email">Email</option>
-                          <option value="SMS">SMS</option>
-                          <option value="Push">Push Announcement</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Audience Segment *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={campaignForm.segment} 
-                          onChange={e => setCampaignForm({ ...campaignForm, segment: e.target.value })}
-                          placeholder="e.g. VIP Ticket Buyers Only"
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    </div>
-                    {campaignForm.type === 'Email' && (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Email Subject Line *</label>
-                        <input 
-                          type="text" 
-                          required={campaignForm.type === 'Email'}
-                          value={campaignForm.subject} 
-                          onChange={e => setCampaignForm({ ...campaignForm, subject: e.target.value })}
-                          placeholder="Announcing new acts!"
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Broadcast Message Body *</label>
-                      <textarea 
-                        rows={5} 
-                        required 
-                        value={campaignForm.content} 
-                        onChange={e => setCampaignForm({ ...campaignForm, content: e.target.value })}
-                        placeholder="Draft the message content..."
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* ── AD PLACEMENT FORM FIELDS ── */}
-                {panelType === 'ad' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Placement Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={adForm.name} 
-                        onChange={e => setAdForm({ ...adForm, name: e.target.value })}
-                        placeholder="e.g. Homepage Hero Placement"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Active Status</label>
-                      <select 
-                        value={adForm.active ? 'true' : 'false'} 
-                        onChange={e => setAdForm({ ...adForm, active: e.target.value === 'true' })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                      >
-                        <option value="true">Active Placement</option>
-                        <option value="false">Paused / Inactive</option>
-                      </select>
-                    </div>
-                    <ImageUploader 
-                      label="Placement Banner Media" 
-                      value={adForm.image_url} 
-                      onChange={base64 => setAdForm({ ...adForm, image_url: base64 })} 
-                    />
-                  </>
-                )}
-
-                {/* ── WEBSITE SECTION FORM FIELDS ── */}
-                {panelType === 'section' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Section Type *</label>
-                        <select 
-                          value={sectionForm.type} 
-                          onChange={e => setSectionForm({ ...sectionForm, type: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="hero">Hero Header</option>
-                          <option value="announcement">Announcement Bar</option>
-                          <option value="features">Features Spotlight</option>
-                          <option value="cta">Call to Action</option>
-                          <option value="footer">Footer Info</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Active Status</label>
-                        <select 
-                          value={sectionForm.active ? 'true' : 'false'} 
-                          onChange={e => setSectionForm({ ...sectionForm, active: e.target.value === 'true' })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="true">Visible</option>
-                          <option value="false">Hidden / Draft</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Section Title *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={sectionForm.title} 
-                        onChange={e => setSectionForm({ ...sectionForm, title: e.target.value })}
-                        placeholder="Enter section title..."
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Subtitle</label>
-                      <input 
-                        type="text" 
-                        value={sectionForm.subtitle} 
-                        onChange={e => setSectionForm({ ...sectionForm, subtitle: e.target.value })}
-                        placeholder="Enter subtitle..."
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Content Body / Description</label>
-                      <textarea 
-                        rows={3} 
-                        value={sectionForm.content} 
-                        onChange={e => setSectionForm({ ...sectionForm, content: e.target.value })}
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    {['hero', 'cta'].includes(sectionForm.type) && (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Action Button Text</label>
-                        <input 
-                          type="text" 
-                          value={sectionForm.buttonText} 
-                          onChange={e => setSectionForm({ ...sectionForm, buttonText: e.target.value })}
-                          placeholder="e.g. Learn More"
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                        />
-                      </div>
-                    )}
-                    {['hero', 'cta', 'features'].includes(sectionForm.type) && (
-                      <ImageUploader 
-                        label="Section Background / Card Graphic" 
-                        value={sectionForm.image_url} 
-                        onChange={base64 => setSectionForm({ ...sectionForm, image_url: base64 })} 
-                      />
-                    )}
-                  </>
-                )}
-
-                {/* ── INTEGRATION FORM FIELDS ── */}
-                {panelType === 'integration' && (
-                  <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">Integration Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={integrationForm.name} 
-                        onChange={e => setIntegrationForm({ ...integrationForm, name: e.target.value })}
-                        placeholder="e.g. Stripe Payment Gateway"
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Provider *</label>
-                        <select 
-                          value={integrationForm.provider} 
-                          onChange={e => setIntegrationForm({ ...integrationForm, provider: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Stripe">Stripe</option>
-                          <option value="PayPal">PayPal</option>
-                          <option value="Twilio">Twilio</option>
-                          <option value="SendGrid">SendGrid</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/50 font-semibold">Connection Status</label>
-                        <select 
-                          value={integrationForm.status} 
-                          onChange={e => setIntegrationForm({ ...integrationForm, status: e.target.value as any })}
-                          className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-semibold"
-                        >
-                          <option value="Connected">Connected</option>
-                          <option value="Disconnected">Disconnected</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-white/50 font-semibold">API Private Key / SID *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={integrationForm.api_key} 
-                        onChange={e => setIntegrationForm({ ...integrationForm, api_key: e.target.value })}
-                        placeholder="e.g. sk_live_..."
-                        className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm font-mono" 
-                      />
-                    </div>
-                  </>
-                )}
-
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-4 border-t border-white/10 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setPanelOpen(false)}
-                  className="btn flex-1 bg-[#16122c] border border-white/10 py-3 rounded-full text-xs font-semibold transition text-center hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn flex-1 bg-[#d4af37] text-[#07050e] hover:scale-105 py-3 rounded-full text-xs font-extrabold transition text-center"
-                >
-                  Save Changes
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
-
-    </div>
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+    </>
   );
 }

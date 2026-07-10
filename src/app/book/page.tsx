@@ -9,7 +9,7 @@ import { Calendar, MapPin, DollarSign, User, Mail, Sparkles, CheckCircle2, Chevr
 const BookTalentContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, usersList, switchUser } = useAuth();
+  const { user, profile, isClient } = useAuth();
 
   const [artists, setArtists] = useState<Artist[]>([]);
   const [selectedArtistId, setSelectedArtistId] = useState('');
@@ -59,17 +59,17 @@ const BookTalentContent = () => {
     loadArtists();
   }, [searchParams]);
 
-  // Sync client profile details if user role is client
+  // Pre-fill form if user is a logged-in client
   useEffect(() => {
-    if (user && user.role === 'Client') {
+    if (user && profile && isClient) {
       setForm(f => ({
         ...f,
-        contact_name: `${user.first_name} ${user.last_name}`,
-        email: user.email,
-        phone: user.phone || ''
+        contact_name: `${profile.first_name} ${profile.last_name}`,
+        email: profile.email,
+        phone: profile.phone || ''
       }));
     }
-  }, [user]);
+  }, [user, profile, isClient]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -88,30 +88,20 @@ const BookTalentContent = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Create client lead
       await db.createLead({
         company_name: form.company_name || undefined,
         contact_name: form.contact_name,
         email: form.email,
         phone: form.phone || undefined,
         country: form.country,
-        assigned_to: 'usr-agent-1', // Route to staff agent Sarah
         details: `Event: ${form.event_title} (${form.event_type}) at ${form.venue_name}, ${form.city}. Attendance: ${form.attendance}. Notes: ${form.details}`,
         budget: parseFloat(form.budget) || 50000,
         preferred_date: form.event_date || new Date().toISOString().split('T')[0],
         artist_id: selectedArtistId || undefined
       });
 
-      // 2. Confetti trigger and success UI
       setIsSubmitted(true);
-      
-      // Auto assign/switch identity to Michael Eavis (the client user) to view dashboard
-      const clientUser = usersList.find(u => u.role === 'Client');
-      if (clientUser) {
-        await switchUser(clientUser.id);
-      }
 
-      // Confetti load
       if (typeof window !== 'undefined') {
         const confetti = (await import('canvas-confetti')).default;
         confetti({
@@ -122,13 +112,12 @@ const BookTalentContent = () => {
         });
       }
 
-      // Redirect to Client Hub after short delay
       setTimeout(() => {
-        router.push('/portal/client');
+        router.push(user ? '/portal/client' : '/');
       }, 4000);
 
-    } catch (err) {
-      console.error('Failed to submit booking inquiry:', err);
+    } catch {
+      // Submission failed — user sees loading state reset
     } finally {
       setLoading(false);
     }
@@ -141,7 +130,7 @@ const BookTalentContent = () => {
         <div className="success-overlay glassmorphism animate-fade">
           <CheckCircle2 className="success-icon" />
           <h2>Booking Inquiry Submitted</h2>
-          <p className="success-tagline">Your request has been routed to our Lead Agent Sarah Silverman.</p>
+          <p className="success-tagline">Your inquiry has been received. Our booking team will contact you within 24 hours.</p>
           <div className="success-summary">
             <p><strong>Artist Selected:</strong> {artists.find(a => a.id === selectedArtistId)?.stage_name}</p>
             <p><strong>Target Date:</strong> {form.event_date}</p>
