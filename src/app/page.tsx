@@ -151,30 +151,78 @@ function ArtistCardPremium({ artist }: { artist: Artist }) {
     </div>
   );
 }
+function ArtistCardPremiumCycling({ categoryArtists }: {
+  categoryArtists: Artist[];
+}) {
+  const [currentIdx, setCurrentIdx] = React.useState(0);
+  const [fade, setFade] = React.useState(true);
+  const [displayArtist, setDisplayArtist] = React.useState<Artist | null>(null);
+
+  useEffect(() => {
+    if (!categoryArtists || categoryArtists.length === 0) return;
+    
+    setDisplayArtist(categoryArtists[0]);
+    if (categoryArtists.length <= 1) return;
+
+    let activeIdx = 0;
+    const delay = 6000 + Math.random() * 2500; // staggered offset
+
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        activeIdx = (activeIdx + 1) % categoryArtists.length;
+        setCurrentIdx(activeIdx);
+        setDisplayArtist(categoryArtists[activeIdx]);
+        setFade(true);
+      }, 500);
+    }, delay);
+
+    return () => clearInterval(interval);
+  }, [categoryArtists]);
+
+  if (!displayArtist) return null;
+
+  return (
+    <div 
+      style={{ 
+        opacity: fade ? 1 : 0, 
+        transform: `scale(${fade ? 1 : 0.985})`, 
+        transition: 'opacity 0.5s ease-in-out, transform 0.5s ease-in-out',
+        width: '100%'
+      }}
+    >
+      <ArtistCardPremium artist={displayArtist} />
+    </div>
+  );
+}
+
 
 
 export default function Home() {
   const router = useRouter();
-  const [featuredArtists, setFeaturedArtists] = React.useState<Artist[]>([]);
+  const [reggaePool, setReggaePool] = React.useState<Artist[]>([]);
+  const [dancehallPool, setDancehallPool] = React.useState<Artist[]>([]);
+  const [djPool, setDjPool] = React.useState<Artist[]>([]);
 
   useEffect(() => {
-    // Load pre-seeded artists for featured showcase
     const loadFeatured = async () => {
       const all = await db.getArtists();
-      // Select 1 Reggae, 1 Dancehall, and 1 DJ to showcase a premium mix on the home page
-      const reggae = all.find((a) => a.category === 'Reggae Artists');
-      const dancehall = all.find((a) => a.category === 'Dancehall Artists');
-      const dj = all.find((a) => a.category === 'DJs');
-      const featured: Artist[] = [];
-      if (reggae) featured.push(reggae);
-      if (dancehall) featured.push(dancehall);
-      if (dj) featured.push(dj);
 
-      if (featured.length < 3) {
-        setFeaturedArtists(all.slice(0, 3));
-      } else {
-        setFeaturedArtists(featured);
-      }
+      const sortFeaturedFirst = (list: Artist[]) => {
+        return [...list].sort((a, b) => {
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          return 0;
+        });
+      };
+
+      const reggae = all.filter(a => a.category === 'Reggae Artists');
+      const dancehall = all.filter(a => a.category === 'Dancehall Artists');
+      const djs = all.filter(a => a.category === 'DJs');
+
+      setReggaePool(sortFeaturedFirst(reggae));
+      setDancehallPool(sortFeaturedFirst(dancehall));
+      setDjPool(sortFeaturedFirst(djs));
     };
     loadFeatured();
   }, []);
@@ -237,9 +285,9 @@ export default function Home() {
             <p>Award-winning icons available for booking on major upcoming tours and festival seasons.</p>
           </div>
           <div className="grid-3 reveal-stagger">
-            {featuredArtists.map((artist) => (
-              <ArtistCardPremium key={artist.id} artist={artist} />
-            ))}
+            <ArtistCardPremiumCycling categoryArtists={reggaePool} />
+            <ArtistCardPremiumCycling categoryArtists={dancehallPool} />
+            <ArtistCardPremiumCycling categoryArtists={djPool} />
           </div>
         </div>
       </section>

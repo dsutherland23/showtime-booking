@@ -838,13 +838,13 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
-  const blank = { stage_name: '', legal_name: '', category: 'Reggae Artists', genre: '', bio: '', profile_image: '', cover_image: '', booking_status: 'Available' as Artist['booking_status'], availability_status: 'Active' as Artist['availability_status'], technical_rider: '', hospitality_rider: '' };
+  const blank = { stage_name: '', legal_name: '', category: 'Reggae Artists', genre: '', bio: '', profile_image: '', cover_image: '', booking_status: 'Available' as Artist['booking_status'], availability_status: 'Active' as Artist['availability_status'], technical_rider: '', hospitality_rider: '', is_featured: false };
   const [form, setForm] = useState(blank);
 
   const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
   const openEdit = (a: Artist) => {
     setEditItem(a);
-    setForm({ stage_name: a.stage_name, legal_name: a.legal_name, category: a.category, genre: a.genre, bio: a.bio, profile_image: a.profile_image, cover_image: a.cover_image, booking_status: a.booking_status, availability_status: a.availability_status, technical_rider: a.technical_rider || '', hospitality_rider: a.hospitality_rider || '' });
+    setForm({ stage_name: a.stage_name, legal_name: a.legal_name, category: a.category, genre: a.genre, bio: a.bio, profile_image: a.profile_image, cover_image: a.cover_image, booking_status: a.booking_status, availability_status: a.availability_status, technical_rider: a.technical_rider || '', hospitality_rider: a.hospitality_rider || '', is_featured: a.is_featured || false });
     setShowModal(true);
   };
   const handleSave = async (e: React.FormEvent) => {
@@ -879,10 +879,10 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Artist</ABtn>
       </div>
       <Tbl>
-        <TH cols={['Artist', 'Category', 'Genre', 'Booking Status', 'Availability', '']} />
+        <TH cols={['Artist', 'Category', 'Genre', 'Booking Status', 'Availability', 'Featured', '']} />
         <tbody>
           {filtered.length === 0 ? (
-            <tr><td colSpan={6}><Empty icon={Music} msg="No artists found" /></td></tr>
+            <tr><td colSpan={7}><Empty icon={Music} msg="No artists found" /></td></tr>
           ) : filtered.map(a => (
             <TR key={a.id}>
               <TD>
@@ -900,6 +900,15 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
               <TD muted>{a.genre}</TD>
               <TD><StatusBadge status={a.booking_status} /></TD>
               <TD><StatusBadge status={a.availability_status} /></TD>
+              <TD>
+                {a.is_featured ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.5rem', borderRadius: 4, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 600 }}>
+                    ★ Spotlight
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>No</span>
+                )}
+              </TD>
               <TD>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <ABtn variant="ghost" size="sm" onClick={() => openEdit(a)}><Edit2 size={12} /></ABtn>
@@ -924,6 +933,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
             </Field>
             <Field label="Availability">
               <FSelect value={form.availability_status} onChange={v => setForm(f => ({ ...f, availability_status: v as Artist['availability_status'] }))} options={[{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }]} />
+            </Field>
+            <Field label="Featured Headliner">
+              <FSelect value={form.is_featured ? 'Yes' : 'No'} onChange={v => setForm(f => ({ ...f, is_featured: v === 'Yes' }))} options={[{ value: 'Yes', label: 'Yes (Spotlight on Homepage)' }, { value: 'No', label: 'No' }]} />
             </Field>
           </FGrid>
           <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>

@@ -28,6 +28,7 @@ export interface Artist {
   media?: { type: 'Image' | 'Video' | 'Audio'; url: string }[];
   technical_rider?: string;
   hospitality_rider?: string;
+  is_featured?: boolean;
 }
 
 export interface Lead {
@@ -233,7 +234,8 @@ const SEED_ARTISTS: Artist[] = [
       { type: 'Image', url: '/images/artist_reggae.jpg' }
     ],
     technical_rider: 'Technical: 1 Premium Vocal Mic (Neumann KMS 105), Grand Piano tuned to A440, full rhythm section backline setup, 6 in-ear monitor transmitters (Sennheiser G4).',
-    hospitality_rider: 'Hospitality: Assorted red wines (Cabernet Sauvignon), hot water kettle, throat lozenges, selection of raw nuts, 100% vegetarian hot catering post-soundcheck, quiet dressing room.'
+    hospitality_rider: 'Hospitality: Assorted red wines (Cabernet Sauvignon), hot water kettle, throat lozenges, selection of raw nuts, 100% vegetarian hot catering post-soundcheck, quiet dressing room.',
+    is_featured: true
   },
   {
     id: 'art-chronixx',
@@ -255,7 +257,8 @@ const SEED_ARTISTS: Artist[] = [
       { type: 'Image', url: '/images/artist_reggae.jpg' }
     ],
     technical_rider: 'Technical: 3 Cordless Vocal Mics (Shure UR4D), 2 Guitar Amps (Fender Twin Reverb), 1 Bass Amp (Ampeg SVT-CL), professional monitor engineer.',
-    hospitality_rider: 'Hospitality: Freshly squeezed fruit juices, selection of herbal teas, hot ginger infusion, organic snacks, organic vegan buffet for 12 touring crew members.'
+    hospitality_rider: 'Hospitality: Freshly squeezed fruit juices, selection of herbal teas, hot ginger infusion, organic snacks, organic vegan buffet for 12 touring crew members.',
+    is_featured: true
   },
   {
     id: 'art-koffee',
@@ -278,7 +281,8 @@ const SEED_ARTISTS: Artist[] = [
       { type: 'Video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' }
     ],
     technical_rider: 'Technical: 3 Vocal Cordless Mics (Shure SM58), Stereo DIs for Keyboards and DJ controller, 4 Monitor wedges (L-Acoustics), standard drum kit mic package.',
-    hospitality_rider: 'Hospitality: Fresh ginger root, organic local honey, hot water kettle, assorted herbal teas, sliced seasonal fruit platters, 12 bottles of room-temperature spring water, 6 clean hand towels.'
+    hospitality_rider: 'Hospitality: Fresh ginger root, organic local honey, hot water kettle, assorted herbal teas, sliced seasonal fruit platters, 12 bottles of room-temperature spring water, 6 clean hand towels.',
+    is_featured: true
   },
   {
     id: 'art-shenseea',
@@ -322,7 +326,8 @@ const SEED_ARTISTS: Artist[] = [
       { type: 'Image', url: '/images/artist_dj.jpg' }
     ],
     technical_rider: 'Technical: 2 Pioneer CDJ-3000, 1 Pioneer DJM-A9 mixer, 1 wired Shure SM58 microphone, 2 booth monitor wedges adjustable at the booth.',
-    hospitality_rider: 'Hospitality: Assorted beers (Red Stripe), sparkling water, Earl Grey tea bags, fresh milk, 2 clean towels, small plate of sandwiches (vegetarian options included).'
+    hospitality_rider: 'Hospitality: Assorted beers (Red Stripe), sparkling water, Earl Grey tea bags, fresh milk, 2 clean towels, small plate of sandwiches (vegetarian options included).',
+    is_featured: true
   },
   {
     id: 'art-skeng',
@@ -926,7 +931,8 @@ const SEED_ARTISTS: Artist[] = [
     cover_image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
     booking_status: 'Available',
     availability_status: 'Active',
-    socials: { Instagram: { url: 'https://instagram.com/kingbeenieman', followers: 2000000 } }
+    socials: { Instagram: { url: 'https://instagram.com/kingbeenieman', followers: 2000000 } },
+    is_featured: true
   }
 ];
 
@@ -1099,8 +1105,12 @@ const getStoreValue = <T>(key: string, seed: T[]): T[] => {
       const seedArtists = seed as unknown as Artist[];
       let updated = false;
       seedArtists.forEach(seedArt => {
-        if (!parsedArtists.some(pa => pa.id === seedArt.id)) {
+        const pa = parsedArtists.find(p => p.id === seedArt.id);
+        if (!pa) {
           parsedArtists.push(seedArt);
+          updated = true;
+        } else if (pa.is_featured === undefined && seedArt.is_featured !== undefined) {
+          pa.is_featured = seedArt.is_featured;
           updated = true;
         }
       });
