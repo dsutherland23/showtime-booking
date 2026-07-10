@@ -201,7 +201,7 @@ const HeroSection: React.FC = () => {
     <div
       ref={wrapperRef}
       style={{
-        height: `${SCROLL_MULTIPLIER * 100}vh`,
+        height: `${SCROLL_MULTIPLIER * 100}dvh`,
         position: 'relative',
         background: '#050505',
       }}
@@ -213,7 +213,7 @@ const HeroSection: React.FC = () => {
           position: 'sticky',
           top: 0,
           width: '100%',
-          height: '100vh',
+          height: '100dvh',
           overflow: 'hidden',
           background: '#050505',
         }}
@@ -299,92 +299,177 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
   const translateY = visible ? (1 - fadeIn) * 20 : 10;
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 10,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        paddingBottom: 'clamp(4rem, 10vh, 8rem)',
-        paddingLeft: '1.5rem',
-        paddingRight: '1.5rem',
-        pointerEvents: opacity > 0.1 ? 'auto' : 'none',
-        textAlign: 'center',
-      }}
-    >
+    <div className={`hero-text-container ${opacity > 0.1 ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <style jsx>{`
+        .hero-text-container {
+          position: absolute;
+          inset: 0;
+          z-index: 10;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-end;
+          padding-bottom: 8dvh;
+          padding-left: 1.5rem;
+          padding-right: 1.5rem;
+          text-align: center;
+        }
+
+        .hero-inner-wrap {
+          max-width: 760px;
+          width: 100%;
+          transition: none;
+        }
+
+        .hero-headline {
+          font-family: var(--font-heading);
+          font-size: clamp(2.5rem, 6.5vw, 5.5rem);
+          font-weight: 800;
+          line-height: 1.05;
+          letter-spacing: -0.04em;
+          color: #ffffff;
+          margin: 0 0 1.25rem;
+          white-space: pre-line;
+          text-shadow: 0 2px 40px rgba(0,0,0,0.8);
+        }
+
+        .hero-sub {
+          font-family: var(--font-body);
+          font-size: clamp(0.95rem, 1.8vw, 1.25rem);
+          color: rgba(255,255,255,0.65);
+          line-height: 1.6;
+          margin: 0 auto 2rem;
+          max-width: 520px;
+          text-shadow: 0 1px 20px rgba(0,0,0,0.7);
+        }
+
+        .hero-tags-wrapper {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.6rem;
+          justify-content: center;
+          margin-bottom: 2rem;
+        }
+
+        .hero-tag-pill {
+          font-family: var(--font-body);
+          font-size: clamp(0.82rem, 1.4vw, 1rem);
+          color: rgba(255,255,255,0.55);
+          border: 1px solid rgba(255,255,255,0.15);
+          borderRadius: 100px;
+          padding: 0.35rem 1.1rem;
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          letter-spacing: 0.02em;
+        }
+
+        .hero-ctas-wrapper {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+          align-items: center;
+        }
+
+        .hero-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.85rem 2.2rem;
+          border-radius: 100px;
+          font-family: var(--font-body);
+          font-size: 0.9375rem;
+          text-decoration: none;
+          transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+          cursor: pointer;
+        }
+
+        .hero-btn-primary {
+          background: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
+          color: #07050e;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+          box-shadow: 0 8px 32px rgba(212,175,55,0.25);
+          border: none;
+        }
+
+        .hero-btn-primary:hover {
+          transform: translateY(-2px) scale(1.02);
+          box-shadow: 0 12px 40px rgba(212,175,55,0.4);
+        }
+
+        .hero-btn-secondary {
+          background: rgba(255,255,255,0.07);
+          border: 1px solid rgba(255,255,255,0.2);
+          color: #ffffff;
+          font-weight: 500;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+
+        .hero-btn-secondary:hover {
+          background: rgba(255,255,255,0.12);
+          border-color: rgba(212,175,55,0.5);
+          transform: translateY(-1px);
+        }
+
+        @media (max-width: 768px) {
+          .hero-text-container {
+            justify-content: center;
+            padding-bottom: 3.5rem;
+          }
+          .hero-headline {
+            font-size: clamp(2rem, 7.5vw, 3.25rem);
+            margin-bottom: 1rem;
+          }
+          .hero-sub {
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            max-width: 90%;
+            padding: 0 0.5rem;
+          }
+          .hero-tags-wrapper {
+            gap: 0.4rem;
+            margin-bottom: 1.5rem;
+          }
+          .hero-tag-pill {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.8rem;
+          }
+          .hero-ctas-wrapper {
+            flex-direction: column;
+            gap: 0.65rem;
+            width: 100%;
+            max-width: 280px;
+            margin: 0 auto;
+          }
+          .hero-btn {
+            width: 100%;
+            padding: 0.8rem 1.5rem;
+            font-size: 0.875rem;
+          }
+        }
+      `}</style>
+
       {displayPhase && (
         <div
+          className="hero-inner-wrap"
           style={{
             opacity,
             transform: `translateY(${translateY}px)`,
-            transition: 'none',
-            maxWidth: 760,
-            width: '100%',
           }}
         >
           {/* Headline */}
-          <h1
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: 'clamp(2.25rem, 6vw, 5rem)',
-              fontWeight: 800,
-              lineHeight: 1.05,
-              letterSpacing: '-0.04em',
-              color: '#ffffff',
-              margin: '0 0 1.25rem',
-              whiteSpace: 'pre-line',
-              textShadow: '0 2px 40px rgba(0,0,0,0.8)',
-            }}
-          >
-            {displayPhase.headline}
-          </h1>
+          <h1 className="hero-headline">{displayPhase.headline}</h1>
 
           {/* Sub */}
-          {displayPhase.sub && (
-            <p
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: 'clamp(0.95rem, 1.8vw, 1.2rem)',
-                color: 'rgba(255,255,255,0.65)',
-                lineHeight: 1.6,
-                margin: '0 auto 2rem',
-                maxWidth: 520,
-                textShadow: '0 1px 20px rgba(0,0,0,0.7)',
-              }}
-            >
-              {displayPhase.sub}
-            </p>
-          )}
+          {displayPhase.sub && <p className="hero-sub">{displayPhase.sub}</p>}
 
           {/* Tags */}
           {displayPhase.tags && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '0.6rem',
-                justifyContent: 'center',
-                marginBottom: '2rem',
-              }}
-            >
+            <div className="hero-tags-wrapper">
               {displayPhase.tags.map((t, i) => (
-                <span
-                  key={i}
-                  style={{
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 'clamp(0.82rem, 1.4vw, 1rem)',
-                    color: 'rgba(255,255,255,0.55)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 100,
-                    padding: '0.35rem 1.1rem',
-                    background: 'rgba(255,255,255,0.04)',
-                    backdropFilter: 'blur(8px)',
-                    letterSpacing: '0.02em',
-                  }}
-                >
+                <span key={i} className="hero-tag-pill">
                   {t}
                 </span>
               ))}
@@ -393,79 +478,16 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
 
           {/* CTAs */}
           {displayPhase.ctas && (
-            <div
-              style={{
-                display: 'flex',
-                gap: '1rem',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-              }}
-            >
-              {displayPhase.ctas.map((cta) =>
-                cta.primary ? (
-                  <Link
-                    key={cta.href}
-                    href={cta.href}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0.85rem 2.2rem',
-                      borderRadius: 100,
-                      background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
-                      color: '#07050e',
-                      fontFamily: 'var(--font-body)',
-                      fontWeight: 700,
-                      fontSize: '0.9375rem',
-                      textDecoration: 'none',
-                      letterSpacing: '-0.01em',
-                      boxShadow: '0 8px 32px rgba(212,175,55,0.35)',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-2px) scale(1.03)';
-                      (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 12px 40px rgba(212,175,55,0.5)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.transform = '';
-                      (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 8px 32px rgba(212,175,55,0.35)';
-                    }}
-                  >
-                    {cta.label}
-                  </Link>
-                ) : (
-                  <Link
-                    key={cta.href}
-                    href={cta.href}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0.85rem 2.2rem',
-                      borderRadius: 100,
-                      background: 'rgba(255,255,255,0.07)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      color: '#ffffff',
-                      fontFamily: 'var(--font-body)',
-                      fontWeight: 500,
-                      fontSize: '0.9375rem',
-                      textDecoration: 'none',
-                      backdropFilter: 'blur(12px)',
-                      transition: 'background 0.2s, border-color 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.12)';
-                      (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(212,175,55,0.5)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.07)';
-                      (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.2)';
-                    }}
-                  >
-                    {cta.label}
-                  </Link>
-                )
-              )}
+            <div className="hero-ctas-wrapper">
+              {displayPhase.ctas.map((cta) => (
+                <Link
+                  key={cta.href}
+                  href={cta.href}
+                  className={cta.primary ? "hero-btn hero-btn-primary" : "hero-btn hero-btn-secondary"}
+                >
+                  {cta.label}
+                </Link>
+              ))}
             </div>
           )}
         </div>
