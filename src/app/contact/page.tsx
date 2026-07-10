@@ -35,7 +35,7 @@ export default function Contact() {
         {/* Contact Info card */}
         <div className="luxury-card contact-info-card">
           <h3>Agency Terminals</h3>
-          <p className="card-desc">For booking inquiries, please utilize our formal Booking intake portal or consult our AI Concierge.</p>
+          <p className="card-desc">For booking inquiries, please utilize our formal Booking intake portal or contact our agency team directly.</p>
 
           <div className="contact-details-list">
             <div className="contact-info-item">

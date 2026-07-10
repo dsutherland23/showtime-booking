@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Spline from '@splinetool/react-spline';
-import { Sparkles } from 'lucide-react';
+
 
 function HeroSplineBackground() {
   const [isDesktop, setIsDesktop] = useState(false);
@@ -117,17 +117,16 @@ function HeroContent() {
              >
                 Explore Talent
             </Link>
-            <Link 
-              href="/ai-assistant" 
-              className="pointer-events-auto btn btn-primary py-3.5 px-8 rounded-full transition duration-300 hover:scale-105 flex items-center justify-center w-full sm:w-auto font-semibold gap-2"
-              style={{
-                background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
-                color: '#07050e',
-              }}
-            >
-               <Sparkles className="w-4 h-4 text-[#07050e]" />
-               AI Concierge
-            </Link>
+             <Link 
+               href="/book" 
+               className="pointer-events-auto btn btn-primary py-3.5 px-8 rounded-full transition duration-300 hover:scale-105 flex items-center justify-center w-full sm:w-auto font-semibold gap-2"
+               style={{
+                 background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)',
+                 color: '#07050e',
+               }}
+             >
+                Book Talent
+             </Link>
         </div>
       </div>
 

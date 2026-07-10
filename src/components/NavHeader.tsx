@@ -78,10 +78,6 @@ export function NavHeader() {
           <Link href="/events" className="nav-link">Events</Link>
           <Link href="/about" className="nav-link">About</Link>
           <Link href="/contact" className="nav-link">Contact</Link>
-          <Link href="/ai-assistant" className="nav-link ai-link">
-            <Sparkles style={{ display: 'inline', width: 13, height: 13, marginRight: 4, verticalAlign: '-1px' }} />
-            AI Assistant
-          </Link>
         </nav>
 
         <div className="nav-actions">
@@ -169,10 +165,6 @@ export function NavHeader() {
           <Link href="/events" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Events</Link>
           <Link href="/about" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>About</Link>
           <Link href="/contact" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
-          <Link href="/ai-assistant" className="mobile-nav-link ai-link" onClick={() => setMobileMenuOpen(false)}>
-            <Sparkles style={{ display: 'inline', width: 16, height: 16, marginRight: 6, verticalAlign: '-1px' }} />
-            AI Assistant
-          </Link>
         </nav>
         <div className="mobile-nav-actions">
           {user && profile ? (

@@ -40,7 +40,7 @@ export default function Services() {
           <p>Consult with our lead logistics agents or submit event details to obtain travel and permit estimations.</p>
           <div className="cta-buttons">
             <Link href="/book" className="btn btn-primary">Book Roster Talent</Link>
-            <Link href="/ai-assistant" className="btn btn-secondary">AI Assistant Estimates</Link>
+            <Link href="/contact" className="btn btn-secondary">Contact Our Team</Link>
           </div>
         </div>
       </div>

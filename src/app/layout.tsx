@@ -120,7 +120,6 @@ export default function RootLayout({
                     <Link href="/talent">Talent Directory</Link>
                     <Link href="/services">Our Services</Link>
                     <Link href="/events">Showcase Events</Link>
-                    <Link href="/ai-assistant">AI Booking Agent</Link>
                   </div>
 
                   <div className="footer-links-col">

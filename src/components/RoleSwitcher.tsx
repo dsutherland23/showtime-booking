@@ -96,6 +96,21 @@ export const RoleSwitcher: React.FC = () => {
           font-family: var(--font-body);
         }
 
+        @media (max-width: 767px) {
+          .role-switcher-container {
+            bottom: auto;
+            top: 12px;
+            right: 12px;
+          }
+          .role-switcher-dropdown {
+            bottom: auto;
+            top: calc(100% + 8px);
+          }
+          .trigger-label { display: none; }
+          .trigger-chevron { display: none; }
+          .role-switcher-trigger { padding: 8px 10px; gap: 6px; }
+        }
+
         .role-switcher-trigger {
           display: flex;
           align-items: center;

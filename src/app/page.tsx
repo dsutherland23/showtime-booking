@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
-import { ArrowRight, Star, Music, Award, ShieldAlert, Sparkles, MapPin, Users, HelpCircle } from 'lucide-react';
+import { ArrowRight, Star, Music, Award, ShieldAlert, MapPin, Users, HelpCircle } from 'lucide-react';
 import { FlowArt, FlowSection } from '@/components/ui/story-scroll';
 import { DottedSurface } from '@/components/ui/dotted-surface';
 import { HeroSection } from '@/components/ui/3d-hero-section-boxes';
@@ -604,13 +604,10 @@ export default function Home() {
         <div className="cta-inner" style={{ position: 'relative', zIndex: 2 }}>
           <p className="section-eyebrow" style={{ color: 'rgba(255,255,255,0.5)' }}>Get Started</p>
           <h2 className="cta-headline">Ready to book your headliner?</h2>
-          <p className="cta-body">Submit a formal inquiry or let our AI Concierge match artists to your event, budget, and capacity.</p>
+          <p className="cta-body">Submit a formal inquiry and our team will match the perfect artist to your event, budget, and capacity.</p>
           <div className="cta-actions">
             <Link href="/book" className="cta-btn-primary">Book Talent</Link>
-            <Link href="/ai-assistant" className="cta-btn-secondary">
-              <Sparkles className="w-4 h-4" />
-              AI Concierge
-            </Link>
+            <Link href="/contact" className="cta-btn-secondary">Contact Us</Link>
           </div>
         </div>
       </section>
