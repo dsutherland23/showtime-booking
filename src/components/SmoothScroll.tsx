@@ -6,14 +6,19 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 export function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Initialize Lenis scroll options
+    // Only apply Lenis smooth scroll on pointer:fine devices (mouse/trackpad)
+    // Touch devices have native momentum scrolling that is superior and
+    // interferes with the image sequence hero scroll animation.
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    if (isTouch) return;
+
     const lenis = new Lenis({
-      duration: 1.1,
+      duration: 0.9,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: 'vertical',
       gestureOrientation: 'vertical',
       smoothWheel: true,
-      wheelMultiplier: 1.0,
+      wheelMultiplier: 0.9,
       touchMultiplier: 1.5,
       infinite: false,
     });
@@ -29,7 +34,6 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
     }
     frameId = requestAnimationFrame(raf);
 
-    // Clean up
     return () => {
       cancelAnimationFrame(frameId);
       lenis.destroy();

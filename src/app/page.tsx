@@ -681,6 +681,14 @@ export default function Home() {
           padding: var(--spacing-xxl) 0;
         }
 
+        @media (max-width: 767px) {
+          .section-pad { padding: 3.5rem 0; }
+        }
+
+        @media (max-width: 480px) {
+          .section-pad { padding: 2.75rem 0; }
+        }
+
         .alt-bg {
           background: var(--bg-secondary);
         }

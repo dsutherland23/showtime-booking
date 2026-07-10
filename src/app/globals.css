@@ -1568,3 +1568,273 @@ body::after {
   transition: transform 0.3s ease;
 }
 
+/* ================================================================
+   COMPREHENSIVE MOBILE RESPONSIVENESS — Full Site
+   ================================================================ */
+
+/* ── Smooth native scroll with CSS ──────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Touch tap highlight suppression ────────────────────────── */
+a, button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── Universal mobile safe areas ────────────────────────────── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .global-footer {
+    padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
+  }
+  .sticky-cta-inner {
+    margin-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Base container tightening for phones ───────────────────── */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 1rem;
+  }
+  
+  /* Section padding — reduced on small phones */
+  .section-pad {
+    padding: 3rem 0 !important;
+  }
+  
+  .section-header {
+    margin-bottom: 1.75rem;
+  }
+  
+  .section-header h2 {
+    font-size: clamp(1.6rem, 8vw, 2.2rem);
+  }
+  
+  .section-header p {
+    font-size: 0.9rem;
+  }
+  
+  /* Stats bar — 2-col on phones, numbers tighter */
+  .stats-bar {
+    padding: 2.5rem 0;
+  }
+  
+  .stats-bar-grid {
+    gap: 1.5rem 0.75rem;
+  }
+  
+  .stat-number {
+    font-size: clamp(1.75rem, 9vw, 2.5rem);
+  }
+  
+  .stat-label {
+    font-size: 0.68rem;
+  }
+  
+  /* Marquee — tighter padding */
+  .marquee-section {
+    padding: 2rem 0;
+  }
+  
+  .marquee-item {
+    padding: 0 2rem;
+    font-size: 0.78rem;
+  }
+  
+  /* Artist premium cards */
+  .artist-card-premium {
+    border-radius: 14px;
+  }
+  
+  .artist-card-reveal {
+    transform: translateY(0);
+    opacity: 1;
+    background: linear-gradient(to top, rgba(7,5,14,0.98) 0%, rgba(7,5,14,0.6) 55%, transparent 100%);
+  }
+  
+  .artist-card-premium:hover .artist-card-reveal {
+    transform: translateY(0);
+  }
+  
+  .artist-card-name {
+    font-size: 1.05rem;
+  }
+  
+  .artist-card-bio {
+    font-size: 0.75rem;
+  }
+}
+
+/* ── Tablet / mid-size mobile (481px–767px) ─────────────────── */
+@media (min-width: 481px) and (max-width: 767px) {
+  .container {
+    padding: 0 1.25rem;
+  }
+  
+  .section-pad {
+    padding: 3.5rem 0 !important;
+  }
+  
+  .section-header h2 {
+    font-size: clamp(1.75rem, 6vw, 2.6rem);
+  }
+  
+  .stats-bar {
+    padding: 3rem 0;
+  }
+}
+
+/* ── Hide sticky CTA on very small phones ───────────────────── */
+@media (max-width: 480px) {
+  .sticky-cta-bar { display: none; }
+}
+
+/* ── Artist card reveal always visible on touch ─────────────── */
+@media (hover: none) and (pointer: coarse) {
+  .artist-card-reveal {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+    background: linear-gradient(to top, rgba(7,5,14,0.97) 0%, rgba(7,5,14,0.55) 60%, transparent 100%);
+  }
+}
+
+/* ── Category grid cards (apple-card) on mobile ─────────────── */
+@media (max-width: 767px) {
+  .apple-card {
+    padding: 1.5rem;
+  }
+  
+  .apple-card-title {
+    font-size: 1.1rem;
+  }
+}
+
+/* ── Events split section ────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .events-split {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+  
+  .events-visual {
+    order: -1;
+  }
+  
+  .event-img-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .events-metrics {
+    gap: 1.5rem;
+  }
+  
+  .em-num {
+    font-size: 1.6rem;
+  }
+}
+
+/* ── CTA band on mobile ──────────────────────────────────────── */
+@media (max-width: 480px) {
+  .cta-band {
+    padding: 3rem 0;
+  }
+  
+  .cta-inner {
+    padding: 0 1.25rem;
+  }
+  
+  .cta-headline {
+    font-size: clamp(1.75rem, 9vw, 2.5rem);
+  }
+  
+  .cta-body {
+    font-size: 0.9rem;
+  }
+  
+  .cta-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .cta-btn-primary,
+  .cta-btn-secondary {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+    padding: 0.85rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+}
+
+/* ── Footer on mobile ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .global-footer {
+    padding: 3rem 0 2rem;
+    margin-top: 4rem;
+  }
+  
+  .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+}
+
+/* ── FlowSection / Story scroll on mobile ───────────────────── */
+@media (max-width: 767px) {
+  /* story scroll sections — reduce min-height for phones */
+  [data-flow-inner] {
+    min-height: auto !important;
+    padding: clamp(2rem, 6vw, 3rem) clamp(1.25rem, 5vw, 2rem) !important;
+  }
+  
+  /* The section headings inside FlowSections */
+  .flow-art-container h3 {
+    font-size: clamp(1.8rem, 7vw, 2.8rem) !important;
+  }
+}
+
+/* ── Landscape phone fix for hero ───────────────────────────── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .home-viewport .stats-bar {
+    padding: 1.5rem 0;
+  }
+}
+
+/* ── Nav on very small phones ────────────────────────────────── */
+@media (max-width: 360px) {
+  .nav-container {
+    padding: 0 0.75rem;
+  }
+  
+  .logo-text {
+    font-size: 1.05rem;
+  }
+}
+
+/* ── Grids — force single column under 480px ────────────────── */
+@media (max-width: 480px) {
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* ── mobile-nav-overlay safe padding ────────────────────────── */
+@media (max-width: 767px) {
+  .mobile-nav-overlay {
+    padding: 2rem 1.5rem;
+    gap: 1.5rem;
+  }
+  
+  .mobile-nav-link {
+    font-size: 1.5rem;
+  }
+}
+

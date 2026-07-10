@@ -309,9 +309,9 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
           flex-direction: column;
           align-items: center;
           justify-content: flex-end;
-          padding-bottom: 8dvh;
-          padding-left: 1.5rem;
-          padding-right: 1.5rem;
+          padding-bottom: clamp(3rem, 8dvh, 8rem);
+          padding-left: 1.25rem;
+          padding-right: 1.25rem;
           text-align: center;
         }
 
@@ -323,66 +323,70 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
 
         .hero-headline {
           font-family: var(--font-heading);
-          font-size: clamp(2.5rem, 6.5vw, 5.5rem);
+          font-size: clamp(2rem, 7vw, 5.5rem);
           font-weight: 800;
           line-height: 1.05;
           letter-spacing: -0.04em;
           color: #ffffff;
-          margin: 0 0 1.25rem;
+          margin: 0 0 1rem;
           white-space: pre-line;
           text-shadow: 0 4px 30px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.8);
         }
 
         .hero-sub {
           font-family: var(--font-body);
-          font-size: clamp(0.95rem, 1.8vw, 1.25rem);
+          font-size: clamp(0.875rem, 2.2vw, 1.25rem);
           color: rgba(255,255,255,0.85);
-          line-height: 1.6;
-          margin: 0 auto 2rem;
-          max-width: 520px;
+          line-height: 1.55;
+          margin: 0 auto 1.5rem;
+          max-width: 500px;
           text-shadow: 0 2px 20px rgba(0,0,0,0.95), 0 1px 5px rgba(0,0,0,0.85);
         }
 
         .hero-tags-wrapper {
           display: flex;
           flex-wrap: wrap;
-          gap: 0.65rem;
+          gap: 0.5rem;
           justify-content: center;
-          margin-bottom: 2rem;
+          margin-bottom: 1.5rem;
         }
 
         .hero-tag-pill {
           font-family: var(--font-body);
-          font-size: clamp(0.82rem, 1.4vw, 1rem);
+          font-size: clamp(0.75rem, 1.5vw, 1rem);
           color: #ffffff;
           border: 1px solid rgba(212,175,55,0.4);
           border-radius: 100px;
-          padding: 0.45rem 1.25rem;
+          padding: 0.4rem 1rem;
           background: rgba(7, 5, 14, 0.85);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           letter-spacing: 0.02em;
           box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+          white-space: nowrap;
         }
 
         .hero-ctas-wrapper {
           display: flex;
-          gap: 1rem;
+          gap: 0.75rem;
           justify-content: center;
           align-items: center;
+          flex-wrap: wrap;
         }
 
         .hero-btn {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 0.85rem 2.2rem;
+          padding: 0.8rem 2rem;
           border-radius: 100px;
           font-family: var(--font-body);
           font-size: 0.9375rem;
           text-decoration: none;
           transition: transform 0.2s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
           cursor: pointer;
+          min-height: 44px;
+          white-space: nowrap;
         }
 
         .hero-btn-primary {
@@ -414,41 +418,84 @@ function TextOverlay({ progressRef }: { progressRef: React.RefObject<number> }) 
           transform: translateY(-1px);
         }
 
-        @media (max-width: 768px) {
+        /* ── Small phones (< 480px) ── */
+        @media (max-width: 480px) {
           .hero-text-container {
-            justify-content: center;
-            padding-bottom: 3.5rem;
+            justify-content: flex-end;
+            padding-bottom: clamp(2.5rem, 6dvh, 5rem);
           }
           .hero-headline {
-            font-size: clamp(2rem, 7.5vw, 3.25rem);
-            margin-bottom: 1rem;
+            font-size: clamp(1.75rem, 8.5vw, 2.75rem);
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.035em;
           }
           .hero-sub {
-            font-size: 0.95rem;
-            margin-bottom: 1.5rem;
-            max-width: 90%;
-            padding: 0 0.5rem;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
           }
           .hero-tags-wrapper {
-            gap: 0.4rem;
-            margin-bottom: 1.5rem;
+            gap: 0.35rem;
+            margin-bottom: 1.25rem;
           }
           .hero-tag-pill {
-            font-size: 0.75rem;
-            padding: 0.3rem 0.8rem;
+            font-size: 0.72rem;
+            padding: 0.28rem 0.7rem;
           }
           .hero-ctas-wrapper {
             flex-direction: column;
-            gap: 0.65rem;
+            gap: 0.55rem;
             width: 100%;
-            max-width: 280px;
+            max-width: 260px;
             margin: 0 auto;
           }
           .hero-btn {
             width: 100%;
-            padding: 0.8rem 1.5rem;
+            padding: 0.85rem 1.5rem;
             font-size: 0.875rem;
           }
+        }
+
+        /* ── Medium mobile (481px – 768px) ── */
+        @media (min-width: 481px) and (max-width: 768px) {
+          .hero-text-container {
+            justify-content: flex-end;
+            padding-bottom: clamp(3rem, 7dvh, 6rem);
+          }
+          .hero-headline {
+            font-size: clamp(2rem, 7.5vw, 3.25rem);
+            margin-bottom: 0.9rem;
+          }
+          .hero-sub {
+            font-size: 0.9375rem;
+            margin-bottom: 1.4rem;
+          }
+          .hero-ctas-wrapper {
+            flex-direction: row;
+            gap: 0.75rem;
+          }
+          .hero-btn {
+            padding: 0.8rem 1.6rem;
+            font-size: 0.875rem;
+          }
+        }
+
+        /* ── Landscape phones ── */
+        @media (max-height: 500px) and (orientation: landscape) {
+          .hero-text-container {
+            justify-content: center;
+            padding-bottom: 1.5rem;
+          }
+          .hero-headline {
+            font-size: clamp(1.4rem, 5vw, 2rem);
+            margin-bottom: 0.5rem;
+          }
+          .hero-sub {
+            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
+          }
+          .hero-tags-wrapper { margin-bottom: 0.75rem; }
+          .hero-btn { padding: 0.6rem 1.5rem; font-size: 0.8125rem; }
         }
       `}</style>
 
