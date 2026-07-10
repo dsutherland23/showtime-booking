@@ -8,6 +8,7 @@ import { SmoothScroll } from '@/components/SmoothScroll';
 import { CustomCursor } from '@/components/CustomCursor';
 import { SplashScreen } from '@/components/SplashScreen';
 import { StickyCTA } from '@/components/StickyCTA';
+import { CookieConsent } from '@/components/CookieConsent';
 import Link from 'next/link';
 import React from 'react';
 
@@ -119,6 +120,8 @@ export default function RootLayout({
                     <Link href="/talent">Talent Directory</Link>
                     <Link href="/services">Our Services</Link>
                     <Link href="/events">Showcase Events</Link>
+                    <Link href="/privacy">Privacy Policy</Link>
+                    <Link href="/accessibility">Accessibility Statement</Link>
                   </div>
 
                   <div className="footer-links-col">
@@ -158,6 +161,7 @@ export default function RootLayout({
                 </div>
               </footer>
               <StickyCTA />
+              <CookieConsent />
             </div>
           </AuthProvider>
         </ThemeProvider>
