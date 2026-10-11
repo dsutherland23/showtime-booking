@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build --webpack && cp public/_headers out/_headers 2>/dev/null && cp public/_redirects out/_redirects 2>/dev/null || true",
+    "build": "next build --webpack && node scripts/export.js",
     "start": "next start",
     "lint": "eslint"
   },
