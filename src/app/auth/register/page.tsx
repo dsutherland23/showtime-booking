@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { db } from '@/utils/db';
 import GoogleSignInButton, { isGoogleSignInConfigured, signInWithVerifiedGoogle, VerifiedGoogleProfile } from '@/components/auth/GoogleSignInButton';
-import AppleSignInButton, { signInWithVerifiedApple, VerifiedAppleProfile } from '@/components/auth/AppleSignInButton';
 import { Eye, EyeOff, UserPlus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 function PasswordStrength({ password }: { password: string }) {
@@ -62,12 +61,6 @@ export default function RegisterPage() {
   const handleGoogleVerified = async (profile: VerifiedGoogleProfile) => {
     setError('');
     const user = await signInWithVerifiedGoogle(profile, role);
-    window.location.href = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
-  };
-
-  const handleAppleVerified = async (profile: VerifiedAppleProfile) => {
-    setError('');
-    const user = await signInWithVerifiedApple(profile, role);
     window.location.href = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
   };
 
@@ -228,15 +221,10 @@ export default function RegisterPage() {
         </div>
 
         {/* Social Authentication */}
-        <div className="auth-social-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        <div className="auth-social-group">
           <GoogleSignInButton
             text="signup_with"
             onVerified={handleGoogleVerified}
-            onError={(msg) => setError(msg)}
-          />
-          <AppleSignInButton
-            text="signup_with"
-            onVerified={handleAppleVerified}
             onError={(msg) => setError(msg)}
           />
         </div>

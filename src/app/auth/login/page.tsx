@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { db, SEED_USERS } from '@/utils/db';
 import GoogleSignInButton, { isGoogleSignInConfigured, signInWithVerifiedGoogle, VerifiedGoogleProfile } from '@/components/auth/GoogleSignInButton';
-import AppleSignInButton, { signInWithVerifiedApple, VerifiedAppleProfile } from '@/components/auth/AppleSignInButton';
 import { Eye, EyeOff, LogIn, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 
 function LoginForm() {
@@ -33,15 +32,6 @@ function LoginForm() {
     if (switchUser) await switchUser(user.id);
     const portal = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
     // Only honour same-site relative redirects.
-    const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : portal;
-    window.location.href = safeRedirect;
-  };
-
-  const handleAppleVerified = async (profile: VerifiedAppleProfile) => {
-    setError('');
-    const user = await signInWithVerifiedApple(profile, 'Client');
-    if (switchUser) await switchUser(user.id);
-    const portal = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
     const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : portal;
     window.location.href = safeRedirect;
   };
@@ -172,15 +162,10 @@ function LoginForm() {
         </div>
 
         {/* Social Authentication */}
-        <div className="auth-social-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        <div className="auth-social-group">
           <GoogleSignInButton
             text="signin_with"
             onVerified={handleGoogleVerified}
-            onError={(msg) => setError(msg)}
-          />
-          <AppleSignInButton
-            text="signin_with"
-            onVerified={handleAppleVerified}
             onError={(msg) => setError(msg)}
           />
         </div>
