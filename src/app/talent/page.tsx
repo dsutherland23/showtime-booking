@@ -317,17 +317,27 @@ const TalentDirectoryContent = () => {
             const pricing = getArtistPricing(artist.id, artist.category);
             return (
               <div key={artist.id} className="luxury-card artist-card animate-fade">
-                <div className="artist-image-container">
+                <Link 
+                  href={`/artist?id=${encodeURIComponent(artist.id)}`} 
+                  className="artist-image-container"
+                  style={{ display: 'block', cursor: 'pointer' }}
+                  aria-label={`View ${artist.stage_name} profile`}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={artist.profile_image} alt={artist.stage_name} className="artist-image" />
                   <div className="card-top-overlay">
                     <span className="badge-category">{artist.category}</span>
                     {pricing && <span className="badge-tier">{pricing.tier}</span>}
                   </div>
-                </div>
+                </Link>
                 
                 <div className="artist-body">
-                  <h3>{artist.stage_name}</h3>
+                  <Link 
+                    href={`/artist?id=${encodeURIComponent(artist.id)}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <h3 style={{ cursor: 'pointer' }} className="hover:text-amber-400 transition-colors">{artist.stage_name}</h3>
+                  </Link>
                   <span className="genre-subtitle">{artist.genre}</span>
                   <p className="bio-short">{artist.bio.substring(0, 140)}...</p>
                   
@@ -343,7 +353,7 @@ const TalentDirectoryContent = () => {
                   </div>
 
                   <div className="artist-actions">
-                    <Link href={`/talent/${artist.id}`} className="btn btn-secondary btn-full">
+                    <Link href={`/artist?id=${encodeURIComponent(artist.id)}`} className="btn btn-secondary btn-full">
                       View Profile & Riders
                     </Link>
                     <Link 

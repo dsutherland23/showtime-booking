@@ -973,13 +973,8 @@ body::after {
   animation: gold-shimmer 4s linear infinite;
 }
 
-/* ── 3. Custom Cursor ─────────────────────────────────────────── */
-/* Hide default cursor on non-touch devices when cursor components are present */
-@media (pointer: fine) {
-  html, body, a, button, [role="button"] {
-    cursor: none !important;
-  }
-}
+/* ── 3. Cursor ────────────────────────────────────────────────── */
+/* Custom ring cursor removed — native system cursor is used. */
 
 .cursor-dot {
   position: fixed;

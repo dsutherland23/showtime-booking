@@ -382,22 +382,29 @@ export default function ClientPortal() {
               <div className="chat-box-header">
                 <div className="agent-profile-avatar">S</div>
                 <div>
-                  <h4>Sarah Silverman</h4>
-                  <p>Assigned Booking Agent &bull; sarah.agent@showtime.com</p>
+                  <h4>Showtime Booking Support</h4>
+                  <p>Dedicated Agent Team &bull; booking@showtimeservices.com</p>
                 </div>
               </div>
 
               <div className="chat-messages-scroller">
-                {messages.map(m => (
-                  <div key={m.id} className={`msg-bubble-row ${m.sender_id === user.id ? 'sent' : 'received'}`}>
-                    <div className="msg-bubble">
-                      <p>{m.message}</p>
-                      <span className="msg-time">
-                        {new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </span>
-                    </div>
+                {messages.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
+                    <MessageSquare style={{ width: 32, height: 32, margin: '0 auto 0.75rem', opacity: 0.4 }} />
+                    <p style={{ margin: 0, fontSize: '0.875rem' }}>No messages yet. Send a message below to reach your booking agent.</p>
                   </div>
-                ))}
+                ) : (
+                  messages.map(m => (
+                    <div key={m.id} className={`msg-bubble-row ${m.sender_id === user.id ? 'sent' : 'received'}`}>
+                      <div className="msg-bubble">
+                        <p>{m.message}</p>
+                        <span className="msg-time">
+                          {new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
                 <div ref={chatBottomRef} />
               </div>
 
@@ -434,8 +441,8 @@ export default function ClientPortal() {
                 <p>This document certifies that the Artist agrees to perform on the specified target date at the designated venue for the guaranteed fee. Hospitality and technical requirements must be aligned with the attached riders. Deposit must be cleared to validate this agreement.</p>
                 <div className="preview-signatures-row">
                   <div>
-                    <span className="sign-line-label">Artist representative:</span>
-                    <span className="signature-font">Sarah Silverman</span>
+                    <span className="sign-line-label">Showtime Representative:</span>
+                    <span className="signature-font">Showtime Entertainment Group</span>
                   </div>
                   <div>
                     <span className="sign-line-label">Client representative:</span>
@@ -445,11 +452,11 @@ export default function ClientPortal() {
               </div>
 
               <div className="field-group sign-input-group">
-                <label htmlFor="signature_name">Type Full Name to Sign Legally *</label>
+                <label htmlFor="signature_name">Type Full Legal Name to Sign *</label>
                 <input
                   id="signature_name"
                   type="text"
-                  placeholder="e.g. Michael Eavis"
+                  placeholder="Type your full legal name"
                   value={signatureName}
                   onChange={e => setSignatureName(e.target.value)}
                   required
@@ -480,7 +487,7 @@ export default function ClientPortal() {
               <div className="payment-success-card animate-fade">
                 <CheckCircle2 className="success-icon-large" />
                 <h3>Payment Processed Successfully</h3>
-                <p>Simulated Stripe Transaction completed. Your booking status will be updated dynamically.</p>
+                <p>Your payment has been recorded. Your booking status will be updated accordingly.</p>
               </div>
             ) : (
               <form onSubmit={handlePayInvoice}>
@@ -491,11 +498,11 @@ export default function ClientPortal() {
 
                 <div className="form-group-grid checkout-fields-grid">
                   <div className="field-group full-width-field">
-                    <label htmlFor="card_number">Credit Card Number *</label>
+                    <label htmlFor="card_number">Card Number *</label>
                     <input
                       id="card_number"
                       type="text"
-                      placeholder="4111 2222 3333 4444"
+                      placeholder="•••• •••• •••• ••••"
                       value={ccNumber}
                       onChange={e => setCcNumber(e.target.value.replace(/\D/g, '').substring(0, 16))}
                       required

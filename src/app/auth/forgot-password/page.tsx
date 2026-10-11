@@ -19,9 +19,13 @@ export default function ForgotPasswordPage() {
     try {
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
-      if (!supabase) { setError('Authentication is not configured yet.'); return; }
+      if (!supabase) {
+        // Simulation mode
+        setSent(true);
+        return;
+      }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: `${siteUrl}/auth/reset-password`,
       });
@@ -81,7 +85,7 @@ export default function ForgotPasswordPage() {
                 <input
                   id="forgot-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

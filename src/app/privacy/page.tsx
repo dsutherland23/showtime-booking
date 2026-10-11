@@ -3,22 +3,33 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, FileText, Trash2, Mail, Info, Calendar } from 'lucide-react';
+import { db } from '@/utils/db';
 
 export default function PrivacyPage() {
   const [requestSent, setRequestSent] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleDeleteRequest = (e: React.FormEvent) => {
+  const handleDeleteRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput) return;
+    if (!emailInput.trim()) return;
     setSubmitting(true);
-    // Simulate API request to GDPR erasure endpoint
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await db.createLead({
+        contact_name: 'GDPR Erasure Request',
+        email: emailInput.trim(),
+        country: 'Global',
+        details: `Data erasure requested for email: ${emailInput.trim()}`,
+        budget: 0,
+        preferred_date: new Date().toISOString().split('T')[0],
+      });
       setRequestSent(true);
       setEmailInput('');
-    }, 1200);
+    } catch (err) {
+      console.error('Failed to submit erasure request:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -141,7 +152,7 @@ export default function PrivacyPage() {
                       type="email" 
                       id="erasure-email" 
                       required 
-                      placeholder="e.g. artist@showtime.com"
+                      placeholder="name@company.com"
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
                     />

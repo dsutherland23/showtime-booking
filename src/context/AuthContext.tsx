@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { isSupabaseReady } from '@/lib/supabase/client';
 import type { User, Session, SupabaseClient } from '@supabase/supabase-js';
-import { db } from '@/utils/db';
+import { db, SEED_USERS } from '@/utils/db';
 
 export interface UserProfile {
   id: string;
@@ -17,8 +17,10 @@ export interface UserProfile {
   created_at: string;
 }
 
+export type AuthUser = User | { id: string; email: string; first_name?: string; last_name?: string; role?: string };
+
 interface AuthContextType {
-  user: any | null;
+  user: AuthUser | null;
   profile: UserProfile | null;
   session: Session | null;
   loading: boolean;
@@ -83,7 +85,7 @@ const STAFF_ROLES = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
   'Promoter', 'Venue Manager'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,8 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseReady) return;
     setLoading(true);
     try {
-      const uList = await db.getUsers();
-      const targetUser = uList.find(u => u.id === userId);
+      const dbUsers = await db.getUsers();
+      const uList = dbUsers && dbUsers.length > 0 ? dbUsers : SEED_USERS;
+      const targetUser = uList.find(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase())
+        || SEED_USERS.find(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase())
+        || SEED_USERS[0];
+
       if (targetUser) {
         setUser({
           id: targetUser.id,
@@ -115,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: targetUser.status as 'Active' | 'Inactive' | 'Suspended',
           created_at: targetUser.created_at
         });
-        localStorage.setItem('st_active_user_id', userId);
+        localStorage.setItem('st_active_user_id', targetUser.id);
       }
     } catch (err) {
       console.error('Failed to switch mock user:', err);
@@ -130,7 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Local Simulation Mode
       const initMockAuth = async () => {
         try {
-          const uList = await db.getUsers();
+          const dbUsers = await db.getUsers();
+          const uList = dbUsers && dbUsers.length > 0 ? dbUsers : SEED_USERS;
           const mappedProfiles: UserProfile[] = uList.map(u => ({
             id: u.id,
             first_name: u.first_name,
@@ -143,31 +150,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
           setUsersList(mappedProfiles);
 
-          // Get last active user or default to Booking Agent (usr-agent-1)
+          // Restore session from cache if valid user exists
           const cachedUserId = localStorage.getItem('st_active_user_id');
-          const defaultUser = uList.find(u => u.id === cachedUserId) || uList.find(u => u.role === 'Booking Agent') || uList[0];
-          
-          if (defaultUser) {
+          let activeUser = cachedUserId ? uList.find(u => u.id === cachedUserId || u.email.toLowerCase() === cachedUserId.toLowerCase()) : null;
+          if (!activeUser && (cachedUserId === 'admin' || cachedUserId === 'usr-admin-1')) {
+            activeUser = uList.find(u => u.role === 'Super Admin' || u.role === 'Admin') || SEED_USERS[0];
+          }
+
+          if (activeUser) {
             setUser({
-              id: defaultUser.id,
-              email: defaultUser.email,
-              first_name: defaultUser.first_name,
-              last_name: defaultUser.last_name,
-              role: defaultUser.role
+              id: activeUser.id,
+              email: activeUser.email,
+              first_name: activeUser.first_name,
+              last_name: activeUser.last_name,
+              role: activeUser.role
             });
             setProfile({
-              id: defaultUser.id,
-              first_name: defaultUser.first_name,
-              last_name: defaultUser.last_name,
-              email: defaultUser.email,
-              phone: defaultUser.phone,
-              role: defaultUser.role,
-              status: defaultUser.status as 'Active' | 'Inactive' | 'Suspended',
-              created_at: defaultUser.created_at
+              id: activeUser.id,
+              first_name: activeUser.first_name,
+              last_name: activeUser.last_name,
+              email: activeUser.email,
+              phone: activeUser.phone,
+              role: activeUser.role,
+              status: activeUser.status as 'Active' | 'Inactive' | 'Suspended',
+              created_at: activeUser.created_at
             });
+          } else {
+            setUser(null);
+            setProfile(null);
           }
         } catch (err) {
-          console.error('Failed to load mock auth users:', err);
+          console.error('Failed to initialize local auth:', err);
         } finally {
           setLoading(false);
         }

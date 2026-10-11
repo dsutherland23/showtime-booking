@@ -223,7 +223,7 @@ export default function AIAssistant() {
                             <strong>{a.stage_name}</strong>
                             <span>{a.genre}</span>
                           </div>
-                          <Link href={`/talent/${a.id}`} className="btn btn-secondary btn-tiny">
+                          <Link href={`/artist?id=${encodeURIComponent(a.id)}`} className="btn btn-secondary btn-tiny">
                             View Roster
                           </Link>
                           <Link href={`/book?artistId=${a.id}`} className="btn btn-primary btn-tiny">

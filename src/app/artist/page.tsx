@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { db, Artist } from '@/utils/db';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
@@ -9,10 +9,21 @@ import {
   Music, Award, Calendar, MapPin, CheckCircle, FileText, Play, Pause, ChevronLeft, Volume2, Camera, Video, Edit2, Trash2, X, Upload
 } from 'lucide-react';
 
-export default function ArtistProfile() {
-  const params = useParams();
+// The site is deployed as a static export on Cloudflare Pages, so dynamic
+// segments like /talent/[id] are never generated. The profile lives at a
+// static route and reads the artist id from the query string: /artist?id=...
+export default function ArtistProfilePage() {
+  return (
+    <Suspense fallback={null}>
+      <ArtistProfile />
+    </Suspense>
+  );
+}
+
+function ArtistProfile() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const id = params?.id as string;
+  const id = searchParams.get('id') || '';
   const { hasPermission } = useAuth();
 
   const [artist, setArtist] = useState<Artist | null>(null);
@@ -24,9 +35,10 @@ export default function ArtistProfile() {
   const [mediaProgress, setMediaProgress] = useState(35);
 
   // Calendar dates generation helper (Current month)
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed 5)
-  const monthName = "June 2026";
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-indexed
+  const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   // Dialog Refs
   const editDialogRef = useRef<HTMLDialogElement | null>(null);
@@ -49,7 +61,7 @@ export default function ArtistProfile() {
   const canManage = hasPermission('manage_artists') || hasPermission('update_profile');
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) { setLoading(false); return; }
     
     const loadArtistData = async () => {
       try {
@@ -219,8 +231,8 @@ export default function ArtistProfile() {
   }
 
   // Calendar rendering math
-  const daysInMonth = 30; // June has 30 days
-  const startingDayOfWeek = 1; // June 1, 2026 is a Monday (1)
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const startingDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
   
   const calendarCells = [];
   // Empty slots for padding
@@ -233,7 +245,7 @@ export default function ArtistProfile() {
   }
 
   const isDateBlocked = (day: number) => {
-    const formattedDate = `2026-06-${day.toString().padStart(2, '0')}`;
+    const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     return blockedDates.includes(formattedDate);
   };
 

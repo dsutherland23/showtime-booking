@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { db } from '@/utils/db';
+import GoogleSignInButton, { isGoogleSignInConfigured, signInWithVerifiedGoogle, VerifiedGoogleProfile } from '@/components/auth/GoogleSignInButton';
+import AppleSignInButton, { signInWithVerifiedApple, VerifiedAppleProfile } from '@/components/auth/AppleSignInButton';
 import { Eye, EyeOff, UserPlus, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 function PasswordStrength({ password }: { password: string }) {
@@ -53,6 +56,20 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  // Called only after /api/auth/google has verified the Google ID token.
+  // If the Google email already has an account, the user is signed into it;
+  // otherwise a new account is created with the role chosen on this form.
+  const handleGoogleVerified = async (profile: VerifiedGoogleProfile) => {
+    setError('');
+    const user = await signInWithVerifiedGoogle(profile, role);
+    window.location.href = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
+  };
+
+  const handleAppleVerified = async (profile: VerifiedAppleProfile) => {
+    setError('');
+    const user = await signInWithVerifiedApple(profile, role);
+    window.location.href = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
+  };
 
   const validate = (): string => {
     if (!firstName.trim()) return 'First name is required.';
@@ -75,9 +92,21 @@ export default function RegisterPage() {
 
     try {
       const supabase = createClient();
-      if (!supabase) { setError('Authentication is not configured yet.'); return; }
+      if (!supabase) {
+        // Cloudflare / Local Simulation registration
+        const newUser = await db.createUser({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          role,
+          status: 'Active',
+        });
+        localStorage.setItem('st_active_user_id', newUser.id);
+        setSuccess(true);
+        return;
+      }
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -123,10 +152,12 @@ export default function RegisterPage() {
     return (
       <div className="auth-page">
         <div className="auth-card">
-          <Link href="/" className="auth-logo-link">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
-          </Link>
+          <div className="auth-logo-center-wrap">
+            <Link href="/" className="auth-logo-link" title="Showtime Global Services">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
+            </Link>
+          </div>
           <div className="success-state">
             <div className="success-icon-wrap">
               <CheckCircle2 className="success-icon" />
@@ -144,7 +175,7 @@ export default function RegisterPage() {
                   const { createClient } = await import('@/lib/supabase/client');
                   const sb = createClient();
                   if (!sb) return;
-                  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+                  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
                   await sb.auth.resend({
                     type: 'signup',
                     email,
@@ -164,8 +195,9 @@ export default function RegisterPage() {
         <style jsx>{`
           .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; background: var(--bg-primary); background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.08), transparent); }
           .auth-card { width: 100%; max-width: 420px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 2.5rem 2rem; box-shadow: var(--shadow-xl); }
-          .auth-logo-link { display: flex; justify-content: center; margin-bottom: 2rem; opacity: 1; }
-          .auth-logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
+          .auth-logo-center-wrap { display: flex; justify-content: center; align-items: center; width: 100%; margin: 0 auto 1.75rem auto; text-align: center; }
+          .auth-logo-link { display: inline-flex; justify-content: center; align-items: center; margin: 0 auto; text-decoration: none; }
+          .auth-logo { height: 38px; width: auto; max-width: 240px; object-fit: contain; margin: 0 auto; display: block; filter: brightness(0) invert(1); }
           .success-state { text-align: center; }
           .success-icon-wrap { width: 56px; height: 56px; border-radius: 50%; background: rgba(48, 209, 88, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
           .success-icon { width: 28px; height: 28px; color: #30d158; }
@@ -182,14 +214,35 @@ export default function RegisterPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <Link href="/" className="auth-logo-link">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
-        </Link>
+        {/* Centered Showtime Logo */}
+        <div className="auth-logo-center-wrap">
+          <Link href="/" className="auth-logo-link" title="Showtime Global Services">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
+          </Link>
+        </div>
 
         <div className="auth-header">
           <h1 className="auth-title">Create your account</h1>
           <p className="auth-subtitle">Join the Showtime platform today</p>
+        </div>
+
+        {/* Social Authentication */}
+        <div className="auth-social-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+          <GoogleSignInButton
+            text="signup_with"
+            onVerified={handleGoogleVerified}
+            onError={(msg) => setError(msg)}
+          />
+          <AppleSignInButton
+            text="signup_with"
+            onVerified={handleAppleVerified}
+            onError={(msg) => setError(msg)}
+          />
+        </div>
+
+        <div className="auth-divider">
+          <span>or register with email</span>
         </div>
 
         {error && (
@@ -213,7 +266,7 @@ export default function RegisterPage() {
 
           <div className="field-group">
             <label htmlFor="reg-email">Email address</label>
-            <input id="reg-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" disabled={loading} />
+            <input id="reg-email" type="email" placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" disabled={loading} />
           </div>
 
           <div className="field-group">
@@ -259,9 +312,18 @@ export default function RegisterPage() {
       <style jsx>{`
         .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem 1rem; background: var(--bg-primary); background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.08), transparent); }
         .auth-card { width: 100%; max-width: 460px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 2.5rem 2rem; box-shadow: var(--shadow-xl); }
-        .auth-logo-link { display: flex; justify-content: center; margin-bottom: 2rem; opacity: 1; }
-        .auth-logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
-        .auth-header { text-align: center; margin-bottom: 1.75rem; }
+        .auth-logo-center-wrap { display: flex; justify-content: center; align-items: center; width: 100%; margin: 0 auto 1.75rem auto; text-align: center; }
+        .auth-logo-link { display: inline-flex; justify-content: center; align-items: center; margin: 0 auto; text-decoration: none; }
+        .auth-logo { height: 38px; width: auto; max-width: 240px; object-fit: contain; margin: 0 auto; display: block; filter: brightness(0) invert(1); transition: transform 0.2s ease; }
+        .auth-logo:hover { transform: scale(1.03); }
+        .auth-social-group { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.25rem; }
+        .auth-social-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: var(--radius-md, 8px); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); color: var(--text-primary); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+        .auth-social-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: rgba(212, 175, 55, 0.4); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
+        .auth-social-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .auth-divider { display: flex; align-items: center; text-align: center; margin: 0.5rem 0 1.25rem; }
+        .auth-divider::before, .auth-divider::after { content: ''; flex: 1; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        .auth-divider span { padding: 0 0.85rem; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        .auth-header { text-align: center; margin-bottom: 1.5rem; }
         .auth-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text-primary); margin-bottom: 0.35rem; }
         .auth-subtitle { font-size: 0.875rem; color: var(--text-secondary); max-width: none; margin: 0; }
         .auth-alert { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.875rem; line-height: 1.45; margin-bottom: 1.25rem; }

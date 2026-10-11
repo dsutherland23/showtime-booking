@@ -95,6 +95,8 @@ function MarqueeSection() {
 /* ── Premium Artist Card with Hover Reveal + 3D Tilt ── */
 function ArtistCardPremium({ artist }: { artist: Artist }) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const profileHref = `/artist?id=${encodeURIComponent(artist.id)}`;
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const card = cardRef.current;
@@ -129,6 +131,12 @@ function ArtistCardPremium({ artist }: { artist: Artist }) {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnter}
+      onClick={() => router.push(profileHref)}
+      onKeyDown={(e) => { if (e.key === 'Enter') router.push(profileHref); }}
+      role="link"
+      tabIndex={0}
+      aria-label={`View ${artist.stage_name} profile`}
+      style={{ cursor: 'pointer' }}
     >
       <div className="artist-card-img-wrap">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -143,7 +151,7 @@ function ArtistCardPremium({ artist }: { artist: Artist }) {
           <div className="artist-card-genre-pill">{artist.genre}</div>
           <h3 className="artist-card-name">{artist.stage_name}</h3>
           <p className="artist-card-bio">{artist.bio.substring(0, 90)}&hellip;</p>
-          <Link href={`/talent/${artist.id}`} className="artist-card-cta" data-cursor="View">
+          <Link href={`/artist?id=${encodeURIComponent(artist.id)}`} className="artist-card-cta" data-cursor="View">
             View Profile <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>

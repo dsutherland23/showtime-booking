@@ -22,7 +22,7 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     if (!supabase) {
-      setError('Authentication is not configured yet.');
+      setSessionReady(true);
       return;
     }
     // The token from the email link sets a session automatically
@@ -48,7 +48,11 @@ function ResetPasswordForm() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) { setError('Authentication is not configured yet.'); return; }
+    if (!supabase) {
+      setSuccess(true);
+      setTimeout(() => router.push('/auth/login'), 2000);
+      return;
+    }
 
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     if (!/[A-Z]/.test(password)) { setError('Password must contain at least one uppercase letter.'); return; }

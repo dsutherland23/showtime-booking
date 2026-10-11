@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack && cp public/_headers out/_headers 2>/dev/null && cp public/_redirects out/_redirects 2>/dev/null || true",
     "start": "next start",
     "lint": "eslint"
   },
@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.110.1",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "firebase": "^13.0.0",
     "framer-motion": "^12.40.0",
     "gsap": "^3.15.0",
     "lenis": "^1.3.23",

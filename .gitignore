@@ -44,3 +44,6 @@ next-env.d.ts
 /src/app/tailwind-compiled.css
 /src/app/output-test.css
 
+# cloudflare wrangler
+.wrangler/
+

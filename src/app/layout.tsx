@@ -5,7 +5,6 @@ import { NavHeader } from '@/components/NavHeader';
 import { ScrollRevealInit } from '@/components/ScrollRevealInit';
 import { ThemeProvider } from 'next-themes';
 import { SmoothScroll } from '@/components/SmoothScroll';
-import { CustomCursor } from '@/components/CustomCursor';
 import { SplashScreen } from '@/components/SplashScreen';
 import { StickyCTA } from '@/components/StickyCTA';
 import { CookieConsent } from '@/components/CookieConsent';
@@ -93,7 +92,6 @@ export default function RootLayout({
             <div className="app-layout">
               <ScrollRevealInit />
               <SplashScreen />
-              <CustomCursor />
               <NavHeader />
 
               <SmoothScroll>

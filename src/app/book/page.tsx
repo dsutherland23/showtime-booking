@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { db, Artist } from '@/utils/db';
+import { db, Artist, BookingArtistItem } from '@/utils/db';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, MapPin, DollarSign, User, Mail, Sparkles, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, User, Mail, Sparkles, CheckCircle2, ChevronRight, ChevronLeft, Plus, X, Search, Music, Check, Users } from 'lucide-react';
+
+export interface SelectedLineupArtist {
+  artist: Artist;
+  role: 'Headliner' | 'Supporting Act' | 'Special Guest' | 'DJ / Sound System' | 'Host';
+}
 
 const BookTalentContent = () => {
   const searchParams = useSearchParams();
@@ -12,7 +17,10 @@ const BookTalentContent = () => {
   const { user, profile, isClient } = useAuth();
 
   const [artists, setArtists] = useState<Artist[]>([]);
-  const [selectedArtistId, setSelectedArtistId] = useState('');
+  const [selectedArtists, setSelectedArtists] = useState<SelectedLineupArtist[]>([]);
+  const [artistSearch, setArtistSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [stepError, setStepError] = useState('');
   
   // Step navigation
   const [step, setStep] = useState(1);
@@ -43,7 +51,7 @@ const BookTalentContent = () => {
     details: ''
   });
 
-  // Sync parameters
+  // Sync parameters & load artists
   useEffect(() => {
     const loadArtists = async () => {
       const all = await db.getArtists();
@@ -51,9 +59,12 @@ const BookTalentContent = () => {
 
       const queryArtistId = searchParams.get('artistId');
       if (queryArtistId) {
-        setSelectedArtistId(queryArtistId);
+        const found = all.find(a => a.id === queryArtistId);
+        if (found) {
+          setSelectedArtists([{ artist: found, role: 'Headliner' }]);
+        }
       } else if (all.length > 0) {
-        setSelectedArtistId(all[0].id);
+        setSelectedArtists([{ artist: all[0], role: 'Headliner' }]);
       }
     };
     loadArtists();
@@ -76,28 +87,74 @@ const BookTalentContent = () => {
     setForm(f => ({ ...f, [name]: value }));
   };
 
+  const toggleArtist = (art: Artist) => {
+    setStepError('');
+    setSelectedArtists(prev => {
+      const exists = prev.find(item => item.artist.id === art.id);
+      if (exists) {
+        return prev.filter(item => item.artist.id !== art.id);
+      } else {
+        const defaultRole = prev.length === 0 ? 'Headliner' : 'Supporting Act';
+        return [...prev, { artist: art, role: defaultRole }];
+      }
+    });
+  };
+
+  const updateArtistRole = (artId: string, role: SelectedLineupArtist['role']) => {
+    setSelectedArtists(prev => prev.map(item => item.artist.id === artId ? { ...item, role } : item));
+  };
+
+  const removeArtist = (artId: string) => {
+    setSelectedArtists(prev => prev.filter(item => item.artist.id !== artId));
+  };
+
   const handleNext = () => {
+    if (step === 3 && selectedArtists.length === 0) {
+      setStepError('Please select at least one artist for your lineup before proceeding.');
+      return;
+    }
+    setStepError('');
     setStep(s => Math.min(4, s + 1));
   };
 
   const handlePrev = () => {
+    setStepError('');
     setStep(s => Math.max(1, s - 1));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedArtists.length === 0) {
+      setStepError('Please select at least one artist for your lineup.');
+      setStep(3);
+      return;
+    }
+
     setLoading(true);
     try {
+      const artistItems: BookingArtistItem[] = selectedArtists.map(item => ({
+        artist_id: item.artist.id,
+        artist_name: item.artist.stage_name,
+        artist_image: item.artist.profile_image,
+        category: item.artist.category,
+        genre: item.artist.genre,
+        role: item.role
+      }));
+
+      const lineupDisplay = selectedArtists.map(item => `${item.artist.stage_name} (${item.role})`).join(', ');
+
       await db.createLead({
         company_name: form.company_name || undefined,
         contact_name: form.contact_name,
         email: form.email,
         phone: form.phone || undefined,
         country: form.country,
-        details: `Event: ${form.event_title} (${form.event_type}) at ${form.venue_name}, ${form.city}. Attendance: ${form.attendance}. Notes: ${form.details}`,
+        details: `Event: ${form.event_title} (${form.event_type}) at ${form.venue_name}, ${form.city}. Lineup: [${lineupDisplay}]. Attendance: ${form.attendance}. Notes: ${form.details}`,
         budget: parseFloat(form.budget) || 50000,
         preferred_date: form.event_date || new Date().toISOString().split('T')[0],
-        artist_id: selectedArtistId || undefined
+        artist_id: selectedArtists[0]?.artist.id || undefined,
+        artist_name: selectedArtists.map(a => a.artist.stage_name).join(', '),
+        artists: artistItems
       });
 
       setIsSubmitted(true);
@@ -123,6 +180,21 @@ const BookTalentContent = () => {
     }
   };
 
+  const filteredCatalogArtists = useMemo(() => {
+    return artists.filter(a => {
+      const matchCat = categoryFilter === 'All' || a.category === categoryFilter;
+      const matchSearch = a.stage_name.toLowerCase().includes(artistSearch.toLowerCase()) ||
+        a.genre.toLowerCase().includes(artistSearch.toLowerCase()) ||
+        (a.category || '').toLowerCase().includes(artistSearch.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [artists, categoryFilter, artistSearch]);
+
+  const uniqueCategories = useMemo(() => {
+    const set = new Set(artists.map(a => a.category).filter(Boolean));
+    return ['All', ...Array.from(set)];
+  }, [artists]);
+
   return (
     <div className="book-talent-container container">
       {/* Visual Success Overlay */}
@@ -130,13 +202,32 @@ const BookTalentContent = () => {
         <div className="success-overlay glassmorphism animate-fade">
           <CheckCircle2 className="success-icon" />
           <h2>Booking Inquiry Submitted</h2>
-          <p className="success-tagline">Your inquiry has been received. Our booking team will contact you within 24 hours.</p>
+          <p className="success-tagline">Your multi-talent booking request has been received. Our executive booking agents will review your lineup offer and contact you within 24 hours.</p>
           <div className="success-summary">
-            <p><strong>Artist Selected:</strong> {artists.find(a => a.id === selectedArtistId)?.stage_name}</p>
-            <p><strong>Target Date:</strong> {form.event_date}</p>
-            <p><strong>Budget Offer:</strong> ${parseFloat(form.budget).toLocaleString()} USD</p>
+            <div>
+              <strong>Event:</strong> {form.event_title || 'Showcase'} ({form.event_type})
+            </div>
+            <div>
+              <strong>Target Date:</strong> {form.event_date}
+            </div>
+            <div>
+              <strong>Location:</strong> {form.venue_name ? `${form.venue_name}, ` : ''}{form.city}, {form.country}
+            </div>
+            <div>
+              <strong>Total Budget Offer:</strong> ${parseFloat(form.budget).toLocaleString()} USD
+            </div>
+            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <strong>Lineup ({selectedArtists.length} Acts):</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+                {selectedArtists.map(item => (
+                  <span key={item.artist.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderRadius: 6, background: 'rgba(212,175,55,0.15)', color: 'var(--gold-primary)', fontSize: '0.8rem' }}>
+                    {item.artist.stage_name} <span style={{ opacity: 0.7, fontSize: '0.7rem' }}>• {item.role}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-          <p className="redirect-note">Redirecting you to the Client Hub where you can view proposal status, sign agreements, and chat with your agent...</p>
+          <p className="redirect-note">Redirecting you to the Client Hub where you can track live proposals, sign contracts, and access artist riders...</p>
           <div className="loading-spinner"></div>
         </div>
       ) : (
@@ -185,7 +276,7 @@ const BookTalentContent = () => {
                       id="event_title"
                       type="text"
                       name="event_title"
-                      placeholder="e.g. Glastonbury festival 2026"
+                      placeholder="e.g. Annual Music Festival or Gala"
                       value={form.event_title}
                       onChange={handleChange}
                       required
@@ -239,7 +330,7 @@ const BookTalentContent = () => {
                       id="venue_name"
                       type="text"
                       name="venue_name"
-                      placeholder="e.g. Empire Polo Field / Pyramid Stage"
+                      placeholder="e.g. Main Auditorium / Concert Hall"
                       value={form.venue_name}
                       onChange={handleChange}
                       required
@@ -276,28 +367,170 @@ const BookTalentContent = () => {
             {/* STEP 3: TALENT SELECTOR */}
             {step === 3 && (
               <div className="step-slide-content animate-fade">
-                <h3>Select Roster Talent & Budget Offer</h3>
-                <div className="form-group-grid">
-                  <div className="field-group">
-                    <label htmlFor="artist_select">Select Preferred Artist *</label>
-                    <div className="input-with-icon-wrapper">
-                      <User className="inner-field-icon" />
-                      <select 
-                        id="artist_select"
-                        value={selectedArtistId} 
-                        onChange={(e) => setSelectedArtistId(e.target.value)}
-                        required
-                      >
-                        <option value="">-- Select Available Artist --</option>
-                        {artists.map(a => (
-                          <option key={a.id} value={a.id}>{a.stage_name} ({a.genre})</option>
-                        ))}
-                      </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Assemble Event Lineup & Budget Offer</h3>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      Select one or multiple headline and supporting acts for your showcase.
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '0.8rem', padding: '4px 10px', borderRadius: 20, background: selectedArtists.length > 0 ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.06)', color: selectedArtists.length > 0 ? 'var(--gold-primary)' : 'var(--text-muted)', border: '1px solid rgba(212,175,55,0.25)', fontWeight: 600 }}>
+                    {selectedArtists.length} {selectedArtists.length === 1 ? 'Artist Selected' : 'Artists in Lineup'}
+                  </span>
+                </div>
+
+                {stepError && (
+                  <div style={{ padding: '0.65rem 1rem', borderRadius: 8, background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>⚠</span> {stepError}
+                  </div>
+                )}
+
+                {/* CURRENT LINEUP TRAY */}
+                <div className="lineup-tray-container">
+                  <div className="lineup-tray-header">
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+                      Selected Event Lineup
+                    </span>
+                    {selectedArtists.length > 0 && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)' }}>
+                        Assign role for each act (Headliner, Supporting, DJ)
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedArtists.length === 0 ? (
+                    <div className="lineup-empty-state">
+                      <Users size={22} style={{ opacity: 0.4, color: 'var(--gold-primary)' }} />
+                      <div>
+                        <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No artists in your lineup yet</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Choose artists from the catalog below to add them to your booking inquiry</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="lineup-chips-list">
+                      {selectedArtists.map(item => (
+                        <div key={item.artist.id} className="lineup-artist-row">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 160 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.artist.profile_image || '/images/artist_reggae.jpg'}
+                              alt={item.artist.stage_name}
+                              className="lineup-artist-avatar"
+                            />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                {item.artist.stage_name}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {item.artist.genre || item.artist.category}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div className="role-select-wrapper">
+                              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Role:</label>
+                              <select
+                                value={item.role}
+                                onChange={(e) => updateArtistRole(item.artist.id, e.target.value as SelectedLineupArtist['role'])}
+                                className="lineup-role-select"
+                              >
+                                <option value="Headliner">Headliner</option>
+                                <option value="Supporting Act">Supporting Act</option>
+                                <option value="Special Guest">Special Guest</option>
+                                <option value="DJ / Sound System">DJ / Sound System</option>
+                                <option value="Host">Host / MC</option>
+                              </select>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => removeArtist(item.artist.id)}
+                              className="lineup-remove-btn"
+                              title="Remove artist"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ROSTER CATALOG SELECTOR */}
+                <div className="catalog-browser-block">
+                  <div className="catalog-controls-row">
+                    <div className="catalog-search-wrapper">
+                      <Search size={14} className="catalog-search-icon" />
+                      <input
+                        type="text"
+                        placeholder="Search roster by artist name, genre..."
+                        value={artistSearch}
+                        onChange={(e) => setArtistSearch(e.target.value)}
+                        className="catalog-search-input"
+                      />
+                      {artistSearch && (
+                        <button type="button" onClick={() => setArtistSearch('')} className="catalog-search-clear">
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="category-pills-row">
+                      {uniqueCategories.map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setCategoryFilter(cat)}
+                          className={`cat-pill-btn ${categoryFilter === cat ? 'active' : ''}`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  
+
+                  <div className="catalog-grid-cards">
+                    {filteredCatalogArtists.map(a => {
+                      const isSelected = selectedArtists.some(item => item.artist.id === a.id);
+                      return (
+                        <div
+                          key={a.id}
+                          className={`roster-pick-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleArtist(a)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={a.profile_image || '/images/artist_reggae.jpg'}
+                            alt={a.stage_name}
+                            className="roster-card-img"
+                          />
+                          <div className="roster-card-info">
+                            <div className="roster-card-name">{a.stage_name}</div>
+                            <div className="roster-card-genre">{a.genre || a.category}</div>
+                          </div>
+                          <div className={`roster-card-status ${isSelected ? 'in-lineup' : ''}`}>
+                            {isSelected ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Check size={12} /> In Lineup
+                              </span>
+                            ) : (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Plus size={12} /> Add
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* BUDGET OFFER */}
+                <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(212, 175, 55, 0.15)' }}>
                   <div className="field-group">
-                    <label htmlFor="budget">Booking Budget Offer (USD) *</label>
+                    <label htmlFor="budget">Total Booking Budget Offer (USD) *</label>
                     <div className="input-with-icon-wrapper">
                       <DollarSign className="inner-field-icon" />
                       <input
@@ -312,7 +545,9 @@ const BookTalentContent = () => {
                         required
                       />
                     </div>
-                    <span className="field-helper-tip">Budget should cover artist guarantee (excluding production, rider expenses, and work permits).</span>
+                    <span className="field-helper-tip">
+                      Budget offer should reflect total artist guarantees for your entire selected lineup (excluding production, backline riders, and hospitality).
+                    </span>
                   </div>
                 </div>
               </div>
@@ -329,7 +564,7 @@ const BookTalentContent = () => {
                       id="company_name"
                       type="text"
                       name="company_name"
-                      placeholder="e.g. Glastonbury Festivals Ltd"
+                      placeholder="e.g. Acme Entertainment Group"
                       value={form.company_name}
                       onChange={handleChange}
                     />
@@ -367,7 +602,7 @@ const BookTalentContent = () => {
                       id="phone"
                       type="tel"
                       name="phone"
-                      placeholder="+1-876-555-1234"
+                      placeholder="+1 (876) 227-1666"
                       value={form.phone}
                       onChange={handleChange}
                       required
@@ -657,6 +892,251 @@ const BookTalentContent = () => {
 
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+
+        /* Multi-Artist Lineup Styles */
+        .lineup-tray-container {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(212, 175, 55, 0.2);
+          border-radius: var(--radius-md);
+          padding: 1rem;
+          margin-bottom: 1.25rem;
+        }
+
+        .lineup-tray-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.75rem;
+        }
+
+        .lineup-empty-state {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 1rem;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px dashed rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+        }
+
+        .lineup-chips-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .lineup-artist-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 0.5rem 0.75rem;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .lineup-artist-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1.5px solid var(--gold-primary);
+        }
+
+        .role-select-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .lineup-role-select {
+          padding: 4px 8px;
+          font-size: 0.78rem;
+          background: var(--bg-tertiary);
+          color: var(--gold-primary);
+          border: 1px solid rgba(212, 175, 55, 0.35);
+          border-radius: 6px;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .lineup-remove-btn {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.25);
+          color: #fca5a5;
+          cursor: pointer;
+          padding: 5px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+
+        .lineup-remove-btn:hover {
+          background: rgba(239, 68, 68, 0.25);
+          color: #fff;
+        }
+
+        .catalog-browser-block {
+          margin-top: 1.25rem;
+        }
+
+        .catalog-controls-row {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+          margin-bottom: 0.9rem;
+        }
+
+        .catalog-search-wrapper {
+          position: relative;
+          flex-grow: 1;
+          min-width: 220px;
+        }
+
+        .catalog-search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-muted);
+          pointer-events: none;
+        }
+
+        .catalog-search-input {
+          width: 100%;
+          padding: 6px 26px 6px 30px;
+          font-size: 0.82rem;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-color);
+          border-radius: 6px;
+          color: var(--text-primary);
+          outline: none;
+        }
+
+        .catalog-search-input:focus {
+          border-color: var(--gold-primary);
+        }
+
+        .catalog-search-clear {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+        }
+
+        .category-pills-row {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .cat-pill-btn {
+          padding: 4px 10px;
+          font-size: 0.74rem;
+          border-radius: 14px;
+          border: 1px solid var(--border-color);
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .cat-pill-btn:hover {
+          border-color: rgba(212, 175, 55, 0.4);
+          color: var(--text-primary);
+        }
+
+        .cat-pill-btn.active {
+          background: rgba(212, 175, 55, 0.18);
+          border-color: var(--gold-primary);
+          color: var(--gold-primary);
+          font-weight: 600;
+        }
+
+        .catalog-grid-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+          gap: 10px;
+          max-height: 290px;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+
+        .roster-pick-card {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .roster-pick-card:hover {
+          border-color: rgba(212, 175, 55, 0.4);
+          background: rgba(212, 175, 55, 0.05);
+        }
+
+        .roster-pick-card.selected {
+          border-color: var(--gold-primary);
+          background: rgba(212, 175, 55, 0.12);
+        }
+
+        .roster-card-img {
+          width: 38px;
+          height: 38px;
+          border-radius: 6px;
+          object-fit: cover;
+          flex-shrink: 0;
+        }
+
+        .roster-card-info {
+          flex-grow: 1;
+          min-width: 0;
+        }
+
+        .roster-card-name {
+          font-size: 0.84rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .roster-card-genre {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .roster-card-status {
+          font-size: 0.72rem;
+          padding: 3px 8px;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--text-muted);
+          flex-shrink: 0;
+        }
+
+        .roster-card-status.in-lineup {
+          background: var(--gold-primary);
+          color: #000;
+          font-weight: 600;
         }
       `}</style>
     </div>

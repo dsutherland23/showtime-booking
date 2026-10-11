@@ -7,6 +7,7 @@ export interface User {
   last_name: string;
   email: string;
   phone?: string;
+  avatar_url?: string;
   status: 'Active' | 'Inactive' | 'Suspended';
   role: string;
   created_at: string;
@@ -31,6 +32,16 @@ export interface Artist {
   is_featured?: boolean;
 }
 
+export interface BookingArtistItem {
+  artist_id: string;
+  artist_name: string;
+  artist_image?: string;
+  category?: string;
+  genre?: string;
+  role?: 'Headliner' | 'Supporting Act' | 'Special Guest' | 'DJ / Sound System' | 'Host';
+  fee?: number;
+}
+
 export interface Lead {
   id: string;
   client_id?: string;
@@ -47,6 +58,7 @@ export interface Lead {
   preferred_date: string;
   artist_id?: string;
   artist_name?: string;
+  artists?: BookingArtistItem[];
   created_at: string;
 }
 
@@ -55,13 +67,20 @@ export interface Booking {
   artist_id: string;
   artist_name: string;
   artist_image: string;
+  artists?: BookingArtistItem[];
   client_id: string;
   client_name: string;
+  client_email?: string;
+  client_phone?: string;
   event_id: string;
   event_title: string;
+  event_type?: string;
   event_date: string;
   event_venue: string;
   event_country: string;
+  attendance?: string;
+  special_requests?: string;
+  technical_rider_notes?: string;
   status: 'Inquiry' | 'Proposal Generated' | 'Contract Sent' | 'Deposit Paid' | 'Confirmed' | 'Completed' | 'Cancelled';
   deposit_amount: number;
   total_amount: number;
@@ -132,6 +151,11 @@ export interface Venue {
   location: string;
   description?: string;
   parking?: string;
+  venue_type?: string;
+  stage_specs?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
 }
 
 export interface Customer {
@@ -141,6 +165,10 @@ export interface Customer {
   email: string;
   tier: string;
   notes: string;
+  phone?: string;
+  country?: string;
+  status?: string;
+  total_spent?: number;
 }
 
 export interface TicketTier {
@@ -180,6 +208,29 @@ export interface AdPlacement {
   image_url?: string;
 }
 
+export interface ShowEvent {
+  id: string;
+  title: string;
+  tagline?: string;
+  category: 'Festival' | 'Concert' | 'Arena Tour' | 'Club Showcase' | 'Gala';
+  venue: string;
+  city: string;
+  country: string;
+  date: string;
+  time?: string;
+  attendance?: string;
+  poster_image: string;
+  header_image?: string;
+  description: string;
+  artist_ids?: string[];
+  lineup?: string;
+  ticket_link?: string;
+  ticket_price_starting?: number;
+  status: 'Published' | 'Upcoming' | 'Draft' | 'Past';
+  is_featured?: boolean;
+  created_at: string;
+}
+
 export interface WebsiteSection {
   id: string;
   type: 'hero' | 'announcement' | 'features' | 'cta' | 'footer';
@@ -194,24 +245,103 @@ export interface WebsiteSection {
 export interface Integration {
   id: string;
   name: string;
-  provider: 'Stripe' | 'PayPal' | 'Twilio' | 'SendGrid';
+  provider: 'Stripe' | 'PayPal' | 'Twilio' | 'SendGrid' | 'Cloudflare' | 'WhatsApp';
+  category?: 'Payments & Escrow' | 'Communications' | 'Infrastructure';
   status: 'Connected' | 'Disconnected';
   api_key: string;
+  environment?: 'Sandbox' | 'Live Production';
+  webhook_url?: string;
+  last_synced?: string;
+  latency_ms?: number;
 }
 
 
 
 // ---------------------------------------------------------
 // Seed Data definition
-// ---------------------------------------------------------
-const SEED_USERS: User[] = [
-  { id: 'usr-admin-1', first_name: 'Damian', last_name: 'Marley', email: 'damian.admin@showtime.com', phone: '+1-876-555-0100', status: 'Active', role: 'Super Admin', created_at: new Date().toISOString() },
-  { id: 'usr-agent-1', first_name: 'Sarah', last_name: 'Silverman', email: 'sarah.agent@showtime.com', phone: '+1-212-555-0155', status: 'Active', role: 'Booking Agent', created_at: new Date().toISOString() },
-  { id: 'usr-manager-1', first_name: 'Robert', last_name: 'Livingston', email: 'robert.manager@showtime.com', phone: '+1-876-555-0199', status: 'Active', role: 'Artist Manager', created_at: new Date().toISOString() },
-  { id: 'usr-beres', first_name: 'Beres', last_name: 'Hammond', email: 'beres.artist@showtime.com', phone: '+1-876-555-0211', status: 'Active', role: 'Artist', created_at: new Date().toISOString() },
-  { id: 'usr-koffee', first_name: 'Koffee', last_name: 'Simpson', email: 'koffee.artist@showtime.com', phone: '+1-876-555-0222', status: 'Active', role: 'Artist', created_at: new Date().toISOString() },
-  { id: 'usr-client-1', first_name: 'Michael', last_name: 'Eavis', email: 'eavis.client@glastonbury.co.uk', phone: '+44-20-7946-0192', status: 'Active', role: 'Client', created_at: new Date().toISOString() }
+export const SEED_USERS: User[] = [
+  {
+    id: 'usr-admin-1',
+    first_name: 'Showtime',
+    last_name: 'Admin',
+    email: 'admin@showtimeservices.com',
+    phone: '+1 (800) 555-0199',
+    status: 'Active',
+    role: 'Super Admin',
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'usr-agent-1',
+    first_name: 'Sarah',
+    last_name: 'Johnson',
+    email: 'agent@showtimeservices.com',
+    phone: '+1 (800) 555-0198',
+    status: 'Active',
+    role: 'Booking Agent',
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'usr-mgr-1',
+    first_name: 'Damian',
+    last_name: 'Clarke',
+    email: 'damian@showtimeservices.com',
+    phone: '+1 (876) 555-0144',
+    status: 'Active',
+    role: 'Artist Manager',
+    created_at: '2026-01-05T00:00:00Z',
+  },
+  {
+    id: 'usr-fin-1',
+    first_name: 'Elena',
+    last_name: 'Rostova',
+    email: 'finance@showtimeservices.com',
+    phone: '+1 (212) 555-0182',
+    status: 'Active',
+    role: 'Finance Manager',
+    created_at: '2026-01-08T00:00:00Z',
+  },
+  {
+    id: 'usr-mkt-1',
+    first_name: 'Jordan',
+    last_name: 'Blake',
+    email: 'marketing@showtimeservices.com',
+    phone: '+44 20 7946 0912',
+    status: 'Active',
+    role: 'Marketing Manager',
+    created_at: '2026-01-12T00:00:00Z',
+  },
+  {
+    id: 'usr-venue-1',
+    first_name: 'Chloe',
+    last_name: 'Bennett',
+    email: 'venues@showtimeservices.com',
+    phone: '+1 (305) 555-0167',
+    status: 'Active',
+    role: 'Venue Manager',
+    created_at: '2026-01-15T00:00:00Z',
+  },
+  {
+    id: 'usr-client-1',
+    first_name: 'Marcus',
+    last_name: 'Sterling',
+    email: 'client@showtimeservices.com',
+    phone: '+1 (800) 555-0197',
+    status: 'Active',
+    role: 'Client',
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'usr-artist-1',
+    first_name: 'Beres',
+    last_name: 'Hammond',
+    email: 'beres@showtimeservices.com',
+    phone: '+1 (800) 555-0196',
+    status: 'Active',
+    role: 'Artist',
+    created_at: '2026-01-01T00:00:00Z',
+  },
 ];
+
 
 const SEED_ARTISTS: Artist[] = [
   {
@@ -277,8 +407,7 @@ const SEED_ARTISTS: Artist[] = [
       Spotify: { url: 'https://spotify.com/artist/originalkoffee', followers: 3500000 }
     },
     media: [
-      { type: 'Image', url: '/images/artist_dancehall.jpg' },
-      { type: 'Video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' }
+      { type: 'Image', url: '/images/artist_dancehall.jpg' }
     ],
     technical_rider: 'Technical: 3 Vocal Cordless Mics (Shure SM58), Stereo DIs for Keyboards and DJ controller, 4 Monitor wedges (L-Acoustics), standard drum kit mic package.',
     hospitality_rider: 'Hospitality: Fresh ginger root, organic local honey, hot water kettle, assorted herbal teas, sliced seasonal fruit platters, 12 bottles of room-temperature spring water, 6 clean hand towels.',
@@ -975,108 +1104,468 @@ const SEED_ARTISTS: Artist[] = [
   }
 ];
 
-const SEED_LEADS: Lead[] = [
-  {
-    id: 'lead-reggae-sumfest',
-    client_id: 'cli-sumfest',
-    company_name: 'Sumfest Productions',
-    contact_name: 'Joe Bogdanovich',
-    email: 'joe@reggaesumfest.com',
-    phone: '+1-876-555-0301',
-    country: 'Jamaica',
-    source: 'Website Booking Form',
-    status: 'Lead Received',
-    assigned_to: 'usr-agent-1',
-    details: 'Requesting Koffee to perform as headliner for Reggae Sumfest Night 2 in Montego Bay. High-priority inquiry.',
-    budget: 75000,
-    preferred_date: '2026-07-18',
-    artist_id: 'art-koffee',
-    artist_name: 'Koffee',
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'lead-coachella',
-    client_id: 'cli-goldenvoice',
-    company_name: 'Goldenvoice Events',
-    contact_name: 'Paul Tollett',
-    email: 'paul@coachella.com',
-    phone: '+1-310-555-0922',
-    country: 'United States',
-    source: 'Direct Agent Outbound',
-    status: 'Negotiation',
-    assigned_to: 'usr-agent-1',
-    details: 'Coachella Outdoor Stage performance request for Chronixx. In negotiation regarding slots and backline requirements.',
-    budget: 120000,
-    preferred_date: '2026-04-18',
-    artist_id: 'art-chronixx',
-    artist_name: 'Chronixx',
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
-  }
-];
-
+const SEED_LEADS: Lead[] = [];
 const SEED_BOOKINGS: Booking[] = [
   {
-    id: 'bk-coachella-chronixx',
-    artist_id: 'art-chronixx',
-    artist_name: 'Chronixx',
-    artist_image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600',
+    id: 'bk-shenseea-coachella',
+    artist_id: 'art-shenseea',
+    artist_name: 'Shenseea',
+    artist_image: '/images/artist_dancehall.jpg',
     client_id: 'cli-goldenvoice',
-    client_name: 'Goldenvoice Events (Paul Tollett)',
+    client_name: 'Goldenvoice Concerts LLC',
     event_id: 'evt-coachella-2026',
-    event_title: 'Coachella Valley Music Festival 2026',
+    event_title: 'Coachella Valley Music & Arts Festival',
     event_date: '2026-04-18',
-    event_venue: 'Empire Polo Club',
+    event_venue: 'Empire Polo Club (Outdoor Theatre)',
     event_country: 'United States',
+    attendance: '125,000+',
+    status: 'Confirmed',
+    deposit_amount: 42500,
+    total_amount: 85000,
+    contract_id: 'ctr-shenseea-coachella',
+    technical_rider_notes: 'FOH console Avid S6L, 2 Shure Axient Digital wireless handhelds, stereo in-ear mixes, dedicated DJ playback channels.',
+    special_requests: 'VIP trailer in Artist Village, 15 All-Access wristbands, dedicated executive Sprinter van with airport escort.',
+    created_at: '2026-01-20T10:00:00Z'
+  },
+  {
+    id: 'bk-shenseea-barclays',
+    artist_id: 'art-shenseea',
+    artist_name: 'Shenseea',
+    artist_image: '/images/artist_dancehall.jpg',
+    client_id: 'cli-live-nation-ny',
+    client_name: 'Live Nation Northeast',
+    event_id: 'evt-summer-jam-2026',
+    event_title: 'Summer Jam Arena Showcase',
+    event_date: '2026-06-25',
+    event_venue: 'Barclays Center Arena',
+    event_country: 'United States',
+    attendance: '19,000+',
     status: 'Contract Sent',
-    deposit_amount: 60000,
-    total_amount: 120000,
-    contract_id: 'ctr-coachella-chronixx',
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+    deposit_amount: 32500,
+    total_amount: 65000,
+    contract_id: 'ctr-shenseea-barclays',
+    technical_rider_notes: 'Full arena stage setup with synchronized pyro & cryo jets, 4 stereo IEM mixes, high-resolution video wall sync.',
+    special_requests: 'Greenroom setup per hospitality rider: organic honey, fresh ginger, fresh fruit, champagne.',
+    created_at: '2026-02-14T15:30:00Z'
+  },
+  {
+    id: 'bk-shenseea-london',
+    artist_id: 'art-shenseea',
+    artist_name: 'Shenseea',
+    artist_image: '/images/artist_dancehall.jpg',
+    client_id: 'cli-sjm-concerts',
+    client_name: 'SJM Concerts UK',
+    event_id: 'evt-london-showcase-2026',
+    event_title: 'Showtime UK Headline Tour - Night 1',
+    event_date: '2026-08-14',
+    event_venue: 'O2 Brixton Academy',
+    event_country: 'United Kingdom',
+    attendance: '5,000+',
+    status: 'Proposal Generated',
+    deposit_amount: 27500,
+    total_amount: 55000,
+    contract_id: 'ctr-shenseea-london',
+    technical_rider_notes: 'Standard UK festival/venue backline with Shure wireless microphone package.',
+    special_requests: 'Airport meet & greet at Heathrow Terminal 5, 2 executive Mercedes V-Class vans.',
+    created_at: '2026-03-01T11:00:00Z'
+  },
+  {
+    id: 'bk-beenie-sumfest',
+    artist_id: 'art-beenie-man',
+    artist_name: 'Beenie Man',
+    artist_image: '/images/artist_dancehall.jpg',
+    client_id: 'cli-downsound',
+    client_name: 'Downsound Entertainment',
+    event_id: 'evt-sumfest-2026',
+    event_title: 'Reggae Sumfest Montego Bay - Dancehall Night',
+    event_date: '2026-07-18',
+    event_venue: 'Catherine Hall Entertainment Center',
+    event_country: 'Jamaica',
+    attendance: '35,000+',
+    status: 'Confirmed',
+    deposit_amount: 25000,
+    total_amount: 50000,
+    contract_id: 'ctr-beenie-sumfest',
+    technical_rider_notes: 'Live band backline: DW Collectors drum kit, Ampeg SVT-CL bass rig, Yamaha Motif keyboards, 6 stage monitors.',
+    special_requests: 'Private VIP air-conditioned dressing room behind main stage, 20 backstage passes.',
+    created_at: '2026-01-15T12:00:00Z'
+  },
+  {
+    id: 'bk-beenie-afronation',
+    artist_id: 'art-beenie-man',
+    artist_name: 'Beenie Man',
+    artist_image: '/images/artist_dancehall.jpg',
+    client_id: 'cli-smade-ent',
+    client_name: 'SMADE Events & Live Nation',
+    event_id: 'evt-afronation-2026',
+    event_title: 'Afro Nation Portugal 2026',
+    event_date: '2026-07-28',
+    event_venue: 'Praia da Rocha Beach Arena',
+    event_country: 'Portugal',
+    attendance: '40,000+',
+    status: 'Contract Sent',
+    deposit_amount: 37500,
+    total_amount: 75000,
+    contract_id: 'ctr-beenie-afronation',
+    technical_rider_notes: 'Headline festival stage package, 4 Shure Axient microphones, 8 wireless IEMs, multitrack recording feed.',
+    special_requests: '5-star beachfront resort suites, private security detail on site.',
+    created_at: '2026-02-20T09:00:00Z'
+  },
+  {
+    id: 'bk-beres-cruise',
+    artist_id: 'art-beres-hammond',
+    artist_name: 'Beres Hammond',
+    artist_image: '/images/artist_reggae.jpg',
+    client_id: 'cli-harmony-promotions',
+    client_name: 'Harmony Tours & Promotions',
+    event_id: 'evt-harmony-cruise-2026',
+    event_title: 'Love & Harmony Caribbean Concert Cruise',
+    event_date: '2026-05-10',
+    event_venue: 'Celebrity Beyond Ocean Deck',
+    event_country: 'United States',
+    attendance: '3,800+',
+    status: 'Confirmed',
+    deposit_amount: 35000,
+    total_amount: 70000,
+    contract_id: 'ctr-beres-cruise',
+    technical_rider_notes: 'Harmony House full live band setup with horns section, 12 monitor mixes, grand piano DI setup.',
+    special_requests: 'Master Suite on top deck, non-smoking VIP wing, private catering chef.',
+    created_at: '2026-01-10T14:00:00Z'
   }
 ];
 
 const SEED_CONTRACTS: Contract[] = [
   {
-    id: 'ctr-coachella-chronixx',
-    booking_id: 'bk-coachella-chronixx',
+    id: 'ctr-shenseea-coachella',
+    booking_id: 'bk-shenseea-coachella',
+    document_url: 'https://docs.showtimeservices.com/contracts/coachella-2026-executed.pdf',
+    status: 'Signed',
+    signed_at: '2026-01-25T14:30:00Z',
+    signature_data: 'Chinsea Linda Lee (Shenseea)',
+    created_at: '2026-01-20T10:00:00Z'
+  },
+  {
+    id: 'ctr-shenseea-barclays',
+    booking_id: 'bk-shenseea-barclays',
+    document_url: 'https://docs.showtimeservices.com/contracts/barclays-summerjam-2026.pdf',
     status: 'Sent',
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+    created_at: '2026-02-14T15:30:00Z'
+  },
+  {
+    id: 'ctr-shenseea-london',
+    booking_id: 'bk-shenseea-london',
+    document_url: 'https://docs.showtimeservices.com/contracts/london-brixton-2026-draft.pdf',
+    status: 'Draft',
+    created_at: '2026-03-01T11:00:00Z'
+  },
+  {
+    id: 'ctr-beenie-sumfest',
+    booking_id: 'bk-beenie-sumfest',
+    document_url: 'https://docs.showtimeservices.com/contracts/reggae-sumfest-2026-beenie.pdf',
+    status: 'Signed',
+    signed_at: '2026-01-22T16:00:00Z',
+    signature_data: 'Moses Davis (Beenie Man)',
+    created_at: '2026-01-15T12:00:00Z'
+  },
+  {
+    id: 'ctr-beenie-afronation',
+    booking_id: 'bk-beenie-afronation',
+    document_url: 'https://docs.showtimeservices.com/contracts/afronation-portugal-2026.pdf',
+    status: 'Sent',
+    created_at: '2026-02-20T09:00:00Z'
+  },
+  {
+    id: 'ctr-beres-cruise',
+    booking_id: 'bk-beres-cruise',
+    document_url: 'https://docs.showtimeservices.com/contracts/love-harmony-cruise-2026.pdf',
+    status: 'Signed',
+    signed_at: '2026-01-12T11:45:00Z',
+    signature_data: 'Hugh Beresford Hammond',
+    created_at: '2026-01-10T14:00:00Z'
   }
 ];
-
 const SEED_INVOICES: Invoice[] = [
   {
-    id: 'inv-coachella-deposit',
-    booking_id: 'bk-coachella-chronixx',
-    amount: 60000,
-    balance_due: 60000,
+    id: 'inv-shenseea-coachella',
+    booking_id: 'bk-shenseea-coachella',
+    amount: 75000,
+    balance_due: 0,
+    status: 'Paid',
+    due_date: '2026-03-15',
+    created_at: '2026-02-15T10:00:00Z'
+  },
+  {
+    id: 'inv-barclays-jam',
+    booking_id: 'bk-barclays-jam',
+    amount: 65000,
+    balance_due: 32500,
+    status: 'Partially Paid',
+    due_date: '2026-06-01',
+    created_at: '2026-03-01T12:00:00Z'
+  },
+  {
+    id: 'inv-beenie-sumfest',
+    booking_id: 'bk-beenie-sumfest',
+    amount: 50000,
+    balance_due: 0,
+    status: 'Paid',
+    due_date: '2026-02-28',
+    created_at: '2026-01-20T14:00:00Z'
+  },
+  {
+    id: 'inv-beenie-afronation',
+    booking_id: 'bk-beenie-afronation',
+    amount: 75000,
+    balance_due: 75000,
     status: 'Unpaid',
-    due_date: '2026-06-30',
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+    due_date: '2026-05-15',
+    created_at: '2026-03-10T09:30:00Z'
+  },
+  {
+    id: 'inv-beres-harmony',
+    booking_id: 'bk-beres-cruise',
+    amount: 80000,
+    balance_due: 0,
+    status: 'Paid',
+    due_date: '2026-02-01',
+    created_at: '2026-01-15T11:00:00Z'
   }
 ];
-
 const SEED_TASKS: Task[] = [
-  { id: 'tsk-1', title: 'Verify Chronixx passport renewal status', description: 'Check with manager Robert regarding international travel documents.', assigned_to: 'usr-agent-1', due_date: '2026-06-15', status: 'Pending', created_at: new Date().toISOString() },
-  { id: 'tsk-2', title: 'Send invoice reminders for Sumfest', description: 'Remind Sumfest productions about deposit requirements.', assigned_to: 'usr-agent-1', due_date: '2026-06-08', status: 'In Progress', created_at: new Date().toISOString() },
-  { id: 'tsk-3', title: 'Upload rider updates for Shenseea', description: 'Upload updated rider with Veuve Clicquot champagne specification.', assigned_to: 'usr-manager-1', due_date: '2026-06-12', status: 'Completed', created_at: new Date().toISOString() }
+  {
+    id: 'tsk-1',
+    title: 'Verify Shenseea Coachella Technical Audio Rider with Goldenvoice Sound Director',
+    description: 'Confirm 4x Shure Axient Digital wireless handhelds and Avid S6L console profile.',
+    due_date: '2026-04-10',
+    status: 'In Progress',
+    assigned_to: 'Sarah Johnson',
+    created_at: '2026-03-01T10:00:00Z'
+  },
+  {
+    id: 'tsk-2',
+    title: 'Countersign Barclays Center Summer Jam Performance Contract',
+    description: 'Ensure 50% escrow deposit ($32,500 USD) is received prior to release.',
+    due_date: '2026-06-15',
+    status: 'Pending',
+    assigned_to: 'Showtime Admin',
+    created_at: '2026-03-05T14:30:00Z'
+  },
+  {
+    id: 'tsk-3',
+    title: 'Escrow Deposit Wire Confirmation for Beenie Man Afro Nation Portugal',
+    description: 'Verify $37,500 wire transfer from SMADE Entertainment Ltd.',
+    due_date: '2026-07-01',
+    status: 'Pending',
+    assigned_to: 'Finance Desk',
+    created_at: '2026-03-08T09:00:00Z'
+  },
+  {
+    id: 'tsk-4',
+    title: 'Review OVO Arena Wembley Load-in & Curfew Schedule',
+    description: 'Stage production load-in at 08:00 AM, Soundcheck at 16:00, strict 23:00 curfew.',
+    due_date: '2026-08-30',
+    status: 'Pending',
+    assigned_to: 'Showtime Admin',
+    created_at: '2026-03-10T11:00:00Z'
+  }
 ];
-
-const SEED_NOTIFICATIONS: Notification[] = [
-  { id: 'notif-1', user_id: 'usr-agent-1', title: 'New Booking Inquiry', message: 'Joe Bogdanovich submitted an inquiry for Koffee at Reggae Sumfest.', read_status: false, created_at: new Date().toISOString() },
-  { id: 'notif-2', user_id: 'usr-agent-1', title: 'Negotiation Updates', message: 'Coachella contract drafts were generated and sent for Chronixx.', read_status: true, created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }
-];
+const SEED_NOTIFICATIONS: Notification[] = [];
 
 const SEED_VENUES: Venue[] = [
-  { id: 'ven-1', name: 'Catherine Hall Stadium', capacity: '35,000 seats', location: 'Montego Bay', description: 'Historic home of Reggae Sumfest, seaside breeze and premium festival staging.', parking: '10,000 cars' },
-  { id: 'ven-2', name: 'National Arena Staging', capacity: '12,500 seats', location: 'Kingston', description: 'Indoor stadium, perfect for high energy dancehall clashes and sound clashes.', parking: '3,000 cars' },
-  { id: 'ven-3', name: 'O2 Arena London', capacity: '20,000 seats', location: 'United Kingdom', description: 'World famous indoor arena, perfect for massive crossover staging.', parking: '5,000 cars' }
+  {
+    id: 'ven-1',
+    name: 'Catherine Hall Entertainment Center',
+    capacity: '35,000 capacity',
+    location: 'Montego Bay, Jamaica',
+    venue_type: 'Open-Air Festival Grounds',
+    description: 'Premier seaside festival staging and historic home of Reggae Sumfest.',
+    parking: '10,000 spaces',
+    stage_specs: '60ft x 48ft Stage, L-Acoustics K1/K2 Line Array',
+    contact_name: 'Josef Bogdanovich',
+    contact_email: 'production@sumfest.com',
+    contact_phone: '+1 (876) 952-4500'
+  },
+  {
+    id: 'ven-2',
+    name: 'Barclays Center Arena',
+    capacity: '19,000 seats',
+    location: 'Brooklyn, New York, USA',
+    venue_type: 'Indoor Arena',
+    description: 'Premier multi-purpose indoor arena in Downtown Brooklyn, host of Summer Jam and major arena tours.',
+    parking: 'MTA Transit Hub & 2,500 garage spots',
+    stage_specs: 'End-Stage Arena Configuration, JBL VTX V25 Line Array',
+    contact_name: 'David Klein',
+    contact_email: 'concerts@barclayscenter.com',
+    contact_phone: '+1 (917) 618-6100'
+  },
+  {
+    id: 'ven-3',
+    name: 'OVO Arena Wembley',
+    capacity: '12,500 seats',
+    location: 'London, United Kingdom',
+    venue_type: 'Indoor Arena',
+    description: 'Iconic indoor music arena in Wembley Park hosting international reggae, dancehall, and pop showcases.',
+    parking: '3,000 spaces',
+    stage_specs: 'Full Arena Rigging Grid, d&b audiotechnik GSL System',
+    contact_name: 'Sarah Higgins',
+    contact_email: 'events@ovoarena.co.uk',
+    contact_phone: '+44 20 8782 5555'
+  },
+  {
+    id: 'ven-4',
+    name: 'Empire Polo Club',
+    capacity: '125,000 capacity',
+    location: 'Indio, California, USA',
+    venue_type: 'Outdoor Festival Complex',
+    description: 'World-famous 78-acre polo club home to Coachella and Stagecoach Music Festivals.',
+    parking: '40,000 spaces & shuttle transit',
+    stage_specs: 'Outdoor Theatre & Sahara Mega-Structures, Clair Global Cohesion CO-12',
+    contact_name: 'Paul Tollett',
+    contact_email: 'talent@goldenvoice.com',
+    contact_phone: '+1 (323) 930-5700'
+  },
+  {
+    id: 'ven-5',
+    name: 'National Stadium',
+    capacity: '35,000 seats',
+    location: 'Kingston, Jamaica',
+    venue_type: 'National Stadium',
+    description: 'Premier national stadium for landmark historical concerts, stadium tours, and Independence spectacles.',
+    parking: '5,000 spaces',
+    stage_specs: 'Field Staging with Delay Towers, Electro-Voice X-Line',
+    contact_name: 'Major Desmon Brown',
+    contact_email: 'info@ipld.org.jm',
+    contact_phone: '+1 (876) 968-3500'
+  }
 ];
 
 const SEED_CUSTOMERS: Customer[] = [
-  { id: 'cust-1', name: 'Joe Bogdanovich', company: 'Sumfest Productions', email: 'joe@reggaesumfest.com', tier: 'VIP Organizer', notes: 'Prefers booking reggae headliners. Fast deposit execution.' },
-  { id: 'cust-2', name: 'Paul Tollett', company: 'Goldenvoice Coachella', email: 'paul@coachella.com', tier: 'Ultra VIP Promoter', notes: 'Standard US promoter client. Always requires international travel logistics check.' },
-  { id: 'cust-3', name: 'Michael Eavis', company: 'Glastonbury Festivals', email: 'eavis.client@glastonbury.co.uk', tier: 'Global Partner', notes: 'Requires full compliance check for UK COS certificates.' }
+  {
+    id: 'cli-goldenvoice',
+    name: 'Paul Tollett',
+    company: 'Goldenvoice Concerts / AEG Presents',
+    email: 'ptollett@goldenvoice.com',
+    phone: '+1 (323) 930-5700',
+    country: 'United States',
+    tier: 'Major Festival Producer',
+    status: 'Active VIP',
+    total_spent: 450000,
+    notes: 'Primary talent buyer for Coachella, Stagecoach, and Day N Vegas. Prompt 50% deposit via wire.'
+  },
+  {
+    id: 'cli-live-nation-ny',
+    name: 'Geoff Gordon',
+    company: 'Live Nation Northeast',
+    email: 'ggordon@livenation.com',
+    phone: '+1 (212) 543-8000',
+    country: 'United States',
+    tier: 'Arena Buyer',
+    status: 'Active VIP',
+    total_spent: 620000,
+    notes: 'Handles Barclays Center, Madison Square Garden, and TD Garden dates. Requires rider compliance sign-off 14 days out.'
+  },
+  {
+    id: 'cli-downsound',
+    name: 'Josef Bogdanovich',
+    company: 'Downsound Entertainment',
+    email: 'josef@downsoundrecords.com',
+    phone: '+1 (876) 929-1000',
+    country: 'Jamaica',
+    tier: 'VIP Promoter',
+    status: 'Active VIP',
+    total_spent: 380000,
+    notes: 'Owner of Reggae Sumfest. Direct escrow payments and guaranteed full technical backline fulfillment.'
+  },
+  {
+    id: 'cli-smade-ent',
+    name: 'Adesegun Adeosun Jr. (SMADE)',
+    company: 'SMADE Entertainment / Live Nation',
+    email: 'smade@smade.co.uk',
+    phone: '+44 20 7946 0912',
+    country: 'United Kingdom',
+    tier: 'Major Festival Producer',
+    status: 'Preferred Buyer',
+    total_spent: 290000,
+    notes: 'Founder of Afro Nation Portugal, Afro Nation Miami, and European tour circuits.'
+  },
+  {
+    id: 'cli-sjm-concerts',
+    name: 'Chris York',
+    company: 'SJM Concerts',
+    email: 'cyork@sjmconcerts.com',
+    phone: '+44 161 832 1111',
+    country: 'United Kingdom',
+    tier: 'Arena Buyer',
+    status: 'Preferred Buyer',
+    total_spent: 195000,
+    notes: 'Promotes O2 Academy Brixton, Manchester AO Arena, and UK national tours.'
+  }
+];
+
+export const SEED_EVENTS: ShowEvent[] = [
+  {
+    id: 'evt-sumfest-2026',
+    title: 'Reggae Sumfest Montego Bay',
+    tagline: 'The Greatest Reggae Show On Earth',
+    category: 'Festival',
+    venue: 'Catherine Hall Entertainment Center',
+    city: 'Montego Bay',
+    country: 'Jamaica',
+    date: '2026-07-18',
+    time: '19:00',
+    attendance: '35,000+',
+    poster_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=800',
+    header_image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1600',
+    description: 'Headline festival performance featuring the pinnacle of Caribbean reggae and dancehall icons across two monumental festival nights.',
+    lineup: 'Buju Banton, Beenie Man, Shaneil Muir',
+    ticket_link: 'https://www.showtimeservices.com/book',
+    ticket_price_starting: 75,
+    status: 'Published',
+    is_featured: true,
+    created_at: '2026-01-15T10:00:00Z'
+  },
+  {
+    id: 'evt-coachella-2026',
+    title: 'Coachella Valley Music & Arts Festival',
+    tagline: 'Desert Odyssey 2026',
+    category: 'Festival',
+    venue: 'Empire Polo Club',
+    city: 'Indio, CA',
+    country: 'United States',
+    date: '2026-04-18',
+    time: '18:00',
+    attendance: '125,000+',
+    poster_image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&q=80&w=800',
+    header_image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&q=80&w=1600',
+    description: 'Major showcase across premier outdoor stages featuring global talent curation and crossover sound systems.',
+    lineup: 'Shenseea, Chromatic Live, Special Guests',
+    ticket_link: 'https://www.showtimeservices.com/book',
+    ticket_price_starting: 499,
+    status: 'Published',
+    is_featured: true,
+    created_at: '2026-01-20T10:00:00Z'
+  },
+  {
+    id: 'evt-wembley-2026',
+    title: 'Showtime Arena Showcases',
+    tagline: 'London Heritage Live',
+    category: 'Arena Tour',
+    venue: 'OVO Arena Wembley',
+    city: 'London',
+    country: 'United Kingdom',
+    date: '2026-09-12',
+    time: '19:30',
+    attendance: '12,500+',
+    poster_image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800',
+    header_image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=1600',
+    description: 'Exclusive London arena headline production contracted and managed end-to-end by Showtime Entertainment Services.',
+    lineup: 'Buju Banton, Govana, DJ Young Chow',
+    ticket_link: 'https://www.showtimeservices.com/book',
+    ticket_price_starting: 95,
+    status: 'Published',
+    is_featured: true,
+    created_at: '2026-02-01T10:00:00Z'
+  }
 ];
 
 const SEED_TICKET_TIERS: TicketTier[] = [
@@ -1087,37 +1576,355 @@ const SEED_TICKET_TIERS: TicketTier[] = [
 ];
 
 const SEED_PROMO_CODES: PromoCode[] = [
-  { id: 'promo-sumfest', code: 'SUMFEST2026', discount: 20, active: true, expiry: '2026-07-01' },
-  { id: 'promo-early', code: 'EARLYBIRD10', discount: 10, active: true, expiry: '2026-06-30' },
-  { id: 'promo-vip', code: 'VIPSHOWTIME', discount: 15, active: false, expiry: '2026-08-15' }
+  { id: 'promo-earlybird', code: 'EARLYBIRD2026', discount: 15, active: true, expiry: '2026-06-30' },
+  { id: 'promo-sumfest', code: 'SUMFESTVIP', discount: 20, active: true, expiry: '2026-07-15' },
+  { id: 'promo-global', code: 'GLOBALROSTER', discount: 10, active: true, expiry: '2026-12-31' },
+  { id: 'promo-spring', code: 'SPRINGPASS', discount: 25, active: false, expiry: '2026-03-31' }
 ];
 
 const SEED_CAMPAIGNS: MarketingCampaign[] = [
-  { id: 'camp-1', name: 'Koffee Sumfest Promotion', type: 'Email', subject: 'Koffee Live at Sumfest 2026!', segment: 'All Past Customers (12,504)', content: 'Get ready for Koffee live at Catherine Hall...', openRate: '34.2%', created_at: new Date().toISOString() },
-  { id: 'camp-2', name: 'Shenseea Ticket Release Alert', type: 'SMS', subject: '', segment: 'VIP Ticket Buyers Only (2,100)', content: 'Shenseea Tickets are Live! Buy now: https://showtimeservices.com/tickets', openRate: '98%', created_at: new Date().toISOString() },
-  { id: 'camp-3', name: 'Coachella Lineup Push Alert', type: 'Push', subject: 'Coachella Lineup Announced', segment: 'All Past Customers (12,504)', content: 'Check out the Coachella lineup including Chronixx!', openRate: '15.4%', created_at: new Date().toISOString() }
+  {
+    id: 'camp-sumfest-launch',
+    name: 'Reggae Sumfest 2026 Lineup Announcement',
+    type: 'Email',
+    subject: '★ The Greatest Reggae Show On Earth: Full Headline Roster Revealed',
+    segment: 'VIP Promoters & Buyers',
+    openRate: '48.2%',
+    content: 'Announcing exclusive festival performance bookings for Beenie Man, Shenseea, and Beres Hammond across two historic nights in Montego Bay.',
+    created_at: '2026-02-15T14:00:00Z'
+  },
+  {
+    id: 'camp-coachella-tour',
+    name: 'Coachella 2026 Desert Weekend Alert',
+    type: 'SMS',
+    subject: 'Shenseea Live at the Empire Polo Club',
+    segment: 'US West Coast Talent Buyers',
+    openRate: '91.4%',
+    content: 'Confirming dates and private showcase slots during Coachella weekend 1 & 2.',
+    created_at: '2026-03-01T11:00:00Z'
+  },
+  {
+    id: 'camp-london-wembley',
+    name: 'London Wembley Arena Showtime Crossover',
+    type: 'Push',
+    subject: 'Headline Arena Dates Announced',
+    segment: 'UK & European Tour Producers',
+    openRate: '34.7%',
+    content: 'Official announcement for OVO Arena Wembley and O2 Brixton tour circuit.',
+    created_at: '2026-03-08T09:00:00Z'
+  },
+  {
+    id: 'camp-carnival-circuit',
+    name: 'Caribbean Carnival Season 2026 VIP Booking',
+    type: 'Email',
+    subject: 'Secure Soca & Dancehall Kings for Carnival',
+    segment: 'Carnival Band Leaders',
+    openRate: '42.9%',
+    content: 'Limited tour dates available for Machel Montano, Destra Garcia, and Mr Killa.',
+    created_at: '2026-01-10T16:00:00Z'
+  }
 ];
 
 const SEED_AD_PLACEMENTS: AdPlacement[] = [
-  { id: 'ad-1', name: 'Homepage Hero Placement', impressions: 142500, clickRate: '2.4% CTR', revenue: 3420, active: true, image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400' },
-  { id: 'ad-2', name: 'Search Results Banner', impressions: 84300, clickRate: '1.8% CTR', revenue: 1510, active: true, image_url: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=400' },
-  { id: 'ad-3', name: 'Email Footer Banner', impressions: 24000, clickRate: '4.2% CTR', revenue: 1008, active: true, image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=400' }
+  {
+    id: 'ad-sumfest-billboard',
+    name: 'Sumfest 2026 Mainstage Billboard',
+    impressions: 145000,
+    clickRate: '4.8%',
+    revenue: 8500,
+    active: true,
+    image_url: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 'ad-coachella-hero',
+    name: 'Desert Odyssey 2026 Hero Spotlight',
+    impressions: 210000,
+    clickRate: '6.2%',
+    revenue: 14200,
+    active: true,
+    image_url: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 'ad-wembley-arena',
+    name: 'London Wembley Arena Header Banner',
+    impressions: 88000,
+    clickRate: '3.9%',
+    revenue: 5200,
+    active: true,
+    image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800'
+  },
+  {
+    id: 'ad-roster-sidebar',
+    name: 'Exclusive Roster Talent Sidebar',
+    impressions: 64000,
+    clickRate: '5.1%',
+    revenue: 3800,
+    active: true,
+    image_url: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=800'
+  }
 ];
 
 const SEED_WEBSITE_SECTIONS: WebsiteSection[] = [
-  { id: 'sec-hero', type: 'hero', title: 'Caribbean Talent Booking Platform', subtitle: 'Book the absolute best Reggae, Dancehall, and Afrobeat acts globally.', content: 'Visual component block preview area.', buttonText: 'Book Artist Now', active: true, image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=600' },
-  { id: 'sec-ann', type: 'announcement', title: '★ Reggae Sumfest 2026 Headliners Confirmed!', content: 'Get your early bird tickets before they sell out.', active: true },
-  { id: 'sec-cta', type: 'cta', title: 'Plan Your Next Tour With Showtime', subtitle: 'From permits to event production, we handle everything you need.', buttonText: 'Get Started', active: true, image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600' }
+  { id: 'sec-hero', type: 'hero', title: 'World-Class Caribbean Talent Booking & Production', subtitle: 'Direct agency access to the premier Reggae, Dancehall, Soca & Afrobeats icons worldwide.', content: 'Global concert tours, stadium spectacles, and festival headline curation.', buttonText: 'Explore Talent Roster', active: true, image_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200' },
+  { id: 'sec-ann', type: 'announcement', title: '★ 2026 Summer Tour Routes Now Open for Booking', content: 'Lock in headline performance dates with direct escrow contracts and guaranteed rider execution.', active: true },
+  { id: 'sec-features', type: 'features', title: 'Agency Guarantees & Turnkey Delivery', subtitle: 'Built for world tours, major festivals, and arena buyers.', content: 'Direct Artist Representation • Secure Escrow & Settlement • Comprehensive Technical Riders • Global Visa & Logistics Coordination', active: true },
+  { id: 'sec-cta', type: 'cta', title: 'Plan Your 2026 Headline Production With Showtime', subtitle: 'Direct agent response within 24 hours. Full rider compliance and escrow protection.', buttonText: 'Initiate Booking Inquiry', active: true, image_url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=1200' },
+  { id: 'sec-footer', type: 'footer', title: 'Showtime Entertainment Services Global', subtitle: 'Kingston • Miami • London • New York', content: 'Premier talent representation, tour routing, and festival backline infrastructure.', active: true }
 ];
 
 const SEED_INTEGRATIONS: Integration[] = [
-  { id: 'int-stripe', name: 'Stripe Payment Gateway', provider: 'Stripe', status: 'Disconnected', api_key: '' },
-  { id: 'int-twilio', name: 'Twilio SMS Business API', provider: 'Twilio', status: 'Disconnected', api_key: '' },
-  { id: 'int-paypal', name: 'PayPal Commerce Platform', provider: 'PayPal', status: 'Disconnected', api_key: '' },
-  { id: 'int-sendgrid', name: 'SendGrid Email API Service', provider: 'SendGrid', status: 'Disconnected', api_key: '' }
+  {
+    id: 'int-stripe',
+    name: 'Stripe Global Payments & Escrow',
+    provider: 'Stripe',
+    category: 'Payments & Escrow',
+    status: 'Connected',
+    api_key: '••••••••••••••••••••',
+    environment: 'Live Production',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/stripe',
+    last_synced: '2026-10-10T12:00:00Z',
+    latency_ms: 32
+  },
+  {
+    id: 'int-paypal',
+    name: 'PayPal Merchant Services ($75/mo Retainer)',
+    provider: 'PayPal',
+    category: 'Payments & Escrow',
+    status: 'Connected',
+    api_key: '••••••••••••••••••••',
+    environment: 'Live Production',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/paypal',
+    last_synced: '2026-10-10T12:30:00Z',
+    latency_ms: 45
+  },
+  {
+    id: 'int-twilio',
+    name: 'Twilio SMS Tour Alerts & Alerts',
+    provider: 'Twilio',
+    category: 'Communications',
+    status: 'Connected',
+    api_key: '••••••••••••••••••••',
+    environment: 'Live Production',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/twilio',
+    last_synced: '2026-10-10T11:15:00Z',
+    latency_ms: 28
+  },
+  {
+    id: 'int-sendgrid',
+    name: 'SendGrid Contract & Invoice Mailer',
+    provider: 'SendGrid',
+    category: 'Communications',
+    status: 'Connected',
+    api_key: '••••••••••••••••••••',
+    environment: 'Live Production',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/sendgrid',
+    last_synced: '2026-10-10T13:00:00Z',
+    latency_ms: 22
+  },
+  {
+    id: 'int-cloudflare',
+    name: 'Cloudflare Edge CDN & D1 Storage',
+    provider: 'Cloudflare',
+    category: 'Infrastructure',
+    status: 'Connected',
+    api_key: '••••••••••••••••••••',
+    environment: 'Live Production',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/cloudflare',
+    last_synced: '2026-10-10T13:30:00Z',
+    latency_ms: 14
+  },
+  {
+    id: 'int-whatsapp',
+    name: 'WhatsApp Business API (VIP Desk)',
+    provider: 'WhatsApp',
+    category: 'Communications',
+    status: 'Disconnected',
+    api_key: '',
+    environment: 'Sandbox',
+    webhook_url: 'https://showtimeservices.com/api/webhooks/whatsapp',
+    last_synced: '2026-10-08T09:00:00Z',
+    latency_ms: 0
+  }
 ];
 
 
+
+// ---------------------------------------------------------
+// Billing documents: Quote → Invoice → Receipt (+ Credit Note)
+// ---------------------------------------------------------
+export type BillingDocType = 'Quote' | 'Invoice' | 'Receipt' | 'Credit Note';
+export type BillingDocStatus =
+  | 'Draft' | 'Sent' | 'Accepted' | 'Declined' | 'Expired'
+  | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Void' | 'Issued' | 'Cancelled';
+
+export interface BillingLineItem {
+  id: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+}
+
+export interface BillingPayment {
+  id: string;
+  amount: number;
+  method: string;
+  date: string;
+  reference?: string;
+  receipt_id?: string;
+  notes?: string;
+}
+
+export interface BillingDoc {
+  id: string;
+  type: BillingDocType;
+  number: string;
+  status: BillingDocStatus;
+  client_name: string;
+  client_email?: string;
+  client_company?: string;
+  client_phone?: string;
+  client_address?: string;
+  booking_id?: string;
+  event_title?: string;
+  artist_name?: string;
+  venue_name?: string;
+  line_items: BillingLineItem[];
+  discount_pct: number;
+  tax_pct: number;
+  deposit_pct_required?: number;
+  currency: string;
+  issue_date: string;
+  due_date: string;          // due date (invoice) or valid-until (quote)
+  valid_until?: string;
+  notes?: string;
+  terms?: string;
+  payment_terms?: string;
+  bank_details?: string;
+  payments: BillingPayment[];
+  source_id?: string;        // document this one was created from
+  source_number?: string;
+  converted_to_id?: string;  // quote → invoice link
+  converted_to_number?: string;
+  sent_at?: string;
+  created_at: string;
+}
+
+export interface BillingTotals {
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paid: number;
+  balance: number;
+  discountAmount: number;
+  taxAmount: number;
+  totalPaid: number;
+  balanceDue: number;
+}
+
+const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+export function docTotals(doc: Pick<BillingDoc, 'line_items' | 'discount_pct' | 'tax_pct' | 'payments' | 'type'>): BillingTotals {
+  const subtotal = r2(doc.line_items.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_price) || 0), 0));
+  const discount = r2(subtotal * ((Number(doc.discount_pct) || 0) / 100));
+  const taxable = subtotal - discount;
+  const tax = r2(taxable * ((Number(doc.tax_pct) || 0) / 100));
+  const total = r2(taxable + tax);
+  const paid = r2((doc.payments || []).reduce((s, p) => s + p.amount, 0));
+  const balance = doc.type === 'Invoice' ? r2(Math.max(total - paid, 0)) : 0;
+  return {
+    subtotal,
+    discount,
+    tax,
+    total,
+    paid,
+    balance,
+    discountAmount: discount,
+    taxAmount: tax,
+    totalPaid: paid,
+    balanceDue: balance
+  };
+}
+
+/** Display status — flags invoices past due as Overdue and stale quotes as Expired. */
+export function effectiveDocStatus(doc: BillingDoc): BillingDocStatus {
+  const today = new Date().toISOString().slice(0, 10);
+  const checkDueDate = doc.due_date || doc.valid_until;
+  if (doc.type === 'Invoice' && ['Sent', 'Partially Paid', 'Unpaid'].includes(doc.status) && checkDueDate && checkDueDate < today) return 'Overdue';
+  if (doc.type === 'Quote' && doc.status === 'Sent' && (doc.valid_until || doc.due_date) && (doc.valid_until || doc.due_date)! < today) return 'Expired';
+  return doc.status;
+}
+
+const DOC_PREFIX: Record<BillingDocType, string> = { Quote: 'QUO', Invoice: 'INV', Receipt: 'RCT', 'Credit Note': 'CN' };
+const uid = (p: string) => p + '-' + Math.random().toString(36).slice(2, 10);
+
+export const DEFAULT_INVOICE_TERMS =
+  'Payment due by the date shown. A 50% non-refundable deposit secures the booking; the balance is due before performance. Late payments may incur a 1.5% monthly fee. Cancellations are subject to the signed artist contract.';
+
+const SEED_BILLING_DOCS: BillingDoc[] = [
+  {
+    id: 'doc-q1', type: 'Quote', number: 'QUO-2026-0001', status: 'Sent',
+    client_name: 'Marcus Sterling', client_email: 'client@showtimeservices.com', client_company: 'Sterling Live Events',
+    event_title: 'Sumfest Headliner Night', artist_name: 'Beres Hammond',
+    line_items: [
+      { id: 'l1', description: 'Headline performance — Beres Hammond (90 min)', qty: 1, unit_price: 65000 },
+      { id: 'l2', description: 'Backline & technical rider fulfilment', qty: 1, unit_price: 6500 },
+      { id: 'l3', description: 'Travel, accommodation & ground transport', qty: 1, unit_price: 8500 },
+    ],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-10-01', due_date: '2026-11-30',
+    notes: 'Quote valid for 60 days. Subject to artist availability.', terms: DEFAULT_INVOICE_TERMS,
+    payments: [], created_at: '2026-10-01T10:00:00Z',
+  },
+  {
+    id: 'doc-i1', type: 'Invoice', number: 'INV-2026-0001', status: 'Partially Paid',
+    client_name: 'Barclays Summer Jam', client_email: 'finance@barclaysjam.example', client_company: 'Barclays Summer Jam Ltd',
+    event_title: 'Summer Jam London', artist_name: 'Shenseea',
+    line_items: [
+      { id: 'l1', description: 'Headline performance — Shenseea', qty: 1, unit_price: 110000 },
+      { id: 'l2', description: 'Production & staging support', qty: 1, unit_price: 20000 },
+    ],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-08-20', due_date: '2026-09-20',
+    notes: 'Deposit received. Balance due before show day.', terms: DEFAULT_INVOICE_TERMS,
+    payments: [{ id: 'pay-1', amount: 65000, method: 'Bank Transfer', date: '2026-08-25', reference: 'WIRE-88231', receipt_id: 'doc-r1' }],
+    created_at: '2026-08-20T10:00:00Z',
+  },
+  {
+    id: 'doc-i2', type: 'Invoice', number: 'INV-2026-0002', status: 'Sent',
+    client_name: 'Afro Nation Portugal', client_email: 'accounts@afronation.example', client_company: 'Afro Nation',
+    event_title: 'Afro Nation 2026', artist_name: 'Beenie Man',
+    line_items: [{ id: 'l1', description: 'Festival performance — Beenie Man (75 min)', qty: 1, unit_price: 75000 }],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-10-05', due_date: '2026-11-05',
+    terms: DEFAULT_INVOICE_TERMS, payments: [], created_at: '2026-10-05T10:00:00Z',
+  },
+  {
+    id: 'doc-i3', type: 'Invoice', number: 'INV-2026-0003', status: 'Paid',
+    client_name: 'Coachella Weekend Showcase', client_email: 'ap@showcase.example',
+    event_title: 'Coachella Showcase', artist_name: 'Shenseea',
+    line_items: [{ id: 'l1', description: 'Showcase set — Shenseea', qty: 1, unit_price: 75000 }],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-07-01', due_date: '2026-07-31',
+    terms: DEFAULT_INVOICE_TERMS,
+    payments: [{ id: 'pay-2', amount: 75000, method: 'Wire', date: '2026-07-15', reference: 'WIRE-77120', receipt_id: 'doc-r2' }],
+    created_at: '2026-07-01T10:00:00Z',
+  },
+  {
+    id: 'doc-r1', type: 'Receipt', number: 'RCT-2026-0001', status: 'Issued',
+    client_name: 'Barclays Summer Jam', client_email: 'finance@barclaysjam.example',
+    event_title: 'Summer Jam London', artist_name: 'Shenseea',
+    line_items: [{ id: 'l1', description: 'Payment received for INV-2026-0001 (deposit)', qty: 1, unit_price: 65000 }],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-08-25', due_date: '2026-08-25',
+    payments: [{ id: 'pay-1', amount: 65000, method: 'Bank Transfer', date: '2026-08-25', reference: 'WIRE-88231' }],
+    source_id: 'doc-i1', source_number: 'INV-2026-0001', created_at: '2026-08-25T10:00:00Z',
+  },
+  {
+    id: 'doc-r2', type: 'Receipt', number: 'RCT-2026-0002', status: 'Issued',
+    client_name: 'Coachella Weekend Showcase', client_email: 'ap@showcase.example',
+    event_title: 'Coachella Showcase', artist_name: 'Shenseea',
+    line_items: [{ id: 'l1', description: 'Payment received for INV-2026-0003 (paid in full)', qty: 1, unit_price: 75000 }],
+    discount_pct: 0, tax_pct: 0, currency: 'USD', issue_date: '2026-07-15', due_date: '2026-07-15',
+    payments: [{ id: 'pay-2', amount: 75000, method: 'Wire', date: '2026-07-15', reference: 'WIRE-77120' }],
+    source_id: 'doc-i3', source_number: 'INV-2026-0003', created_at: '2026-07-15T10:00:00Z',
+  },
+];
 
 // Initialize local DB state helper
 const getStoreValue = <T>(key: string, seed: T[]): T[] => {
@@ -1139,6 +1946,45 @@ const getStoreValue = <T>(key: string, seed: T[]): T[] => {
   try {
     const parsed = JSON.parse(raw) as T[];
     // Merge new seed items if they don't exist by ID in localStorage
+    if (key === 'st_users') {
+      const parsedUsers = (Array.isArray(parsed) ? parsed : []) as unknown as User[];
+      const seedUsers = seed as unknown as User[];
+      let updated = false;
+      seedUsers.forEach(seedU => {
+        const pa = parsedUsers.find(p => p.id === seedU.id || p.email.toLowerCase() === seedU.email.toLowerCase());
+        if (!pa) {
+          parsedUsers.push(seedU);
+          updated = true;
+        }
+      });
+      if (updated || parsedUsers.length === 0) {
+        const finalUsers = parsedUsers.length > 0 ? parsedUsers : seedUsers;
+        localStorage.setItem(key, JSON.stringify(finalUsers));
+        return finalUsers as unknown as T[];
+      }
+    }
+
+    if (key === 'st_integrations') {
+      const parsedInts = (Array.isArray(parsed) ? parsed : []) as unknown as Integration[];
+      const seedInts = seed as unknown as Integration[];
+      let updated = false;
+      seedInts.forEach(sInt => {
+        const existing = parsedInts.find(p => p.id === sInt.id);
+        if (!existing) {
+          parsedInts.push(sInt);
+          updated = true;
+        } else if (!existing.category || !existing.environment) {
+          Object.assign(existing, { category: sInt.category, environment: sInt.environment, webhook_url: sInt.webhook_url, latency_ms: sInt.latency_ms });
+          updated = true;
+        }
+      });
+      if (updated || parsedInts.length === 0) {
+        const finalInts = parsedInts.length > 0 ? parsedInts : seedInts;
+        localStorage.setItem(key, JSON.stringify(finalInts));
+        return finalInts as unknown as T[];
+      }
+    }
+
     if (key === 'st_artists_v2') {
       const parsedArtists = parsed as unknown as Artist[];
       const seedArtists = seed as unknown as Artist[];
@@ -1156,6 +2002,13 @@ const getStoreValue = <T>(key: string, seed: T[]): T[] => {
       if (updated) {
         localStorage.setItem(key, JSON.stringify(parsedArtists));
         return parsedArtists as unknown as T[];
+      }
+    }
+
+    if ((key === 'st_bookings' || key === 'st_contracts' || key === 'st_venues' || key === 'st_customers' || key === 'st_tasks' || key === 'st_invoices' || key === 'st_promo_codes' || key === 'st_campaigns' || key === 'st_ad_placements' || key === 'st_sections' || key === 'st_integrations' || key === 'st_billing_docs') && Array.isArray(parsed)) {
+      if (parsed.length === 0 && seed.length > 0) {
+        localStorage.setItem(key, JSON.stringify(seed));
+        return seed;
       }
     }
     return parsed;
@@ -1265,15 +2118,36 @@ export const db = {
   },
 
   async createLead(leadData: Omit<Lead, 'id' | 'created_at' | 'status' | 'source'>): Promise<Lead> {
-    const artists = await this.getArtists();
-    const artist = artists.find(a => a.id === leadData.artist_id);
+    const allArtists = await this.getArtists();
+    let computedArtistName = leadData.artist_name;
+    let computedArtists = leadData.artists;
+
+    if (computedArtists && computedArtists.length > 0) {
+      if (!computedArtistName) {
+        computedArtistName = computedArtists.map(a => a.artist_name).join(', ');
+      }
+    } else if (leadData.artist_id) {
+      const art = allArtists.find(a => a.id === leadData.artist_id);
+      if (art) {
+        computedArtistName = art.stage_name;
+        computedArtists = [{
+          artist_id: art.id,
+          artist_name: art.stage_name,
+          artist_image: art.profile_image,
+          category: art.category,
+          genre: art.genre,
+          role: 'Headliner'
+        }];
+      }
+    }
     
     const newLead: Lead = {
       ...leadData,
       id: 'lead-' + Math.random().toString(36).substr(2, 9),
       source: 'Website Booking Form',
       status: 'Lead Received',
-      artist_name: artist ? artist.stage_name : undefined,
+      artist_name: computedArtistName,
+      artists: computedArtists,
       created_at: new Date().toISOString()
     };
 
@@ -1286,8 +2160,27 @@ export const db = {
     leads.unshift(newLead);
     setStoreValue('st_leads', leads);
 
-    // Auto create system notification for agent
-    await this.createNotification('usr-agent-1', 'New Inquiry Received', `New inquiry from ${leadData.contact_name} for ${artist?.stage_name || 'Talent'}.`);
+    // Auto create system notification for admin & agents
+    const talentDisplay = computedArtistName || 'Talent';
+    await this.createNotification(
+      'usr-admin-1',
+      '⚡ New Booking Inquiry Received',
+      `New inquiry from ${leadData.contact_name} (${leadData.country}) for ${talentDisplay}. Offer: $${(leadData.budget || 0).toLocaleString()} USD.`
+    );
+    await this.createNotification(
+      'usr-agent-1',
+      'New Inquiry Received',
+      `New inquiry from ${leadData.contact_name} for ${talentDisplay}.`
+    );
+    await this.createNotification(
+      'all',
+      '⚡ New Booking Inquiry',
+      `Inquiry from ${leadData.contact_name} for ${talentDisplay}.`
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_new_booking_event', { detail: newLead }));
+    }
 
     return newLead;
   },
@@ -1357,18 +2250,32 @@ export const db = {
     const artists = await this.getArtists();
     const artist = artists.find(a => a.id === lead.artist_id);
 
+    const primaryArtistImage = (lead.artists && lead.artists[0]?.artist_image) || (artist ? artist.profile_image : '');
+    const lineupArtists = lead.artists || (artist ? [{
+      artist_id: artist.id,
+      artist_name: artist.stage_name,
+      artist_image: artist.profile_image,
+      category: artist.category,
+      genre: artist.genre,
+      role: 'Headliner' as const
+    }] : []);
+
     const newBooking: Booking = {
       id: 'bk-' + Math.random().toString(36).substr(2, 9),
-      artist_id: lead.artist_id || '',
-      artist_name: lead.artist_name || '',
-      artist_image: artist ? artist.profile_image : '',
+      artist_id: lead.artist_id || (lead.artists && lead.artists[0]?.artist_id) || '',
+      artist_name: lead.artist_name || (lead.artists && lead.artists.map(a => a.artist_name).join(', ')) || '',
+      artist_image: primaryArtistImage,
+      artists: lineupArtists,
       client_id: lead.client_id || 'cli-generic',
       client_name: lead.company_name ? `${lead.company_name} (${lead.contact_name})` : lead.contact_name,
+      client_email: lead.email,
+      client_phone: lead.phone,
       event_id: 'evt-' + Math.random().toString(36).substr(2, 9),
-      event_title: `Performance by ${lead.artist_name}`,
+      event_title: `Performance by ${lead.artist_name || 'Talent'}`,
       event_date: lead.preferred_date,
       event_venue: 'To Be Decided',
       event_country: lead.country,
+      special_requests: lead.details,
       status: initialStatus,
       deposit_amount: Math.round(lead.budget * 0.5),
       total_amount: lead.budget,
@@ -1534,17 +2441,14 @@ export const db = {
   // --- ARTIST AVAILABILITY ---
   async getArtistAvailability(artistId: string): Promise<string[]> {
     // Returns list of blocked/unavailable dates as strings (YYYY-MM-DD)
+    if (typeof window === 'undefined') return [];
     const raw = localStorage.getItem(`st_avail_${artistId}`);
-    if (!raw) {
-      // Seed some dates
-      const seedDates = [
-        new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      ];
-      localStorage.setItem(`st_avail_${artistId}`, JSON.stringify(seedDates));
-      return seedDates;
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as string[];
+    } catch {
+      return [];
     }
-    return JSON.parse(raw) as string[];
   },
 
   async toggleArtistDate(artistId: string, dateStr: string): Promise<string[]> {
@@ -1606,10 +2510,7 @@ export const db = {
 
   // --- MESSAGES ---
   async getMessages(userId: string, contactId: string): Promise<Message[]> {
-    const allMessages = getStoreValue<Message>('st_messages', [
-      { id: 'm1', sender_id: 'usr-agent-1', receiver_id: 'usr-client-1', message: 'Hello Paul, I have sent over the contract for Chronixx Coachella performance. Please review and sign.', created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'm2', sender_id: 'usr-client-1', receiver_id: 'usr-agent-1', message: 'Thanks Sarah, reviewing it now with the legal team. We will sign by tomorrow.', created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }
-    ]);
+    const allMessages = getStoreValue<Message>('st_messages', []);
     return allMessages.filter(m => 
       (m.sender_id === userId && m.receiver_id === contactId) ||
       (m.sender_id === contactId && m.receiver_id === userId)
@@ -1633,7 +2534,11 @@ export const db = {
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<Notification[]> {
     const allNotifs = getStoreValue('st_notifs', SEED_NOTIFICATIONS);
-    return allNotifs.filter(n => n.user_id === userId).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return allNotifs.filter(n =>
+      n.user_id === userId ||
+      n.user_id === 'all' ||
+      (userId === 'usr-admin-1' && (n.user_id === 'admin' || n.user_id === 'usr-agent-1'))
+    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   },
 
   async createNotification(userId: string, title: string, message: string): Promise<Notification> {
@@ -1688,6 +2593,22 @@ export const db = {
     };
     bookings.unshift(newBk);
     setStoreValue('st_bookings', bookings);
+
+    await this.createNotification(
+      'usr-admin-1',
+      '⚡ New Booking Created',
+      `Booking logged: ${newBk.event_title} (${newBk.artist_name || 'Lineup'}) on ${newBk.event_date}. Total: $${(newBk.total_amount || 0).toLocaleString()} USD.`
+    );
+    await this.createNotification(
+      'all',
+      '⚡ New Booking Created',
+      `Booking logged: ${newBk.event_title} (${newBk.artist_name || 'Lineup'}).`
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_new_booking_event', { detail: newBk }));
+    }
+
     return newBk;
   },
 
@@ -2015,5 +2936,222 @@ export const db = {
     const filtered = ints.filter(i => i.id !== id);
     setStoreValue('st_integrations', filtered);
     return true;
+  },
+
+  // --- SHOW EVENTS ---
+  async getEvents(): Promise<ShowEvent[]> {
+    return getStoreValue('st_events', SEED_EVENTS);
+  },
+
+  async createEvent(evt: Omit<ShowEvent, 'id' | 'created_at'>): Promise<ShowEvent> {
+    const events = await this.getEvents();
+    const newEvt: ShowEvent = {
+      ...evt,
+      id: 'evt-' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    events.unshift(newEvt);
+    setStoreValue('st_events', events);
+    return newEvt;
+  },
+
+  async updateEvent(id: string, updates: Partial<ShowEvent>): Promise<ShowEvent> {
+    const events = await this.getEvents();
+    const idx = events.findIndex(e => e.id === id);
+    if (idx !== -1) {
+      events[idx] = { ...events[idx], ...updates };
+      setStoreValue('st_events', events);
+      return events[idx];
+    }
+    throw new Error('Event not found');
+  },
+
+  async deleteEvent(id: string): Promise<boolean> {
+    const events = await this.getEvents();
+    const filtered = events.filter(e => e.id !== id);
+    setStoreValue('st_events', filtered);
+    return true;
+  },
+
+  // --- BILLING DOCUMENTS (Quotes, Invoices, Receipts, Credit Notes) ---
+  async getBillingDocs(): Promise<BillingDoc[]> {
+    return getStoreValue('st_billing_docs', SEED_BILLING_DOCS);
+  },
+
+  _nextDocNumber(docs: BillingDoc[], type: BillingDocType): string {
+    const year = new Date().getFullYear();
+    const prefix = `${DOC_PREFIX[type]}-${year}-`;
+    const max = docs
+      .filter(d => d.number.startsWith(prefix))
+      .reduce((m, d) => Math.max(m, parseInt(d.number.slice(prefix.length), 10) || 0), 0);
+    return prefix + String(max + 1).padStart(4, '0');
+  },
+
+  async createBillingDoc(data: Omit<BillingDoc, 'id' | 'number' | 'created_at' | 'payments'> & { number?: string; payments?: BillingPayment[] }): Promise<BillingDoc> {
+    const docs = await this.getBillingDocs();
+    const doc: BillingDoc = {
+      ...data,
+      payments: data.payments || [],
+      id: uid('doc'),
+      number: data.number?.trim() || this._nextDocNumber(docs, data.type),
+      created_at: new Date().toISOString(),
+    };
+    docs.unshift(doc);
+    setStoreValue('st_billing_docs', docs);
+    return doc;
+  },
+
+  async updateBillingDoc(id: string, updates: Partial<BillingDoc>): Promise<BillingDoc> {
+    const docs = await this.getBillingDocs();
+    const idx = docs.findIndex(d => d.id === id);
+    if (idx === -1) throw new Error('Document not found');
+    docs[idx] = { ...docs[idx], ...updates };
+    setStoreValue('st_billing_docs', docs);
+    return docs[idx];
+  },
+
+  async deleteBillingDoc(id: string): Promise<boolean> {
+    const docs = await this.getBillingDocs();
+    setStoreValue('st_billing_docs', docs.filter(d => d.id !== id));
+    return true;
+  },
+
+  /** Quote → Invoice. depositPct < 100 raises a deposit invoice instead of the full amount. */
+  async convertQuoteToInvoice(quoteId: string, depositPct = 100, dueInDays = 14): Promise<BillingDoc> {
+    const docs = await this.getBillingDocs();
+    const quote = docs.find(d => d.id === quoteId);
+    if (!quote || quote.type !== 'Quote') throw new Error('Quote not found');
+    const today = new Date();
+    const due = new Date(today.getTime() + dueInDays * 86400000);
+    const full = depositPct >= 100;
+    const t = docTotals(quote);
+    const invoice = await this.createBillingDoc({
+      type: 'Invoice',
+      status: 'Draft',
+      client_name: quote.client_name, client_email: quote.client_email,
+      client_company: quote.client_company, client_address: quote.client_address,
+      booking_id: quote.booking_id, event_title: quote.event_title, artist_name: quote.artist_name,
+      line_items: full
+        ? quote.line_items.map(l => ({ ...l, id: uid('li') }))
+        : [{ id: uid('li'), description: `${depositPct}% booking deposit for ${quote.event_title || 'event'} (per ${quote.number})`, qty: 1, unit_price: r2(t.total * depositPct / 100) }],
+      discount_pct: full ? quote.discount_pct : 0,
+      tax_pct: full ? quote.tax_pct : 0,
+      currency: quote.currency,
+      issue_date: today.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+      notes: quote.notes, terms: quote.terms || DEFAULT_INVOICE_TERMS,
+      source_id: quote.id, source_number: quote.number,
+    });
+    await this.updateBillingDoc(quote.id, { status: 'Accepted', converted_to_id: invoice.id, converted_to_number: invoice.number });
+    return invoice;
+  },
+
+  /** Records a payment against an invoice and auto-issues a receipt. */
+  async recordInvoicePayment(invoiceId: string, p: { amount: number; method: string; date: string; reference?: string; notes?: string }): Promise<{ invoice: BillingDoc; receipt: BillingDoc }> {
+    const docs = await this.getBillingDocs();
+    const inv = docs.find(d => d.id === invoiceId);
+    if (!inv || inv.type !== 'Invoice') throw new Error('Invoice not found');
+    const before = docTotals(inv);
+    const amount = r2(Math.min(Math.max(p.amount, 0), before.balance));
+    if (amount <= 0) throw new Error('Nothing to pay');
+    const payment: BillingPayment = { id: uid('pay'), amount, method: p.method, date: p.date, reference: p.reference, notes: p.notes };
+    const payments = [...inv.payments, payment];
+    const after = docTotals({ ...inv, payments });
+    const fully = after.balance <= 0.005;
+    const receipt = await this.createBillingDoc({
+      type: 'Receipt', status: 'Issued',
+      client_name: inv.client_name, client_email: inv.client_email, client_company: inv.client_company,
+      booking_id: inv.booking_id, event_title: inv.event_title, artist_name: inv.artist_name,
+      line_items: [{ id: uid('li'), description: `Payment received for ${inv.number}${fully ? ' (paid in full)' : ' (partial payment)'}`, qty: 1, unit_price: amount }],
+      discount_pct: 0, tax_pct: 0, currency: inv.currency,
+      issue_date: p.date, due_date: p.date,
+      payments: [payment], source_id: inv.id, source_number: inv.number,
+    });
+    payment.receipt_id = receipt.id;
+    const invoice = await this.updateBillingDoc(inv.id, { payments, status: fully ? 'Paid' : 'Partially Paid' });
+    return { invoice, receipt };
+  },
+
+  /** Issues a credit note for the full invoice value and voids the invoice. */
+  async createCreditNote(invoiceId: string, reason?: string): Promise<BillingDoc> {
+    const docs = await this.getBillingDocs();
+    const inv = docs.find(d => d.id === invoiceId);
+    if (!inv || inv.type !== 'Invoice') throw new Error('Invoice not found');
+    const cn = await this.createBillingDoc({
+      type: 'Credit Note', status: 'Issued',
+      client_name: inv.client_name, client_email: inv.client_email, client_company: inv.client_company,
+      booking_id: inv.booking_id, event_title: inv.event_title, artist_name: inv.artist_name,
+      line_items: inv.line_items.map(l => ({ ...l, id: uid('li') })),
+      discount_pct: inv.discount_pct, tax_pct: inv.tax_pct, currency: inv.currency,
+      issue_date: new Date().toISOString().slice(0, 10), due_date: new Date().toISOString().slice(0, 10),
+      notes: reason || `Credit issued against ${inv.number}.`,
+      source_id: inv.id, source_number: inv.number,
+    });
+    await this.updateBillingDoc(inv.id, { status: 'Void' });
+    return cn;
+  },
+
+  async duplicateBillingDoc(id: string): Promise<BillingDoc> {
+    const docs = await this.getBillingDocs();
+    const d = docs.find(x => x.id === id);
+    if (!d) throw new Error('Document not found');
+    const today = new Date().toISOString().slice(0, 10);
+    const due = new Date(Date.now() + (d.type === 'Quote' ? 30 : 14) * 86400000).toISOString().slice(0, 10);
+    return this.createBillingDoc({
+      ...d, status: 'Draft', payments: [], issue_date: today, due_date: due,
+      line_items: d.line_items.map(l => ({ ...l, id: uid('li') })),
+      source_id: undefined, source_number: undefined, converted_to_id: undefined, converted_to_number: undefined, sent_at: undefined,
+    });
+  },
+
+  // --- SYSTEM BACKUP & RESTORE ---
+  exportSystemBackup(): string {
+    if (typeof window === 'undefined') return '{}';
+    const backupKeys = [
+      'st_users', 'st_artists_v2', 'st_leads', 'st_bookings', 'st_contracts',
+      'st_invoices', 'st_tasks', 'st_notifs', 'st_venues', 'st_customers',
+      'st_ticket_tiers', 'st_promo_codes', 'st_campaigns', 'st_ad_placements',
+      'st_website_sections', 'st_integrations', 'st_events', 'st_settings_domain',
+      'st_settings_currency', 'st_settings_policy'
+    ];
+    const data: Record<string, unknown> = {
+      _meta: {
+        system: 'Showtime Entertainment Services',
+        version: '2026.4',
+        timestamp: new Date().toISOString(),
+      }
+    };
+    backupKeys.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) {
+        try {
+          data[k] = JSON.parse(v);
+        } catch {
+          data[k] = v;
+        }
+      }
+    });
+    return JSON.stringify(data, null, 2);
+  },
+
+  importSystemBackup(jsonString: string): { success: boolean; recordsRestored: number; error?: string } {
+    if (typeof window === 'undefined') return { success: false, recordsRestored: 0, error: 'No browser window' };
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object') {
+        return { success: false, recordsRestored: 0, error: 'Invalid JSON backup payload' };
+      }
+      let count = 0;
+      Object.keys(data).forEach(k => {
+        if (k.startsWith('st_')) {
+          const val = typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k]);
+          localStorage.setItem(k, val);
+          count++;
+        }
+      });
+      return { success: true, recordsRestored: count };
+    } catch (err: unknown) {
+      return { success: false, recordsRestored: 0, error: (err as Error).message || 'Failed to parse JSON' };
+    }
   }
 };

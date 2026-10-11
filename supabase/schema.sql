@@ -333,31 +333,6 @@ INSERT INTO permissions (name, module, action) VALUES
 ('download_documents', 'documents', 'read')
 ON CONFLICT (name) DO NOTHING;
 
--- Seed Users (System Administrators & Staff)
-INSERT INTO users (id, first_name, last_name, email, phone, status) VALUES
--- Admin
-('10a0e5b0-2b22-4911-88f2-1a48c90994f2', 'Damian', 'Marley', 'damian.admin@showtime.com', '+1-876-555-0100', 'Active'),
--- Agent
-('e8efb503-0de2-4c22-95f2-2e5a60a77f0a', 'Sarah', 'Silverman', 'sarah.agent@showtime.com', '+1-212-555-0155', 'Active'),
--- Manager
-('9fefb7bc-ff6e-4e4f-b67f-38e9a2bc8ef1', 'Robert', 'Livingston', 'robert.manager@showtime.com', '+1-876-555-0199', 'Active'),
--- Artist (Direct Accounts)
-('3ab0e6f0-1a77-4c22-b5f2-9e8a80a22f0e', 'Beres', 'Hammond', 'beres.artist@showtime.com', '+1-876-555-0211', 'Active'),
-('b080eb2c-7ab5-4673-9ef4-113fa096dfb2', 'Koffee', 'Mikayla', 'koffee.artist@showtime.com', '+1-876-555-0222', 'Active'),
--- Client
-('fc9e5b03-fde2-44bc-877f-1d488e01bf22', 'Michael', 'Eavis', 'eavis.client@glastonbury.co.uk', '+44-20-7946-0192', 'Active')
-ON CONFLICT (email) DO NOTHING;
-
--- Map User Roles
-INSERT INTO user_roles (user_id, role_id) VALUES
-('10a0e5b0-2b22-4911-88f2-1a48c90994f2', 'b1a478b0-a548-4c91-9e7b-c990a42442cf'), -- Damian -> Admin
-('e8efb503-0de2-4c22-95f2-2e5a60a77f0a', 'c7e8e503-4fde-44bc-877f-1d488e01bf3b'), -- Sarah -> Agent
-('9fefb7bc-ff6e-4e4f-b67f-38e9a2bc8ef1', '12247fb0-b74e-4f01-9a7c-12f8e02bc8ef'), -- Robert -> Manager
-('3ab0e6f0-1a77-4c22-b5f2-9e8a80a22f0e', '5081fa2c-8ab5-4673-93f4-013fa096dfb2'), -- Beres -> Artist
-('b080eb2c-7ab5-4673-9ef4-113fa096dfb2', '5081fa2c-8ab5-4673-93f4-013fa096dfb2'), -- Koffee -> Artist
-('fc9e5b03-fde2-44bc-877f-1d488e01bf22', 'd408ebc0-ff48-40b1-871c-43f0aa7bb8e2')  -- Michael -> Client
-ON CONFLICT DO NOTHING;
-
 -- Seed Categories
 INSERT INTO artist_categories (id, name, description) VALUES
 ('a5a478b0-c548-4c91-9e7b-c990a42442ca', 'Reggae Artists', 'Root reggae, lovers rock, and foundation icons.'),
@@ -380,7 +355,7 @@ INSERT INTO artists (id, stage_name, legal_name, category_id, genre, bio, profil
     'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=1200',
     'Available',
     'Active',
-    '9fefb7bc-ff6e-4e4f-b67f-38e9a2bc8ef1'
+    NULL
 ),
 (
     '0b8b78bc-b548-4c91-9e7b-c990a4244102', 
@@ -393,7 +368,7 @@ INSERT INTO artists (id, stage_name, legal_name, category_id, genre, bio, profil
     'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&q=80&w=1200',
     'Available',
     'Active',
-    '9fefb7bc-ff6e-4e4f-b67f-38e9a2bc8ef1'
+    NULL
 ),
 (
     '0c8c78bc-c548-4c91-9e7b-c990a4244103', 
@@ -406,7 +381,7 @@ INSERT INTO artists (id, stage_name, legal_name, category_id, genre, bio, profil
     'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&q=80&w=1200',
     'Available',
     'Active',
-    'b080eb2c-7ab5-4673-9ef4-113fa096dfb2'
+    NULL
 ),
 (
     '0d8d78bc-d548-4c91-9e7b-c990a4244104', 
@@ -419,7 +394,7 @@ INSERT INTO artists (id, stage_name, legal_name, category_id, genre, bio, profil
     'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
     'Available',
     'Active',
-    '9fefb7bc-ff6e-4e4f-b67f-38e9a2bc8ef1'
+    NULL
 ),
 (
     '0e8e78bc-e548-4c91-9e7b-c990a4244105', 
@@ -432,7 +407,7 @@ INSERT INTO artists (id, stage_name, legal_name, category_id, genre, bio, profil
     'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
     'Available',
     'Active',
-    '10a0e5b0-2b22-4911-88f2-1a48c90994f2'
+    NULL
 )
 ON CONFLICT (stage_name) DO UPDATE SET 
     bio = EXCLUDED.bio,
@@ -453,7 +428,6 @@ ON CONFLICT (artist_id, platform) DO UPDATE SET followers = EXCLUDED.followers;
 -- Seed Artist Media
 INSERT INTO artist_media (artist_id, media_type, url) VALUES
 ('0c8c78bc-c548-4c91-9e7b-c990a4244103', 'Image', 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&q=80&w=600'),
-('0c8c78bc-c548-4c91-9e7b-c990a4244103', 'Video', 'https://www.w3schools.com/html/mov_bbb.mp4'),
 ('0d8d78bc-d548-4c91-9e7b-c990a4244104', 'Image', 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&q=80&w=600'),
 ('0a8a78bc-a548-4c91-9e7b-c990a4244101', 'Image', 'https://images.unsplash.com/photo-1487180142328-054b783fc471?auto=format&fit=crop&q=80&w=600')
 ON CONFLICT DO NOTHING;
@@ -470,35 +444,3 @@ INSERT INTO venues (id, name, capacity, address, city, country) VALUES
 ('v2b2e5b0-2b22-4911-88f2-1a48c90994f2', 'Wembley Arena', 12500, 'Arena Square, Engineers Way', 'London', 'United Kingdom'),
 ('v3c3e5b0-2b22-4911-88f2-1a48c90994f3', 'Red Rocks Amphitheatre', 9525, '18300 W Alameda Pkwy', 'Morrison', 'United States')
 ON CONFLICT (name) DO UPDATE SET capacity = EXCLUDED.capacity;
-
--- Seed Clients
-INSERT INTO clients (id, company_name, contact_name, email, phone, country) VALUES
-('c10a5b03-fde2-44bc-877f-1d488e01bf01', 'Sumfest Productions', 'Joe Bogdanovich', 'joe@reggaesumfest.com', '+1-876-555-0301', 'Jamaica'),
-('c20b5b03-fde2-44bc-877f-1d488e01bf02', 'Goldenvoice Events', 'Paul Tollett', 'paul@coachella.com', '+1-310-555-0922', 'United States')
-ON CONFLICT (email) DO NOTHING;
-
--- Seed Leads / Inquiries
-INSERT INTO leads (id, client_id, source, status, assigned_to, details, budget, preferred_date, artist_id) VALUES
-(
-    'l1a1a5b0-2b22-4911-88f2-1a48c90994fa', 
-    'c10a5b03-fde2-44bc-877f-1d488e01bf01', 
-    'Website Booking Form', 
-    'Lead Received', 
-    'e8efb503-0de2-4c22-95f2-2e5a60a77f0a', 
-    'Requesting Koffee to perform as headliner for Reggae Sumfest Night 2 in Montego Bay. High-priority inquiry.',
-    75000.00,
-    '2026-07-18',
-    '0c8c78bc-c548-4c91-9e7b-c990a4244103'
-),
-(
-    'l2b2b5b0-2b22-4911-88f2-1a48c90994fb', 
-    'c20b5b03-fde2-44bc-877f-1d488e01bf02', 
-    'Direct Agent Outbound', 
-    'Negotiation', 
-    'e8efb503-0de2-4c22-95f2-2e5a60a77f0a', 
-    'Coachella Outdoor Stage performance request for Chronixx. In negotiation regarding slots and backline requirements.',
-    120000.00,
-    '2026-04-18',
-    '0b8b78bc-b548-4c91-9e7b-c990a4244102'
-)
-ON CONFLICT DO NOTHING;

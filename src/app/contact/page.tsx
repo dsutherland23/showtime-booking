@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import { db } from '@/utils/db';
 
 export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -12,14 +14,28 @@ export default function Contact() {
     message: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    // Simple mock success
-    setTimeout(() => {
-      setSubmitted(false);
+    setSubmitting(true);
+    try {
+      await db.createLead({
+        contact_name: form.name.trim(),
+        email: form.email.trim(),
+        country: 'Jamaica',
+        details: `Subject: ${form.subject}\n\nMessage: ${form.message.trim()}`,
+        budget: 0,
+        preferred_date: new Date().toISOString().split('T')[0],
+      });
+      setSubmitted(true);
       setForm({ name: '', email: '', subject: 'General Inquiry', message: '' });
-    }, 3000);
+      setTimeout(() => {
+        setSubmitted(false);
+      }, 5000);
+    } catch (err) {
+      console.error('Failed to submit contact message:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -84,10 +100,11 @@ export default function Contact() {
                   <input
                     id="name"
                     type="text"
-                    placeholder="e.g. Paul Tollett"
+                    placeholder="Your Full Name"
                     value={form.name}
                     onChange={e => setForm({...form, name: e.target.value})}
                     required
+                    disabled={submitting}
                   />
                 </div>
                 <div className="field-group">
@@ -99,6 +116,7 @@ export default function Contact() {
                     value={form.email}
                     onChange={e => setForm({...form, email: e.target.value})}
                     required
+                    disabled={submitting}
                   />
                 </div>
                 <div className="field-group">
@@ -107,6 +125,7 @@ export default function Contact() {
                     id="subject"
                     value={form.subject}
                     onChange={e => setForm({...form, subject: e.target.value})}
+                    disabled={submitting}
                   >
                     <option value="General Inquiry">General Inquiry</option>
                     <option value="Billing & Invoicing">Billing & Invoicing</option>
@@ -123,11 +142,16 @@ export default function Contact() {
                     value={form.message}
                     onChange={e => setForm({...form, message: e.target.value})}
                     required
+                    disabled={submitting}
                   />
                 </div>
 
-                <button type="submit" className="btn btn-primary">
-                  <Send className="w-4 h-4" /> Send Office Message
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send className="w-4 h-4" /> Send Office Message</>
+                  )}
                 </button>
               </div>
             </form>

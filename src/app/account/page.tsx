@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { isSupabaseReady } from '@/lib/supabase/client';
+import { db } from '@/utils/db';
 import { User, Mail, Phone, Shield, Save, Loader2, CheckCircle, ArrowLeft, Lock } from 'lucide-react';
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -43,9 +45,32 @@ export default function AccountPage() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
-    await new Promise(r => setTimeout(r, 700));
-    setSavingProfile(false);
-    showToast('Profile updated successfully.');
+    try {
+      if (isSupabaseReady) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        if (supabase && user?.id) {
+          const { error } = await supabase.from('profiles').update({
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            phone: phone.trim(),
+          }).eq('id', user.id);
+          if (error) throw error;
+        }
+      } else if (user?.id) {
+        await db.updateUser(user.id, {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone: phone.trim(),
+        });
+      }
+      await refreshProfile();
+      showToast('Profile updated successfully.');
+    } catch {
+      showToast('Failed to update profile.', false);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleSavePassword = async (e: React.FormEvent) => {
@@ -59,11 +84,23 @@ export default function AccountPage() {
       return;
     }
     setSavingPassword(true);
-    await new Promise(r => setTimeout(r, 700));
-    setSavingPassword(false);
-    setNewPassword('');
-    setConfirmPassword('');
-    showToast('Password updated successfully.');
+    try {
+      if (isSupabaseReady) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        if (supabase) {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) throw error;
+        }
+      }
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast('Password updated successfully.');
+    } catch {
+      showToast('Failed to update password.', false);
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   if (loading || !profile) {
@@ -102,10 +139,10 @@ export default function AccountPage() {
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
         {/* Back link */}
         <Link
-          href="/dashboard"
+          href={profile.role === 'Artist' ? '/portal/artist' : profile.role === 'Client' ? '/portal/client' : '/dashboard'}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.82rem', textDecoration: 'none', marginBottom: '1.75rem' }}
         >
-          <ArrowLeft size={14} /> Back to Dashboard
+          <ArrowLeft size={14} /> {profile.role === 'Artist' ? 'Back to Artist Hub' : profile.role === 'Client' ? 'Back to Client Portal' : 'Back to Dashboard'}
         </Link>
 
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '0.35rem' }}>Account Settings</h1>
@@ -142,7 +179,7 @@ export default function AccountPage() {
               </div>
               <div>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.35rem' }}><Phone size={10} />PHONE</label>
-                <input className="acc-input" style={inp} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 876 000 0000" />
+                <input className="acc-input" style={inp} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 (876) 227-1666" />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>

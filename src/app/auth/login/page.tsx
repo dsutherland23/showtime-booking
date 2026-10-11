@@ -3,7 +3,11 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient, isSupabaseReady } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/context/AuthContext';
+import { db, SEED_USERS } from '@/utils/db';
+import GoogleSignInButton, { isGoogleSignInConfigured, signInWithVerifiedGoogle, VerifiedGoogleProfile } from '@/components/auth/GoogleSignInButton';
+import AppleSignInButton, { signInWithVerifiedApple, VerifiedAppleProfile } from '@/components/auth/AppleSignInButton';
 import { Eye, EyeOff, LogIn, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 
 function LoginForm() {
@@ -13,6 +17,7 @@ function LoginForm() {
   const verified = searchParams.get('verified');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), []);
+  const { switchUser, profile, isStaff } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,66 +26,130 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [rateLimited, setRateLimited] = useState(false);
 
+  // Called only after /api/auth/google has verified the Google ID token.
+  const handleGoogleVerified = async (profile: VerifiedGoogleProfile) => {
+    setError('');
+    const user = await signInWithVerifiedGoogle(profile, 'Client');
+    if (switchUser) await switchUser(user.id);
+    const portal = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
+    // Only honour same-site relative redirects.
+    const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : portal;
+    window.location.href = safeRedirect;
+  };
+
+  const handleAppleVerified = async (profile: VerifiedAppleProfile) => {
+    setError('');
+    const user = await signInWithVerifiedApple(profile, 'Client');
+    if (switchUser) await switchUser(user.id);
+    const portal = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
+    const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : portal;
+    window.location.href = safeRedirect;
+  };
+
   useEffect(() => {
-    if (!supabase) return;
-    // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push(redirect);
-    });
-  }, [supabase, router, redirect]);
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) router.push(redirect);
+      });
+    } else if (profile && isStaff && redirect.startsWith('/dashboard')) {
+      router.push('/dashboard');
+    }
+  }, [supabase, router, redirect, profile, isStaff]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rateLimited) return;
-    if (!supabase) { setError('Authentication is not configured yet.'); return; }
 
     setError('');
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
 
-      if (error) {
-        if (error.message.includes('rate limit')) {
-          setRateLimited(true);
-          setError('Too many login attempts. Please wait a few minutes and try again.');
-          setTimeout(() => setRateLimited(false), 60000);
-        } else if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
-          setError('Incorrect email or password. Please check your credentials and try again.');
-        } else if (error.message.includes('Email not confirmed')) {
-          setError('Please verify your email address before logging in. Check your inbox for a verification link.');
-        } else {
-          setError('An error occurred during login. Please try again.');
+        if (error) {
+          if (error.message.includes('rate limit')) {
+            setRateLimited(true);
+            setError('Too many login attempts. Please wait a few minutes and try again.');
+            setTimeout(() => setRateLimited(false), 60000);
+          } else if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
+            setError('Incorrect email or password. Please check your credentials and try again.');
+          } else if (error.message.includes('Email not confirmed')) {
+            setError('Please verify your email address before logging in. Check your inbox for a verification link.');
+          } else {
+            setError('An error occurred during login. Please try again.');
+          }
+          return;
         }
+
+        if (data?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single();
+
+          const role = profile?.role || '';
+          const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
+            'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
+            'Promoter', 'Venue Manager'];
+
+          if (staffRoles.includes(role) || redirect.startsWith('/dashboard') || redirect.startsWith('/admin')) {
+            window.location.href = '/dashboard';
+          } else if (role === 'Artist') {
+            window.location.href = '/portal/artist';
+          } else if (role === 'Client') {
+            window.location.href = '/portal/client';
+          } else {
+            window.location.href = redirect !== '/' ? redirect : '/';
+          }
+          return;
+        }
+      }
+
+      // Cloudflare D1 / Local Auth mode
+      const trimmedEmail = email.trim().toLowerCase();
+      const dbUsers = await db.getUsers();
+      const users = dbUsers && dbUsers.length > 0 ? dbUsers : SEED_USERS;
+      const matched = users.find(u => u.email.toLowerCase() === trimmedEmail)
+        || SEED_USERS.find(u => u.email.toLowerCase() === trimmedEmail);
+
+      if (!matched) {
+        setError('No account found with this email. Please check your credentials or register a new account.');
+        setLoading(false);
         return;
       }
 
-      if (data?.user) {
-        // Route based on role stored in profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        const role = profile?.role || '';
-        const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
-          'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
-          'Promoter', 'Venue Manager'];
-
-        if (staffRoles.includes(role) || redirect.startsWith('/dashboard') || redirect.startsWith('/admin')) {
-          router.push('/dashboard');
-        } else if (role === 'Artist') {
-          router.push('/portal/artist');
-        } else if (role === 'Client') {
-          router.push('/portal/client');
-        } else {
-          router.push(redirect !== '/' ? redirect : '/');
-        }
+      if (matched.status !== 'Active') {
+        setError(`This account is ${matched.status.toLowerCase()}. Please contact Showtime support.`);
+        setLoading(false);
+        return;
       }
+
+      localStorage.setItem('st_active_user_id', matched.id);
+      if (switchUser) {
+        await switchUser(matched.id);
+      }
+
+      const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
+        'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
+        'Promoter', 'Venue Manager'];
+
+      if (staffRoles.includes(matched.role) || redirect.startsWith('/dashboard') || redirect.startsWith('/admin')) {
+        window.location.href = '/dashboard';
+      } else if (matched.role === 'Artist') {
+        window.location.href = '/portal/artist';
+      } else if (matched.role === 'Client') {
+        window.location.href = '/portal/client';
+      } else {
+        window.location.href = redirect !== '/' ? redirect : '/';
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError('An error occurred during login. Please check your credentials and try again.');
     } finally {
       setLoading(false);
     }
@@ -89,15 +158,35 @@ function LoginForm() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        {/* Logo */}
-        <Link href="/" className="auth-logo-link">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
-        </Link>
+        {/* Centered Showtime Logo */}
+        <div className="auth-logo-center-wrap">
+          <Link href="/" className="auth-logo-link" title="Showtime Global Services">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/logo.png" alt="Showtime Services" className="auth-logo" />
+          </Link>
+        </div>
 
         <div className="auth-header">
           <h1 className="auth-title">Welcome back</h1>
           <p className="auth-subtitle">Sign in to your Showtime account</p>
+        </div>
+
+        {/* Social Authentication */}
+        <div className="auth-social-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+          <GoogleSignInButton
+            text="signin_with"
+            onVerified={handleGoogleVerified}
+            onError={(msg) => setError(msg)}
+          />
+          <AppleSignInButton
+            text="signin_with"
+            onVerified={handleAppleVerified}
+            onError={(msg) => setError(msg)}
+          />
+        </div>
+
+        <div className="auth-divider">
+          <span>or sign in with email</span>
         </div>
 
         {verified && (
@@ -120,7 +209,7 @@ function LoginForm() {
             <input
               id="login-email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -205,20 +294,89 @@ function LoginForm() {
           padding: 2.5rem 2rem;
           box-shadow: var(--shadow-xl);
         }
-        .auth-logo-link {
+        .auth-logo-center-wrap {
           display: flex;
           justify-content: center;
-          margin-bottom: 2rem;
-          opacity: 1;
+          align-items: center;
+          width: 100%;
+          margin: 0 auto 1.75rem auto;
+          text-align: center;
+        }
+        .auth-logo-link {
+          display: inline-flex;
+          justify-content: center;
+          align-items: center;
+          margin: 0 auto;
+          text-decoration: none;
         }
         .auth-logo {
-          height: 28px;
+          height: 38px;
           width: auto;
+          max-width: 240px;
+          object-fit: contain;
+          margin: 0 auto;
+          display: block;
           filter: brightness(0) invert(1);
+          transition: transform 0.2s ease;
+        }
+        .auth-logo:hover {
+          transform: scale(1.03);
+        }
+        .auth-social-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.65rem;
+          margin-bottom: 1.25rem;
+        }
+        .auth-social-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          border-radius: var(--radius-md, 8px);
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: var(--text-primary);
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        .auth-social-btn:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(212, 175, 55, 0.4);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        }
+        .auth-social-btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+        .auth-divider {
+          display: flex;
+          align-items: center;
+          text-align: center;
+          margin: 0.5rem 0 1.25rem;
+        }
+        .auth-divider::before,
+        .auth-divider::after {
+          content: '';
+          flex: 1;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .auth-divider span {
+          padding: 0 0.85rem;
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
         }
         .auth-header {
           text-align: center;
-          margin-bottom: 1.75rem;
+          margin-bottom: 1.5rem;
         }
         .auth-title {
           font-size: 1.5rem;
