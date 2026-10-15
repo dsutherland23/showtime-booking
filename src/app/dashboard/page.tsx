@@ -10,7 +10,9 @@ import {
   WebsiteSection, Integration, ShowEvent,
   BillingDoc, BillingDocType, BillingDocStatus, BillingLineItem, BillingPayment,
   docTotals, effectiveDocStatus,
-  HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG
+  HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG,
+  AboutUsConfig, PrivacySectionItem, PrivacyPolicyConfig, AccessibilityConfig,
+  SEED_ABOUT_CONFIG, SEED_PRIVACY_CONFIG, SEED_ACCESSIBILITY_CONFIG
 } from '@/utils/db';
 import {
   LayoutDashboard, Calendar, Music, MapPin, Users, Ticket, Receipt,
@@ -25,7 +27,8 @@ import {
   Send, Download, Printer, Percent, Sparkles,
   Key, Copy, Server, Database, Cpu, Zap, UserCheck, FileCode, RotateCcw,
   HelpCircle, BookOpen, ChevronDown, Rocket, Lightbulb,
-  ArrowRight, FileCheck, FilePlus, Split, Share2, Landmark
+  ArrowRight, FileCheck, FilePlus, Split, Share2, Landmark,
+  Award, Compass, Target
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,7 +56,10 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'tickets',      label: 'Tickets',       icon: Ticket,          section: 'Financial',       permission: 'view_tickets' },
   { id: 'marketing',    label: 'Marketing',     icon: Megaphone,       section: 'Growth',          permission: 'manage_marketing' },
   { id: 'advertising',  label: 'Advertising',   icon: Radio,           section: 'Growth',          permission: 'manage_advertising' },
-  { id: 'content',      label: 'Content CMS',   icon: FileText,        section: 'Website',         permission: 'manage_content' },
+  { id: 'content',            label: 'Content CMS',           icon: FileText,    section: 'Website', permission: 'manage_content' },
+  { id: 'page_about',         label: 'About Us Page',         icon: Compass,     section: 'Website', permission: 'manage_content' },
+  { id: 'page_privacy',       label: 'Privacy Policy',        icon: ShieldCheck, section: 'Website', permission: 'manage_content' },
+  { id: 'page_accessibility', label: 'Accessibility Page',    icon: Award,       section: 'Website', permission: 'manage_content' },
   { id: 'staff',        label: 'Staff & Roles', icon: ShieldCheck,     section: 'System',          adminOnly: true },
   { id: 'integrations', label: 'Integrations',  icon: Cable,           section: 'System',          adminOnly: true },
   { id: 'maintenance',  label: 'Maintenance',   icon: Wrench,          section: 'System',          adminOnly: true },
@@ -6174,10 +6180,17 @@ function AdvertisingSection({ ads, onRefresh, showToast }: {
 
 // ─── Content CMS Section ──────────────────────────────────────────────────────
 
-function ContentSection({ sections, onRefresh, showToast }: {
+function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
   sections: WebsiteSection[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
+  initialSubTab?: 'stats' | 'marquee' | 'sections' | 'about' | 'privacy' | 'accessibility';
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'marquee' | 'sections'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'marquee' | 'sections' | 'about' | 'privacy' | 'accessibility'>(initialSubTab || 'stats');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   // ── 1. Key Statistics State ─────────────────────────────────────────────────
   const [stats, setStats] = useState<HomepageStatItem[]>(SEED_HOMEPAGE_CONFIG.stats);
@@ -6204,7 +6217,23 @@ function ContentSection({ sections, onRefresh, showToast }: {
   const blank = { type: 'hero' as WebsiteSection['type'], title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true };
   const [form, setForm] = useState(blank);
 
-  // Load Homepage Config on Mount
+  // ── 4. About Us State ───────────────────────────────────────────────────────
+  const [aboutConfig, setAboutConfig] = useState<AboutUsConfig>(SEED_ABOUT_CONFIG);
+  const [savingAbout, setSavingAbout] = useState(false);
+  const [savedAbout, setSavedAbout] = useState(false);
+  const [newMarketInput, setNewMarketInput] = useState('');
+
+  // ── 5. Privacy Policy State ─────────────────────────────────────────────────
+  const [privacyConfig, setPrivacyConfig] = useState<PrivacyPolicyConfig>(SEED_PRIVACY_CONFIG);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [savedPrivacy, setSavedPrivacy] = useState(false);
+
+  // ── 6. Accessibility Statement State ────────────────────────────────────────
+  const [a11yConfig, setA11yConfig] = useState<AccessibilityConfig>(SEED_ACCESSIBILITY_CONFIG);
+  const [savingA11y, setSavingA11y] = useState(false);
+  const [savedA11y, setSavedA11y] = useState(false);
+
+  // Load Configurations on Mount
   useEffect(() => {
     let mounted = true;
     db.getHomepageConfig().then((cfg) => {
@@ -6221,6 +6250,19 @@ function ContentSection({ sections, onRefresh, showToast }: {
       }
       if (mounted) setStatsLoading(false);
     });
+
+    db.getAboutConfig().then(cfg => {
+      if (mounted && cfg) setAboutConfig(cfg);
+    });
+
+    db.getPrivacyConfig().then(cfg => {
+      if (mounted && cfg) setPrivacyConfig(cfg);
+    });
+
+    db.getAccessibilityConfig().then(cfg => {
+      if (mounted && cfg) setA11yConfig(cfg);
+    });
+
     return () => { mounted = false; };
   }, []);
 
@@ -6354,7 +6396,201 @@ function ContentSection({ sections, onRefresh, showToast }: {
     finally { setConfirm(null); }
   };
 
+  // ── About Us Handlers ───────────────────────────────────────────────────────
+  const handleSaveAbout = async () => {
+    setSavingAbout(true);
+    try {
+      await db.updateAboutConfig(aboutConfig);
+      setSavedAbout(true);
+      showToast('About Us page updated and published live.', 'success');
+      setTimeout(() => setSavedAbout(false), 3500);
+    } catch {
+      showToast('Failed to save About Us page.', 'error');
+    } finally {
+      setSavingAbout(false);
+    }
+  };
+
+  const handleResetAbout = () => {
+    setAboutConfig(SEED_ABOUT_CONFIG);
+    showToast('Reset to default About Us content. Click "Save Changes" to publish.', 'success');
+  };
+
+  const handleAddMarket = (txt?: string) => {
+    const val = (txt || newMarketInput).trim();
+    if (!val) return;
+    setAboutConfig(c => ({ ...c, markets_list: [...(c.markets_list || []), val] }));
+    if (!txt) setNewMarketInput('');
+  };
+
+  const handleRemoveMarket = (idx: number) => {
+    setAboutConfig(c => ({
+      ...c,
+      markets_list: (c.markets_list || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleUpdateMarket = (idx: number, val: string) => {
+    setAboutConfig(c => {
+      const list = [...(c.markets_list || [])];
+      list[idx] = val;
+      return { ...c, markets_list: list };
+    });
+  };
+
+  // ── Privacy Policy Handlers ─────────────────────────────────────────────────
+  const handleSavePrivacy = async () => {
+    setSavingPrivacy(true);
+    try {
+      await db.updatePrivacyConfig(privacyConfig);
+      setSavedPrivacy(true);
+      showToast('Privacy Policy updated and published live.', 'success');
+      setTimeout(() => setSavedPrivacy(false), 3500);
+    } catch {
+      showToast('Failed to save Privacy Policy.', 'error');
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
+  const handleResetPrivacy = () => {
+    setPrivacyConfig(SEED_PRIVACY_CONFIG);
+    showToast('Reset to default Privacy Policy. Click "Save Changes" to publish.', 'success');
+  };
+
+  const handleAddPrivacySection = () => {
+    const newSec: PrivacySectionItem = {
+      id: `sec-${Date.now()}`,
+      title: 'New Policy Section',
+      subtitle: 'Policy Subtitle',
+      content: 'Section description and details...',
+      bullets: ['First disclosure point...']
+    };
+    setPrivacyConfig(c => ({ ...c, sections: [...(c.sections || []), newSec] }));
+  };
+
+  const handleRemovePrivacySection = (idx: number) => {
+    setPrivacyConfig(c => ({
+      ...c,
+      sections: (c.sections || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleUpdatePrivacySection = (idx: number, field: keyof PrivacySectionItem, val: any) => {
+    setPrivacyConfig(c => {
+      const secs = [...(c.sections || [])];
+      secs[idx] = { ...secs[idx], [field]: val };
+      return { ...c, sections: secs };
+    });
+  };
+
+  const handleAddPrivacyBullet = (secIdx: number) => {
+    setPrivacyConfig(c => {
+      const secs = [...(c.sections || [])];
+      const bullets = [...(secs[secIdx].bullets || []), 'New requirement or point...'];
+      secs[secIdx] = { ...secs[secIdx], bullets };
+      return { ...c, sections: secs };
+    });
+  };
+
+  const handleUpdatePrivacyBullet = (secIdx: number, bIdx: number, val: string) => {
+    setPrivacyConfig(c => {
+      const secs = [...(c.sections || [])];
+      const bullets = [...(secs[secIdx].bullets || [])];
+      bullets[bIdx] = val;
+      secs[secIdx] = { ...secs[secIdx], bullets };
+      return { ...c, sections: secs };
+    });
+  };
+
+  const handleRemovePrivacyBullet = (secIdx: number, bIdx: number) => {
+    setPrivacyConfig(c => {
+      const secs = [...(c.sections || [])];
+      const bullets = (secs[secIdx].bullets || []).filter((_, i) => i !== bIdx);
+      secs[secIdx] = { ...secs[secIdx], bullets };
+      return { ...c, sections: secs };
+    });
+  };
+
+  // ── Accessibility Handlers ──────────────────────────────────────────────────
+  const handleSaveA11y = async () => {
+    setSavingA11y(true);
+    try {
+      await db.updateAccessibilityConfig(a11yConfig);
+      setSavedA11y(true);
+      showToast('Accessibility Statement updated and published live.', 'success');
+      setTimeout(() => setSavedA11y(false), 3500);
+    } catch {
+      showToast('Failed to save Accessibility Statement.', 'error');
+    } finally {
+      setSavingA11y(false);
+    }
+  };
+
+  const handleResetA11y = () => {
+    setA11yConfig(SEED_ACCESSIBILITY_CONFIG);
+    showToast('Reset to default Accessibility Statement. Click "Save Changes" to publish.', 'success');
+  };
+
+  const handleAddConformancePoint = () => {
+    setA11yConfig(c => ({
+      ...c,
+      conformance_points: [...(c.conformance_points || []), 'New audit or compliance verification standard...']
+    }));
+  };
+
+  const handleUpdateConformancePoint = (idx: number, val: string) => {
+    setA11yConfig(c => {
+      const pts = [...(c.conformance_points || [])];
+      pts[idx] = val;
+      return { ...c, conformance_points: pts };
+    });
+  };
+
+  const handleRemoveConformancePoint = (idx: number) => {
+    setA11yConfig(c => ({
+      ...c,
+      conformance_points: (c.conformance_points || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleAddMethodologyPoint = () => {
+    setA11yConfig(c => ({
+      ...c,
+      methodology_points: [...(c.methodology_points || []), 'New testing or validation methodology tool...']
+    }));
+  };
+
+  const handleUpdateMethodologyPoint = (idx: number, val: string) => {
+    setA11yConfig(c => {
+      const pts = [...(c.methodology_points || [])];
+      pts[idx] = val;
+      return { ...c, methodology_points: pts };
+    });
+  };
+
+  const handleRemoveMethodologyPoint = (idx: number) => {
+    setA11yConfig(c => ({
+      ...c,
+      methodology_points: (c.methodology_points || []).filter((_, i) => i !== idx)
+    }));
+  };
+
   const filtered = sections.filter(s => selectedType === 'All' || s.type === selectedType);
+
+  const getLivePreviewUrl = () => {
+    if (activeSubTab === 'about') return '/about';
+    if (activeSubTab === 'privacy') return '/privacy';
+    if (activeSubTab === 'accessibility') return '/accessibility';
+    return '/';
+  };
+
+  const getLivePreviewLabel = () => {
+    if (activeSubTab === 'about') return 'About Us Page';
+    if (activeSubTab === 'privacy') return 'Privacy Policy';
+    if (activeSubTab === 'accessibility') return 'Accessibility Statement';
+    return 'Live Website';
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -6370,76 +6606,48 @@ function ContentSection({ sections, onRefresh, showToast }: {
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 10
       }}>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('stats')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '6px 14px',
-              borderRadius: 7,
-              fontSize: '0.8rem',
-              fontWeight: activeSubTab === 'stats' ? 600 : 400,
-              background: activeSubTab === 'stats' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
-              border: `1px solid ${activeSubTab === 'stats' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
-              color: activeSubTab === 'stats' ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <Activity size={13} />
-            Key Statistics Bar
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('marquee')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '6px 14px',
-              borderRadius: 7,
-              fontSize: '0.8rem',
-              fontWeight: activeSubTab === 'marquee' ? 600 : 400,
-              background: activeSubTab === 'marquee' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
-              border: `1px solid ${activeSubTab === 'marquee' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
-              color: activeSubTab === 'marquee' ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <Star size={13} />
-            Festivals &amp; Promoters (Marquee)
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('sections')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '6px 14px',
-              borderRadius: 7,
-              fontSize: '0.8rem',
-              fontWeight: activeSubTab === 'sections' ? 600 : 400,
-              background: activeSubTab === 'sections' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
-              border: `1px solid ${activeSubTab === 'sections' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
-              color: activeSubTab === 'sections' ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <FileText size={13} />
-            Hero &amp; Banners CMS
-          </button>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {[
+            { id: 'stats', label: 'Key Statistics Bar', icon: Activity },
+            { id: 'marquee', label: 'Festivals & Promoters', icon: Star },
+            { id: 'sections', label: 'Hero & Banners CMS', icon: FileText },
+            { id: 'about', label: 'About Us Page', icon: Compass },
+            { id: 'privacy', label: 'Privacy Policy', icon: ShieldCheck },
+            { id: 'accessibility', label: 'Accessibility Statement', icon: Award },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isAct = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSubTab(tab.id as any)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '6px 14px',
+                  borderRadius: 7,
+                  fontSize: '0.8rem',
+                  fontWeight: isAct ? 600 : 400,
+                  background: isAct ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
+                  border: `1px solid ${isAct ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
+                  color: isAct ? 'var(--accent)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Icon size={13} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        <a href="/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-          <ABtn variant="secondary" size="sm"><ExternalLink size={12} /> View Live Website</ABtn>
+        <a href={getLivePreviewUrl()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <ABtn variant="secondary" size="sm">
+            <ExternalLink size={12} /> View {getLivePreviewLabel()}
+          </ABtn>
         </a>
       </div>
 
@@ -6932,6 +7140,561 @@ function ContentSection({ sections, onRefresh, showToast }: {
             </form>
           </Modal>
           <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 4: ABOUT US PAGE ════════════════════ */}
+      {activeSubTab === 'about' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Compass size={16} color="var(--accent)" />
+                About Us Page Editor
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Edit company story, agency vision, and global target market routes displayed live on <code style={{ color: 'var(--accent)' }}>/about</code>.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetAbout}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <a href="/about" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <ABtn variant="secondary" size="sm">
+                  <ExternalLink size={12} /> Preview Live Page
+                </ABtn>
+              </a>
+              <ABtn variant={savedAbout ? 'success' : 'primary'} size="sm" onClick={handleSaveAbout} disabled={savingAbout}>
+                {savingAbout ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : savedAbout ? <CheckCircle size={13} /> : <Save size={13} />}
+                {savingAbout ? 'Saving…' : savedAbout ? '✓ Saved & Live!' : 'Save Changes'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Saved Notification Banner */}
+          {savedAbout && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              background: 'rgba(48,209,88,0.12)',
+              border: '1px solid rgba(48,209,88,0.3)',
+              color: '#30d158',
+              fontSize: '0.82rem',
+              fontWeight: 600
+            }}>
+              <CheckCircle size={16} />
+              <span>About Us page successfully updated and live on website.</span>
+            </div>
+          )}
+
+          {/* Live Preview Block */}
+          <div style={{
+            background: 'linear-gradient(180deg, rgba(20,16,36,0.95) 0%, rgba(10,8,18,0.98) 100%)',
+            border: '1px solid rgba(212,175,55,0.3)',
+            borderRadius: 14,
+            padding: '1.25rem 1.5rem',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0.6rem' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Sparkles size={12} /> Live Preview &bull; Header &amp; Vision
+              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Real-time formatting preview</span>
+            </div>
+
+            <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto' }}>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '3px 10px', borderRadius: 20, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)', fontWeight: 700 }}>
+                {aboutConfig.badge || 'Agency Profile'}
+              </span>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.6rem 0 0.3rem 0', color: '#fff' }}>
+                {aboutConfig.title || 'About Showtime Booking'}
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                {aboutConfig.subtitle || 'Building the leading Caribbean talent booking platform.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Form Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+            {/* Card 1: Header & Profile Details */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0' }}>
+                1. Page Title &amp; Introduction
+              </h4>
+              <FGrid cols={2}>
+                <Field label="Category Badge / Eyebrow">
+                  <FInput value={aboutConfig.badge} onChange={v => setAboutConfig(c => ({ ...c, badge: v }))} placeholder="e.g. Agency Profile" />
+                </Field>
+                <Field label="Page Main Heading">
+                  <FInput value={aboutConfig.title} onChange={v => setAboutConfig(c => ({ ...c, title: v }))} placeholder="e.g. About Showtime Booking" />
+                </Field>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Field label="Header Subtitle / Tagline">
+                    <FTextarea value={aboutConfig.subtitle} onChange={v => setAboutConfig(c => ({ ...c, subtitle: v }))} rows={2} placeholder="Headline statement..." />
+                  </Field>
+                </div>
+              </FGrid>
+            </div>
+
+            {/* Card 2: Company Vision Statement */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Target size={14} /> 2. Company Vision Statement
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Vision Card Title">
+                  <FInput value={aboutConfig.vision_title} onChange={v => setAboutConfig(c => ({ ...c, vision_title: v }))} placeholder="e.g. Our Vision" />
+                </Field>
+                <Field label="Vision Statement Narrative (Markdown / Paragraphs supported)">
+                  <FTextarea value={aboutConfig.vision_content} onChange={v => setAboutConfig(c => ({ ...c, vision_content: v }))} rows={5} placeholder="Full vision paragraph..." />
+                </Field>
+              </div>
+            </div>
+
+            {/* Card 3: Target Markets & Tour Routes */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Globe size={14} /> 3. Target Markets &amp; Touring Regions
+                </h4>
+                <ABtn variant="secondary" size="sm" onClick={() => handleAddMarket('New Target Territory')}>
+                  <Plus size={12} /> Add Market Region
+                </ABtn>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Markets Section Title">
+                  <FInput value={aboutConfig.markets_title} onChange={v => setAboutConfig(c => ({ ...c, markets_title: v }))} placeholder="e.g. Target Markets" />
+                </Field>
+                <Field label="Introductory Description">
+                  <FInput value={aboutConfig.markets_description} onChange={v => setAboutConfig(c => ({ ...c, markets_description: v }))} placeholder="Intro sentence..." />
+                </Field>
+
+                <div style={{ marginTop: '0.5rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                    Active Market Territories List ({aboutConfig.markets_list?.length || 0})
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {(aboutConfig.markets_list || []).map((market, mIdx) => (
+                      <div key={mIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 700, width: 22, textAlign: 'center' }}>
+                          {mIdx + 1}.
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <FInput value={market} onChange={val => handleUpdateMarket(mIdx, val)} placeholder="e.g. United Kingdom (London Arenas, Glastonbury)" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMarket(mIdx)}
+                          title="Remove territory"
+                          style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: '6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Quick Add input */}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <FInput
+                        value={newMarketInput}
+                        onChange={v => setNewMarketInput(v)}
+                        placeholder="Add another region (e.g. Japan, Australia, West Africa) and press Add..."
+                      />
+                    </div>
+                    <ABtn variant="secondary" size="sm" onClick={() => handleAddMarket()}>
+                      <Plus size={13} /> Add
+                    </ABtn>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 5: PRIVACY POLICY ════════════════════ */}
+      {activeSubTab === 'privacy' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <ShieldCheck size={16} color="var(--accent)" />
+                Privacy Policy Editor
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Edit GDPR/CCPA disclosures, data processing clauses, and deletion guidelines on <code style={{ color: 'var(--accent)' }}>/privacy</code>.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetPrivacy}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <ABtn variant="secondary" size="sm">
+                  <ExternalLink size={12} /> Preview Live Page
+                </ABtn>
+              </a>
+              <ABtn variant={savedPrivacy ? 'success' : 'primary'} size="sm" onClick={handleSavePrivacy} disabled={savingPrivacy}>
+                {savingPrivacy ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : savedPrivacy ? <CheckCircle size={13} /> : <Save size={13} />}
+                {savingPrivacy ? 'Saving…' : savedPrivacy ? '✓ Saved & Live!' : 'Save Privacy Policy'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Saved Notification Banner */}
+          {savedPrivacy && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              background: 'rgba(48,209,88,0.12)',
+              border: '1px solid rgba(48,209,88,0.3)',
+              color: '#30d158',
+              fontSize: '0.82rem',
+              fontWeight: 600
+            }}>
+              <CheckCircle size={16} />
+              <span>Privacy Policy successfully updated and live on website.</span>
+            </div>
+          )}
+
+          {/* Form Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+            {/* Card 1: Document Header */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0' }}>
+                1. Document Header &amp; Compliance Details
+              </h4>
+              <FGrid cols={2}>
+                <Field label="Header Badge">
+                  <FInput value={privacyConfig.badge} onChange={v => setPrivacyConfig(c => ({ ...c, badge: v }))} placeholder="e.g. Showtime Legal & Security" />
+                </Field>
+                <Field label="Document Title">
+                  <FInput value={privacyConfig.title} onChange={v => setPrivacyConfig(c => ({ ...c, title: v }))} placeholder="e.g. Privacy Policy" />
+                </Field>
+                <Field label="Last Updated Date String">
+                  <FInput value={privacyConfig.last_updated} onChange={v => setPrivacyConfig(c => ({ ...c, last_updated: v }))} placeholder="e.g. July 10, 2026" />
+                </Field>
+                <Field label="Legal Desk Email Address">
+                  <FInput value={privacyConfig.contact_email} onChange={v => setPrivacyConfig(c => ({ ...c, contact_email: v }))} placeholder="legal@showtimeservices.com" type="email" />
+                </Field>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Field label="1. Introduction Narrative">
+                    <FTextarea value={privacyConfig.intro} onChange={v => setPrivacyConfig(c => ({ ...c, intro: v }))} rows={3} placeholder="Intro statement explaining GDPR/CCPA..." />
+                  </Field>
+                </div>
+              </FGrid>
+            </div>
+
+            {/* Card 2: Core Disclosures (WHAT, WHY, WHEN) */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: 0 }}>
+                  2. Policy Sections &amp; Data Collection Clauses ({privacyConfig.sections?.length || 0})
+                </h4>
+                <ABtn variant="secondary" size="sm" onClick={handleAddPrivacySection}>
+                  <Plus size={12} /> Add Policy Section
+                </ABtn>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {(privacyConfig.sections || []).map((sec, secIdx) => (
+                  <div key={sec.id || secIdx} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>
+                        Section {secIdx + 2}: {sec.title || 'Untitled'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePrivacySection(secIdx)}
+                        style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Trash2 size={12} /> Remove Section
+                      </button>
+                    </div>
+
+                    <FGrid cols={2}>
+                      <Field label="Section Title">
+                        <FInput value={sec.title} onChange={v => handleUpdatePrivacySection(secIdx, 'title', v)} placeholder="e.g. WHAT We Collect" />
+                      </Field>
+                      <Field label="Section Subtitle">
+                        <FInput value={sec.subtitle || ''} onChange={v => handleUpdatePrivacySection(secIdx, 'subtitle', v)} placeholder="e.g. Data minimization in talent contracting" />
+                      </Field>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <Field label="Lead Paragraph / Content">
+                          <FTextarea value={sec.content} onChange={v => handleUpdatePrivacySection(secIdx, 'content', v)} rows={2} placeholder="Intro for this section..." />
+                        </Field>
+                      </div>
+                    </FGrid>
+
+                    {/* Bullet Points */}
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Itemized Disclosures ({sec.bullets?.length || 0})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleAddPrivacyBullet(secIdx)}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Plus size={11} /> Add Bullet
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        {(sec.bullets || []).map((bullet, bIdx) => (
+                          <div key={bIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', width: 18 }}>&bull;</span>
+                            <div style={{ flex: 1 }}>
+                              <FInput value={bullet} onChange={val => handleUpdatePrivacyBullet(secIdx, bIdx, val)} placeholder="e.g. Identity & Profile Data: Names, stage names..." />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePrivacyBullet(secIdx, bIdx)}
+                              style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 4 }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Card 3: Data Deletion & Erasure */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Trash2 size={14} color="#ff453a" /> 3. Right to Erasure &amp; Data Deletion Instructions
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Right to Erasure Policy Description">
+                  <FTextarea value={privacyConfig.erasure_intro} onChange={v => setPrivacyConfig(c => ({ ...c, erasure_intro: v }))} rows={2} placeholder="GDPR Article 17 statement..." />
+                </Field>
+
+                <FGrid cols={2}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <Field label="Method 1 Title">
+                      <FInput value={privacyConfig.erasure_method1_title} onChange={v => setPrivacyConfig(c => ({ ...c, erasure_method1_title: v }))} placeholder="Method 1: Account Control Settings" />
+                    </Field>
+                    <Field label="Method 1 Description">
+                      <FTextarea value={privacyConfig.erasure_method1_desc} onChange={v => setPrivacyConfig(c => ({ ...c, erasure_method1_desc: v }))} rows={3} placeholder="How users delete account from settings..." />
+                    </Field>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <Field label="Method 2 Title">
+                      <FInput value={privacyConfig.erasure_method2_title} onChange={v => setPrivacyConfig(c => ({ ...c, erasure_method2_title: v }))} placeholder="Method 2: Immediate Legal Request" />
+                    </Field>
+                    <Field label="Method 2 Description">
+                      <FTextarea value={privacyConfig.erasure_method2_desc} onChange={v => setPrivacyConfig(c => ({ ...c, erasure_method2_desc: v }))} rows={3} placeholder="How users email legal desk..." />
+                    </Field>
+                  </div>
+                </FGrid>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 6: ACCESSIBILITY STATEMENT ════════════════════ */}
+      {activeSubTab === 'accessibility' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Award size={16} color="var(--accent)" />
+                Accessibility Statement Editor
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Edit WCAG 2.2 AA conformance status, audit disclosures, and barrier reporting guidance on <code style={{ color: 'var(--accent)' }}>/accessibility</code>.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetA11y}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <a href="/accessibility" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <ABtn variant="secondary" size="sm">
+                  <ExternalLink size={12} /> Preview Live Page
+                </ABtn>
+              </a>
+              <ABtn variant={savedA11y ? 'success' : 'primary'} size="sm" onClick={handleSaveA11y} disabled={savingA11y}>
+                {savingA11y ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : savedA11y ? <CheckCircle size={13} /> : <Save size={13} />}
+                {savingA11y ? 'Saving…' : savedA11y ? '✓ Saved & Live!' : 'Save Statement'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Saved Notification Banner */}
+          {savedA11y && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              background: 'rgba(48,209,88,0.12)',
+              border: '1px solid rgba(48,209,88,0.3)',
+              color: '#30d158',
+              fontSize: '0.82rem',
+              fontWeight: 600
+            }}>
+              <CheckCircle size={16} />
+              <span>Accessibility Statement successfully updated and live on website.</span>
+            </div>
+          )}
+
+          {/* Form Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+            {/* Card 1: Header & Commitment */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0' }}>
+                1. Header &amp; Commitment Statement
+              </h4>
+              <FGrid cols={2}>
+                <Field label="Compliance Badge">
+                  <FInput value={a11yConfig.badge} onChange={v => setA11yConfig(c => ({ ...c, badge: v }))} placeholder="e.g. WCAG 2.2 AA Compliance" />
+                </Field>
+                <Field label="Document Heading">
+                  <FInput value={a11yConfig.title} onChange={v => setA11yConfig(c => ({ ...c, title: v }))} placeholder="e.g. Accessibility Statement" />
+                </Field>
+                <Field label="Last Updated Date">
+                  <FInput value={a11yConfig.last_updated} onChange={v => setA11yConfig(c => ({ ...c, last_updated: v }))} placeholder="e.g. July 10, 2026" />
+                </Field>
+                <Field label="Compliance Desk Email">
+                  <FInput value={a11yConfig.contact_email} onChange={v => setA11yConfig(c => ({ ...c, contact_email: v }))} placeholder="compliance@showtimeservices.com" type="email" />
+                </Field>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Field label="Our Commitment Statement">
+                    <FTextarea value={a11yConfig.commitment} onChange={v => setA11yConfig(c => ({ ...c, commitment: v }))} rows={4} placeholder="Full commitment paragraph..." />
+                  </Field>
+                </div>
+              </FGrid>
+            </div>
+
+            {/* Card 2: Conformance Status & Key Audit Standards */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: 0 }}>
+                  2. Conformance Status &amp; Standards ({a11yConfig.conformance_points?.length || 0})
+                </h4>
+                <ABtn variant="secondary" size="sm" onClick={handleAddConformancePoint}>
+                  <Plus size={12} /> Add Standard Point
+                </ABtn>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Section 2 Heading">
+                  <FInput value={a11yConfig.conformance_title} onChange={v => setA11yConfig(c => ({ ...c, conformance_title: v }))} placeholder="e.g. 2. Conformance Status" />
+                </Field>
+                <Field label="Conformance Overview Paragraph">
+                  <FTextarea value={a11yConfig.conformance_intro} onChange={v => setA11yConfig(c => ({ ...c, conformance_intro: v }))} rows={2} placeholder="Overview description..." />
+                </Field>
+
+                <div style={{ marginTop: '0.5rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                    Audit Standards Verified:
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {(a11yConfig.conformance_points || []).map((pt, pIdx) => (
+                      <div key={pIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, width: 20 }}>&bull;</span>
+                        <div style={{ flex: 1 }}>
+                          <FInput value={pt} onChange={val => handleUpdateConformancePoint(pIdx, val)} placeholder="e.g. Clear contrast levels: Minimum 4.5:1 ratio..." />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveConformancePoint(pIdx)}
+                          style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 4 }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Testing & Verification Methodology */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: 0 }}>
+                  3. Testing &amp; Verification Methodology ({a11yConfig.methodology_points?.length || 0})
+                </h4>
+                <ABtn variant="secondary" size="sm" onClick={handleAddMethodologyPoint}>
+                  <Plus size={12} /> Add Methodology Tool
+                </ABtn>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Section 3 Heading">
+                  <FInput value={a11yConfig.methodology_title} onChange={v => setA11yConfig(c => ({ ...c, methodology_title: v }))} placeholder="e.g. 3. Testing & Verification Methodology" />
+                </Field>
+                <Field label="Methodology Lead Paragraph">
+                  <FInput value={a11yConfig.methodology_intro} onChange={v => setA11yConfig(c => ({ ...c, methodology_intro: v }))} placeholder="Intro text..." />
+                </Field>
+
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {(a11yConfig.methodology_points || []).map((pt, mIdx) => (
+                      <div key={mIdx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, width: 20 }}>&bull;</span>
+                        <div style={{ flex: 1 }}>
+                          <FInput value={pt} onChange={val => handleUpdateMethodologyPoint(mIdx, val)} placeholder="e.g. Automated audits: Deque axe-core..." />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMethodologyPoint(mIdx)}
+                          style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 4 }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Content Limitations */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '1.25rem' }}>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', margin: '0 0 1rem 0' }}>
+                4. Limitations &amp; Barrier Reporting
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Section 4 Heading">
+                  <FInput value={a11yConfig.limitations_title} onChange={v => setA11yConfig(c => ({ ...c, limitations_title: v }))} placeholder="e.g. 4. Underrepresented Content Limitations" />
+                </Field>
+                <Field label="Limitations Narrative & Barrier Guidance">
+                  <FTextarea value={a11yConfig.limitations_content} onChange={v => setA11yConfig(c => ({ ...c, limitations_content: v }))} rows={3} placeholder="Guidance on reporting accessibility barriers..." />
+                </Field>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -8912,7 +9675,10 @@ export default function AdminPortal() {
       case 'tickets':      return !hasPermission('view_tickets') && !isAdmin    ? <AccessDenied /> : <TicketsSection tiers={ticketTiers} promoCodes={promoCodes} onRefresh={loadData} showToast={showToast} />;
       case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={loadData} showToast={showToast} />;
       case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={loadData} showToast={showToast} />;
-      case 'content':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} />;
+      case 'content':            return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} />;
+      case 'page_about':         return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="about" />;
+      case 'page_privacy':       return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="privacy" />;
+      case 'page_accessibility': return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="accessibility" />;
       case 'staff':        return !isAdmin ? <AccessDenied /> : <StaffSection users={users} onRefresh={loadData} showToast={showToast} />;
       case 'integrations': return !isAdmin ? <AccessDenied /> : <IntegrationsSection integrations={integrations} onRefresh={loadData} showToast={showToast} />;
       case 'maintenance':  return !isAdmin ? <AccessDenied /> : <MaintenanceSection showToast={showToast} />;

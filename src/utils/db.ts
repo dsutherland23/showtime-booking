@@ -257,6 +257,56 @@ export interface HomepageConfig {
   };
 }
 
+export interface AboutUsConfig {
+  badge: string;
+  title: string;
+  subtitle: string;
+  vision_title: string;
+  vision_content: string;
+  markets_title: string;
+  markets_description: string;
+  markets_list: string[];
+  highlights?: Array<{ title: string; description: string }>;
+}
+
+export interface PrivacySectionItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  content: string;
+  bullets?: string[];
+}
+
+export interface PrivacyPolicyConfig {
+  badge: string;
+  title: string;
+  last_updated: string;
+  contact_email: string;
+  intro: string;
+  sections: PrivacySectionItem[];
+  erasure_intro: string;
+  erasure_method1_title: string;
+  erasure_method1_desc: string;
+  erasure_method2_title: string;
+  erasure_method2_desc: string;
+}
+
+export interface AccessibilityConfig {
+  badge: string;
+  title: string;
+  last_updated: string;
+  contact_email: string;
+  commitment: string;
+  conformance_title: string;
+  conformance_intro: string;
+  conformance_points: string[];
+  methodology_title: string;
+  methodology_intro: string;
+  methodology_points: string[];
+  limitations_title: string;
+  limitations_content: string;
+}
+
 export interface Integration {
   id: string;
   name: string;
@@ -1704,6 +1754,108 @@ export const SEED_HOMEPAGE_CONFIG: HomepageConfig = {
   }
 };
 
+export const SEED_ABOUT_CONFIG: AboutUsConfig = {
+  badge: 'Agency Profile',
+  title: 'About Showtime Booking',
+  subtitle: 'Building the leading Caribbean talent booking, artist management, and entertainment logistics platform.',
+  vision_title: 'Our Vision',
+  vision_content: 'Showtime was founded with a singular, high-conviction mandate: to build the gold-standard pathway for Caribbean and international talent to conquer global markets. We streamline the complex administrative layers of booking, visa compliance, legal contracting, and touring logistics. By creating a premium, modern portal connecting clients with represented stars, we enable culture to move seamlessly onto world stages.',
+  markets_title: 'Target Markets',
+  markets_description: 'We manage active booking pipelines and live concert routes across primary target territories:',
+  markets_list: [
+    'Jamaica & the Caribbean Islands',
+    'United States (Coachella, Summer Stages)',
+    'United Kingdom (London Arenas, Glastonbury)',
+    'Canada, Continental Europe & Middle East'
+  ],
+  highlights: [
+    {
+      title: 'Global Escrow & Direct Settlement',
+      description: 'Institutional-grade deposit security guaranteeing performance payouts and stage fulfillment without friction.'
+    },
+    {
+      title: 'Turnkey International Tour Routing',
+      description: 'End-to-end artist visas, immigration compliance, travel riders, and international backline logistics.'
+    }
+  ]
+};
+
+export const SEED_PRIVACY_CONFIG: PrivacyPolicyConfig = {
+  badge: 'Showtime Legal & Security',
+  title: 'Privacy Policy',
+  last_updated: 'July 10, 2026',
+  contact_email: 'legal@showtimeservices.com',
+  intro: 'At Showtime Booking Agency, privacy, transparency, and data control are foundational to our premium booking experience. This Privacy Policy details how we process user data under global compliance regulations, including the General Data Protection Regulation (GDPR) and California Consumer Privacy Act (CCPA).',
+  sections: [
+    {
+      id: 'what',
+      title: 'WHAT We Collect',
+      subtitle: 'Data minimization in talent contracting',
+      content: 'We restrict data collection to the minimum required to facilitate secure contracts and talent arrangements. This includes:',
+      bullets: [
+        'Identity & Profile Data: Names, stage names, account roles (Artist or Client), and profile or cover images uploaded from your device.',
+        'Contact details: Email addresses and phone numbers.',
+        'Event Booking Records: Venue details, performance specifications, contract drafts, and deposit tracking.',
+        'Technical Logs: IP address, device specs, browser type, and cookie preferences to ensure layout security and performance.'
+      ]
+    },
+    {
+      id: 'why',
+      title: 'WHY We Collect It',
+      subtitle: 'Legitimate business & contractual necessity',
+      content: 'Your data is processed strictly for the following purposes:',
+      bullets: [
+        'To authenticate portal accounts and deliver localized dashboards.',
+        'To generate legal, compliant talent contract agreements between promoters and headliners.',
+        'To secure escrow deposits and organize stage technical riders.',
+        'To enable our AI booking assistant to make tailored talent recommendations.'
+      ]
+    },
+    {
+      id: 'when',
+      title: 'WHEN We Collect It',
+      subtitle: 'Direct interaction touchpoints',
+      content: 'Data collection occurs exclusively when you interact directly with the platform:',
+      bullets: [
+        'When you create a client or artist account.',
+        'When you fill out or edit your artist profile details, including uploading imagery.',
+        'When you submit booking requests, contact forms, or technical rider specs.',
+        'During navigation (strictly performance-monitoring cookies, subject to your cookie settings).'
+      ]
+    }
+  ],
+  erasure_intro: 'In compliance with GDPR Article 17 and CCPA specifications, you maintain absolute ownership of your personal information. You can request complete erasure of your credentials, files, and transaction histories at any time.',
+  erasure_method1_title: 'Method 1: Account Control Settings',
+  erasure_method1_desc: 'Log in to your account, navigate to Account Settings, scroll to the bottom, and click "Delete My Account". This instantly and permanently redacts your profile information, files, and auth records from our primary database.',
+  erasure_method2_title: 'Method 2: Immediate Legal Request',
+  erasure_method2_desc: 'Fill out the official erasure form on the right or email our legal team directly at legal@showtimeservices.com. We process all manual erasure requests within 24 hours.'
+};
+
+export const SEED_ACCESSIBILITY_CONFIG: AccessibilityConfig = {
+  badge: 'WCAG 2.2 AA Compliance',
+  title: 'Accessibility Statement',
+  last_updated: 'July 10, 2026',
+  contact_email: 'compliance@showtimeservices.com',
+  commitment: 'Showtime Booking Agency is committed to ensuring digital accessibility for all visitors, including individuals with visual, auditory, motor, or cognitive disabilities. We actively align our portals, layout structures, and media presentation with the Web Content Accessibility Guidelines (WCAG) 2.2 Level AA conformance requirements to ensure an inclusive, premium user experience and fully prevent ADA litigation risks.',
+  conformance_title: '2. Conformance Status',
+  conformance_intro: 'The Web Content Accessibility Guidelines (WCAG) defines requirements for designers and developers to improve accessibility for people with disabilities. Showtime Booking Agency is fully conformant with WCAG 2.2 Level AA. Our team regularly audits core components to ensure:',
+  conformance_points: [
+    'Clear contrast levels: All elements maintain a minimum text-to-background contrast ratio of 4.5:1 (and 3:1 for large heading blocks) to assist users with low vision.',
+    'Focus visibility: Active elements show a distinct, high-contrast outline (outline: 3px solid rgba(0, 113, 227, 0.6)) during keyboard navigation to aid motor-disabled users.',
+    'Semantic DOM structures: Pages use logical HTML5 landmarks (header, main, footer, section) and ARIA tags to facilitate seamless screen reader translation.',
+    'Interactive controls: All elements are focusable and triggerable via keyboard alone.'
+  ],
+  methodology_title: '3. Testing & Verification Methodology',
+  methodology_intro: 'We conduct continuous accessibility tests on our local systems and dev servers before any production deployment:',
+  methodology_points: [
+    'Automated audits: Continuous testing using the Deque axe-core engine and Google Lighthouse Audits.',
+    'Screen readers: Manual auditing with VoiceOver (macOS/iOS) and NVDA (Windows).',
+    'Keyboard navigation: Full audit of modals, forms, and custom selection dropdowns to ensure zero focus traps.'
+  ],
+  limitations_title: '4. Underrepresented Content Limitations',
+  limitations_content: 'Despite our best efforts, some legacy sections or external portal components may occasionally exhibit minor barriers. We resolve these promptly as they are identified. If you encounter any accessibility issues, please use the compliance reporting form on the right to notify us immediately.'
+};
+
 const SEED_INTEGRATIONS: Integration[] = [
   {
     id: 'int-stripe',
@@ -3000,6 +3152,149 @@ export const db = {
     return updated;
   },
 
+  // --- ABOUT US PAGE CONFIGURATION ---
+  async getAboutConfig(): Promise<AboutUsConfig> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('website_sections').select('*').eq('id', 'about_config').single();
+        if (!error && data?.content) {
+          const parsed = JSON.parse(data.content);
+          if (parsed && parsed.title && Array.isArray(parsed.markets_list)) {
+            return parsed as AboutUsConfig;
+          }
+        }
+      } catch {
+        // fallback to store
+      }
+    }
+    return getObjectStoreValue<AboutUsConfig>('st_about_config', SEED_ABOUT_CONFIG);
+  },
+
+  async updateAboutConfig(updates: Partial<AboutUsConfig>): Promise<AboutUsConfig> {
+    const current = await this.getAboutConfig();
+    const updated: AboutUsConfig = {
+      ...current,
+      ...updates,
+      markets_list: updates.markets_list !== undefined ? updates.markets_list : current.markets_list,
+      highlights: updates.highlights !== undefined ? updates.highlights : current.highlights
+    };
+    setStoreValue('st_about_config', updated);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'about_config',
+          type: 'features',
+          title: 'About Us Page Configuration',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_about_config_updated', { detail: updated }));
+    }
+    return updated;
+  },
+
+  // --- PRIVACY POLICY CONFIGURATION ---
+  async getPrivacyConfig(): Promise<PrivacyPolicyConfig> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('website_sections').select('*').eq('id', 'privacy_config').single();
+        if (!error && data?.content) {
+          const parsed = JSON.parse(data.content);
+          if (parsed && parsed.title && Array.isArray(parsed.sections)) {
+            return parsed as PrivacyPolicyConfig;
+          }
+        }
+      } catch {
+        // fallback to store
+      }
+    }
+    return getObjectStoreValue<PrivacyPolicyConfig>('st_privacy_config', SEED_PRIVACY_CONFIG);
+  },
+
+  async updatePrivacyConfig(updates: Partial<PrivacyPolicyConfig>): Promise<PrivacyPolicyConfig> {
+    const current = await this.getPrivacyConfig();
+    const updated: PrivacyPolicyConfig = {
+      ...current,
+      ...updates,
+      sections: updates.sections !== undefined ? updates.sections : current.sections
+    };
+    setStoreValue('st_privacy_config', updated);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'privacy_config',
+          type: 'features',
+          title: 'Privacy Policy Page Configuration',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_privacy_config_updated', { detail: updated }));
+    }
+    return updated;
+  },
+
+  // --- ACCESSIBILITY STATEMENT CONFIGURATION ---
+  async getAccessibilityConfig(): Promise<AccessibilityConfig> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('website_sections').select('*').eq('id', 'accessibility_config').single();
+        if (!error && data?.content) {
+          const parsed = JSON.parse(data.content);
+          if (parsed && parsed.title && Array.isArray(parsed.conformance_points)) {
+            return parsed as AccessibilityConfig;
+          }
+        }
+      } catch {
+        // fallback to store
+      }
+    }
+    return getObjectStoreValue<AccessibilityConfig>('st_accessibility_config', SEED_ACCESSIBILITY_CONFIG);
+  },
+
+  async updateAccessibilityConfig(updates: Partial<AccessibilityConfig>): Promise<AccessibilityConfig> {
+    const current = await this.getAccessibilityConfig();
+    const updated: AccessibilityConfig = {
+      ...current,
+      ...updates,
+      conformance_points: updates.conformance_points !== undefined ? updates.conformance_points : current.conformance_points,
+      methodology_points: updates.methodology_points !== undefined ? updates.methodology_points : current.methodology_points
+    };
+    setStoreValue('st_accessibility_config', updated);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'accessibility_config',
+          type: 'features',
+          title: 'Accessibility Statement Page Configuration',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_accessibility_config_updated', { detail: updated }));
+    }
+    return updated;
+  },
+
   // --- INTEGRATIONS ---
   async getIntegrations(): Promise<Integration[]> {
     return getStoreValue('st_integrations', SEED_INTEGRATIONS);
@@ -3207,7 +3502,8 @@ export const db = {
       'st_users', 'st_artists_v2', 'st_leads', 'st_bookings', 'st_contracts',
       'st_invoices', 'st_tasks', 'st_notifs', 'st_venues', 'st_customers',
       'st_ticket_tiers', 'st_promo_codes', 'st_campaigns', 'st_ad_placements',
-      'st_website_sections', 'st_integrations', 'st_events', 'st_settings_domain',
+      'st_website_sections', 'st_homepage_config', 'st_about_config', 'st_privacy_config', 'st_accessibility_config',
+      'st_integrations', 'st_events', 'st_settings_domain',
       'st_settings_currency', 'st_settings_policy'
     ];
     const data: Record<string, unknown> = {

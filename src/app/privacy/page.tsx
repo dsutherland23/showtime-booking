@@ -1,14 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, FileText, Trash2, Mail, Info, Calendar } from 'lucide-react';
-import { db } from '@/utils/db';
+import { db, PrivacyPolicyConfig, SEED_PRIVACY_CONFIG } from '@/utils/db';
 
 export default function PrivacyPage() {
+  const [config, setConfig] = useState<PrivacyPolicyConfig>(SEED_PRIVACY_CONFIG);
   const [requestSent, setRequestSent] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    db.getPrivacyConfig().then(cfg => {
+      if (mounted && cfg) {
+        setConfig(cfg);
+      }
+    });
+
+    const handleUpdate = (e: Event) => {
+      const custom = e as CustomEvent<PrivacyPolicyConfig>;
+      if (custom.detail) {
+        setConfig(custom.detail);
+      }
+    };
+
+    window.addEventListener('st_privacy_config_updated', handleUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('st_privacy_config_updated', handleUpdate);
+    };
+  }, []);
 
   const handleDeleteRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,10 +68,10 @@ export default function PrivacyPage() {
         <header className="privacy-header mb-12">
           <div className="privacy-badge">
             <ShieldCheck className="w-5 h-5 text-accent" />
-            <span>Showtime Legal &amp; Security</span>
+            <span>{config.badge || 'Showtime Legal & Security'}</span>
           </div>
-          <h1>Privacy Policy</h1>
-          <p className="last-updated">Last Updated: July 10, 2026</p>
+          <h1>{config.title || 'Privacy Policy'}</h1>
+          <p className="last-updated">Last Updated: {config.last_updated || 'July 10, 2026'}</p>
         </header>
 
         <div className="privacy-layout">
@@ -56,71 +79,58 @@ export default function PrivacyPage() {
           <main className="privacy-docs" role="main">
             <section className="doc-section">
               <h2>1. Introduction</h2>
-              <p>
-                At Showtime Booking Agency, privacy, transparency, and data control are foundational to our premium booking experience. This Privacy Policy details how we process user data under global compliance regulations, including the General Data Protection Regulation (GDPR) and California Consumer Privacy Act (CCPA).
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.intro || 'At Showtime Booking Agency, privacy, transparency, and data control are foundational to our premium booking experience. This Privacy Policy details how we process user data under global compliance regulations, including the General Data Protection Regulation (GDPR) and California Consumer Privacy Act (CCPA).'}
               </p>
             </section>
 
-            <section className="doc-section">
-              <div className="section-eyebrow-doc">
-                <Info className="w-4 h-4" />
-                <h3>WHAT We Collect</h3>
-              </div>
-              <p>We restrict data collection to the minimum required to facilitate secure contracts and talent arrangements. This includes:</p>
-              <ul>
-                <li><strong>Identity &amp; Profile Data:</strong> Names, stage names, account roles (Artist or Client), and profile or cover images uploaded from your device.</li>
-                <li><strong>Contact details:</strong> Email addresses and phone numbers.</li>
-                <li><strong>Event Booking Records:</strong> Venue details, performance specifications, contract drafts, and deposit tracking.</li>
-                <li><strong>Technical Logs:</strong> IP address, device specs, browser type, and cookie preferences to ensure layout security and performance.</li>
-              </ul>
-            </section>
-
-            <section className="doc-section">
-              <div className="section-eyebrow-doc">
-                <Info className="w-4 h-4" />
-                <h3>WHY We Collect It</h3>
-              </div>
-              <p>Your data is processed strictly for the following purposes:</p>
-              <ul>
-                <li>To authenticate portal accounts and deliver localized dashboards.</li>
-                <li>To generate legal, compliant talent contract agreements between promoters and headliners.</li>
-                <li>To secure escrow deposits and organize stage technical riders.</li>
-                <li>To enable our AI booking assistant to make tailored talent recommendations.</li>
-              </ul>
-            </section>
-
-            <section className="doc-section">
-              <div className="section-eyebrow-doc">
-                <Calendar className="w-4 h-4" />
-                <h3>WHEN We Collect It</h3>
-              </div>
-              <p>Data collection occurs exclusively when you interact directly with the platform:</p>
-              <ul>
-                <li>When you create a client or artist account.</li>
-                <li>When you fill out or edit your artist profile details, including uploading imagery.</li>
-                <li>When you submit booking requests, contact forms, or technical rider specs.</li>
-                <li>During navigation (strictly performance-monitoring cookies, subject to your cookie settings).</li>
-              </ul>
-            </section>
+            {(config.sections || []).map((sec, idx) => (
+              <section key={sec.id || idx} className="doc-section">
+                <div className="section-eyebrow-doc">
+                  <Info className="w-4 h-4" />
+                  <h3>{sec.title}</h3>
+                </div>
+                {sec.subtitle && (
+                  <p style={{ color: 'var(--gold-primary)', fontSize: '0.82rem', fontWeight: 600, marginTop: '-0.25rem', marginBottom: '0.5rem' }}>
+                    {sec.subtitle}
+                  </p>
+                )}
+                <p style={{ whiteSpace: 'pre-line' }}>{sec.content}</p>
+                {sec.bullets && sec.bullets.length > 0 && (
+                  <ul>
+                    {sec.bullets.map((b, bIdx) => (
+                      <li key={bIdx}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
 
             <section className="doc-section" id="data-erasure">
               <div className="section-eyebrow-doc">
                 <Trash2 className="w-4 h-4 text-error" />
                 <h3>HOW to Delete Your Data (Right to Erasure)</h3>
               </div>
-              <p>
-                In compliance with GDPR Article 17 and CCPA specifications, you maintain absolute ownership of your personal information. You can request complete erasure of your credentials, files, and transaction histories at any time.
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.erasure_intro || 'In compliance with GDPR Article 17 and CCPA specifications, you maintain absolute ownership of your personal information. You can request complete erasure of your credentials, files, and transaction histories at any time.'}
               </p>
               
               <div className="erasure-methods mt-6">
                 <div className="method-card">
-                  <h4>Method 1: Account Control Settings</h4>
-                  <p>Log in to your account, navigate to Account Settings, scroll to the bottom, and click <strong>"Delete My Account"</strong>. This instantly and permanently redacts your profile information, files, and auth records from our primary database.</p>
+                  <h4>{config.erasure_method1_title || 'Method 1: Account Control Settings'}</h4>
+                  <p style={{ whiteSpace: 'pre-line' }}>
+                    {config.erasure_method1_desc || 'Log in to your account, navigate to Account Settings, scroll to the bottom, and click "Delete My Account". This instantly and permanently redacts your profile information, files, and auth records from our primary database.'}
+                  </p>
                 </div>
 
                 <div className="method-card">
-                  <h4>Method 2: Immediate Legal Request</h4>
-                  <p>Fill out the official erasure form on the right or email our legal team directly at <a href="mailto:legal@showtimeservices.com" className="email-link">legal@showtimeservices.com</a>. We process all manual erasure requests within 24 hours.</p>
+                  <h4>{config.erasure_method2_title || 'Method 2: Immediate Legal Request'}</h4>
+                  <p style={{ whiteSpace: 'pre-line' }}>
+                    {config.erasure_method2_desc || 'Fill out the official erasure form on the right or email our legal team directly at'}{' '}
+                    <a href={`mailto:${config.contact_email || 'legal@showtimeservices.com'}`} className="email-link">
+                      {config.contact_email || 'legal@showtimeservices.com'}
+                    </a>. We process all manual erasure requests within 24 hours.
+                  </p>
                 </div>
               </div>
             </section>

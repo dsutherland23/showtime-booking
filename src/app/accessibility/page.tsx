@@ -1,14 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, HelpCircle, Mail, ShieldAlert, Award, FileText } from 'lucide-react';
+import { db, AccessibilityConfig, SEED_ACCESSIBILITY_CONFIG } from '@/utils/db';
 
 export default function AccessibilityPage() {
+  const [config, setConfig] = useState<AccessibilityConfig>(SEED_ACCESSIBILITY_CONFIG);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    db.getAccessibilityConfig().then(cfg => {
+      if (mounted && cfg) {
+        setConfig(cfg);
+      }
+    });
+
+    const handleUpdate = (e: Event) => {
+      const custom = e as CustomEvent<AccessibilityConfig>;
+      if (custom.detail) {
+        setConfig(custom.detail);
+      }
+    };
+
+    window.addEventListener('st_accessibility_config_updated', handleUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('st_accessibility_config_updated', handleUpdate);
+    };
+  }, []);
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +61,10 @@ export default function AccessibilityPage() {
         <header className="a11y-header mb-12">
           <div className="a11y-badge">
             <Award className="w-5 h-5 text-accent" />
-            <span>WCAG 2.2 AA Compliance</span>
+            <span>{config.badge || 'WCAG 2.2 AA Compliance'}</span>
           </div>
-          <h1>Accessibility Statement</h1>
-          <p className="last-updated">Last Updated: July 10, 2026</p>
+          <h1>{config.title || 'Accessibility Statement'}</h1>
+          <p className="last-updated">Last Updated: {config.last_updated || 'July 10, 2026'}</p>
         </header>
 
         <div className="a11y-layout">
@@ -48,43 +72,43 @@ export default function AccessibilityPage() {
           <main className="a11y-docs" role="main">
             <section className="doc-section">
               <h2>1. Our Commitment</h2>
-              <p>
-                Showtime Booking Agency is committed to ensuring digital accessibility for all visitors, including individuals with visual, auditory, motor, or cognitive disabilities. We actively align our portals, layout structures, and media presentation with the **Web Content Accessibility Guidelines (WCAG) 2.2 Level AA** conformance requirements to ensure an inclusive, premium user experience and fully prevent ADA litigation risks.
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.commitment || 'Showtime Booking Agency is committed to ensuring digital accessibility for all visitors, including individuals with visual, auditory, motor, or cognitive disabilities. We actively align our portals, layout structures, and media presentation with the Web Content Accessibility Guidelines (WCAG) 2.2 Level AA conformance requirements to ensure an inclusive, premium user experience and fully prevent ADA litigation risks.'}
               </p>
             </section>
 
             <section className="doc-section">
-              <h2>2. Conformance Status</h2>
-              <p>
-                The Web Content Accessibility Guidelines (WCAG) defines requirements for designers and developers to improve accessibility for people with disabilities. Showtime Booking Agency is fully conformant with WCAG 2.2 Level AA.
+              <h2>{config.conformance_title || '2. Conformance Status'}</h2>
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.conformance_intro || 'The Web Content Accessibility Guidelines (WCAG) defines requirements for designers and developers to improve accessibility for people with disabilities. Showtime Booking Agency is fully conformant with WCAG 2.2 Level AA.'}
               </p>
-              <p>
-                Our team regularly audits core components to ensure:
-              </p>
-              <ul>
-                <li><strong>Clear contrast levels:</strong> All elements maintain a minimum text-to-background contrast ratio of **4.5:1** (and **3:1** for large heading blocks) to assist users with low vision.</li>
-                <li><strong>Focus visibility:</strong> Active elements show a distinct, high-contrast outline (`outline: 3px solid rgba(0, 113, 227, 0.6)`) during keyboard navigation to aid motor-disabled users.</li>
-                <li><strong>Semantic DOM structures:</strong> Pages use logical HTML5 landmarks (`header`, `main`, `footer`, `section`) and ARIA tags to facilitate seamless screen reader translation.</li>
-                <li><strong>Interactive controls:</strong> All elements are focusable and triggerable via keyboard alone.</li>
-              </ul>
+              {config.conformance_points && config.conformance_points.length > 0 && (
+                <ul>
+                  {config.conformance_points.map((pt, idx) => (
+                    <li key={idx}>{pt}</li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section className="doc-section">
-              <h2>3. Testing &amp; Verification Methodology</h2>
-              <p>
-                We conduct continuous accessibility tests on our local systems and dev servers before any production deployment:
+              <h2>{config.methodology_title || '3. Testing & Verification Methodology'}</h2>
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.methodology_intro || 'We conduct continuous accessibility tests on our local systems and dev servers before any production deployment:'}
               </p>
-              <ul>
-                <li><strong>Automated audits:</strong> Continuous testing using the **Deque axe-core** engine and Google Lighthouse Audits.</li>
-                <li><strong>Screen readers:</strong> Manual auditing with VoiceOver (macOS/iOS) and NVDA (Windows).</li>
-                <li><strong>Keyboard navigation:</strong> Full audit of modals, forms, and custom selection dropdowns to ensure zero focus traps.</li>
-              </ul>
+              {config.methodology_points && config.methodology_points.length > 0 && (
+                <ul>
+                  {config.methodology_points.map((pt, idx) => (
+                    <li key={idx}>{pt}</li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section className="doc-section">
-              <h2>4. Underrepresented Content Limitations</h2>
-              <p>
-                Despite our best efforts, some legacy sections or external portal components may occasionally exhibit minor barriers. We resolve these promptly as they are identified. If you encounter any accessibility issues, please use the compliance reporting form on the right to notify us immediately.
+              <h2>{config.limitations_title || '4. Underrepresented Content Limitations'}</h2>
+              <p style={{ whiteSpace: 'pre-line' }}>
+                {config.limitations_content || 'Despite our best efforts, some legacy sections or external portal components may occasionally exhibit minor barriers. We resolve these promptly as they are identified. If you encounter any accessibility issues, please use the compliance reporting form on the right to notify us immediately.'}
               </p>
             </section>
           </main>
