@@ -85,6 +85,7 @@ const BookTalentContent = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [stepError, setStepError] = useState('');
+  const [lineupError, setLineupError] = useState('');
 
   const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -127,9 +128,9 @@ const BookTalentContent = () => {
       setArtists(all);
 
       // Check query parameters
-      const queryArtistId = searchParams.get('artistId');
+      const queryArtistId = searchParams.get('artistId') || searchParams.get('artist');
       const queryBudget = searchParams.get('budget');
-      const queryEventTitle = searchParams.get('eventTitle');
+      const queryEventTitle = searchParams.get('eventTitle') || searchParams.get('event');
       const queryEventType = searchParams.get('eventType');
       const queryVenue = searchParams.get('venue');
       const queryCity = searchParams.get('city');
@@ -158,11 +159,16 @@ const BookTalentContent = () => {
         setForm(f => ({ ...f, attendance: queryAttendance }));
       }
 
+      // Strictly start empty unless an artist was specifically passed via URL parameter
       if (queryArtistId) {
-        const found = all.find(a => a.id === queryArtistId);
+        const found = all.find(a => a.id === queryArtistId || a.stage_name.toLowerCase() === queryArtistId.toLowerCase());
         if (found) {
           setSelectedArtists([{ artist: found, role: 'Headliner' }]);
+        } else {
+          setSelectedArtists([]);
         }
+      } else {
+        setSelectedArtists([]);
       }
     };
     loadArtists();
@@ -207,6 +213,9 @@ const BookTalentContent = () => {
         return '';
       case 'city':
         if (!value.trim()) return 'City is required.';
+        return '';
+      case 'country':
+        if (!value.trim()) return 'Country / target market is required.';
         return '';
       case 'budget': {
         const num = parseFloat(value);
@@ -268,6 +277,7 @@ const BookTalentContent = () => {
 
   const toggleArtist = (art: Artist) => {
     setStepError('');
+    setLineupError('');
     setSelectedArtists(prev => {
       const exists = prev.find(item => item.artist.id === art.id);
       if (exists) {
@@ -308,11 +318,20 @@ const BookTalentContent = () => {
       const cityErr = validateField('city', form.city);
       if (cityErr) newErrors.city = cityErr;
       newTouched.city = true;
+
+      const countryErr = validateField('country', form.country);
+      if (countryErr) newErrors.country = countryErr;
+      newTouched.country = true;
     } else if (currentStep === 3) {
       if (selectedArtists.length === 0) {
+        setLineupError('Please select at least one headline or supporting act for your lineup.');
         setStepError('Please select at least one artist for your lineup before continuing.');
+        const tray = document.getElementById('lineup-tray');
+        if (tray) tray.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return false;
       }
+      setLineupError('');
+
       const budgetErr = validateField('budget', form.budget);
       if (budgetErr) newErrors.budget = budgetErr;
       newTouched.budget = true;
@@ -334,11 +353,14 @@ const BookTalentContent = () => {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...newErrors }));
-      setStepError('Please resolve the highlighted field errors before continuing.');
-      // Auto-focus first invalid input
+      setStepError('Please complete all required fields marked in red before proceeding.');
+      // Auto-focus and scroll to first invalid input
       const firstInvalidKey = Object.keys(newErrors)[0];
       const el = document.getElementById(firstInvalidKey);
-      if (el) el.focus();
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return false;
     }
 
@@ -353,20 +375,29 @@ const BookTalentContent = () => {
 
   const handlePrev = () => {
     setStepError('');
+    setLineupError('');
     setSubmitError(null);
     setStep(s => Math.max(1, s - 1));
   };
 
   const goToStep = (targetStep: number) => {
-    // Only allow jumping back, or jumping forward if validated
+    // Only allow jumping back, or jumping forward if all preceding steps validate
     if (targetStep < step) {
       setStepError('');
+      setLineupError('');
       setSubmitError(null);
       setStep(targetStep);
-    } else {
-      if (validateStep(step)) {
-        setStep(targetStep);
+      return;
+    }
+
+    if (targetStep > step) {
+      for (let s = 1; s < targetStep; s++) {
+        if (!validateStep(s)) {
+          setStep(s);
+          return;
+        }
       }
+      setStep(targetStep);
     }
   };
 
@@ -374,15 +405,12 @@ const BookTalentContent = () => {
     e.preventDefault();
     setSubmitError(null);
 
-    // Validate current step (Step 4) and previous critical requirements
-    if (selectedArtists.length === 0) {
-      setStepError('Please select at least one artist for your lineup.');
-      setStep(3);
-      return;
-    }
-
-    if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) {
-      return;
+    // Sequentially validate steps 1 through 4; navigate to first failing step
+    for (let s = 1; s <= 4; s++) {
+      if (!validateStep(s)) {
+        setStep(s);
+        return;
+      }
     }
 
     setLoading(true);
@@ -473,7 +501,11 @@ const BookTalentContent = () => {
     setErrors({});
     setTouched({});
     setStepError('');
+    setLineupError('');
     setSubmitError(null);
+    try {
+      sessionStorage.removeItem('st_booking_draft');
+    } catch {}
   };
 
   return (
@@ -814,7 +846,12 @@ const BookTalentContent = () => {
                 </div>
 
                 {/* CURRENT LINEUP TRAY */}
-                <div className="lineup-tray-container" role="region" aria-label="Current Lineup">
+                <div
+                  id="lineup-tray"
+                  className={`lineup-tray-container ${lineupError ? 'has-lineup-error' : ''}`}
+                  role="region"
+                  aria-label="Current Lineup"
+                >
                   <div className="lineup-tray-header">
                     <span className="tray-label">Selected Event Lineup</span>
                     {selectedArtists.length > 0 && (
@@ -883,6 +920,13 @@ const BookTalentContent = () => {
                     </div>
                   )}
                 </div>
+
+                {lineupError && (
+                  <div className="field-error-msg" role="alert" style={{ marginTop: '0.65rem', marginBottom: '0.5rem' }}>
+                    <AlertCircle size={15} aria-hidden="true" />
+                    <span>{lineupError}</span>
+                  </div>
+                )}
 
                 {/* ROSTER CATALOG SELECTOR */}
                 <div className="catalog-browser-block">
@@ -1335,7 +1379,8 @@ const BookTalentContent = () => {
         }
 
         .step-node-button:disabled {
-          cursor: default;
+          cursor: not-allowed;
+          opacity: 0.45;
         }
 
         .node-num {
@@ -1739,6 +1784,12 @@ const BookTalentContent = () => {
           border-radius: var(--radius-md);
           padding: 1rem;
           margin-bottom: 1.25rem;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .lineup-tray-container.has-lineup-error {
+          border-color: #ef4444 !important;
+          box-shadow: 0 0 14px rgba(239, 68, 68, 0.25);
         }
 
         .lineup-tray-header {

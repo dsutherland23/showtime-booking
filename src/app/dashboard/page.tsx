@@ -331,9 +331,9 @@ const iStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 };
 
-function FInput({ value, onChange, placeholder, type = 'text', required = false, min, max, step }: {
+function FInput({ value, onChange, placeholder, type = 'text', required = false, min, max, step, onBlur }: {
   value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean;
-  min?: number | string; max?: number | string; step?: number | string;
+  min?: number | string; max?: number | string; step?: number | string; onBlur?: () => void;
 }) {
   const [f, setF] = useState(false);
   return (
@@ -343,7 +343,11 @@ function FInput({ value, onChange, placeholder, type = 'text', required = false,
       min={min} max={max} step={step}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      onFocus={() => setF(true)} onBlur={() => setF(false)}
+      onFocus={() => setF(true)}
+      onBlur={() => {
+        setF(false);
+        onBlur?.();
+      }}
       style={{ ...iStyle, borderColor: f ? 'var(--accent)' : 'rgba(255,255,255,0.1)' }}
     />
   );
@@ -996,7 +1000,7 @@ function BookingsSection({
   const blankForm = { contact_name: '', company_name: '', email: '', phone: '', country: 'Jamaica', budget: '50000', preferred_date: new Date().toISOString().split('T')[0], artist_id: '', details: '', status: 'Lead Received' as Lead['status'] };
   const [form, setForm] = useState(blankForm);
 
-  const openCreate = () => { setEditLead(null); setForm({ ...blankForm, artist_id: artists[0]?.id || '' }); setShowModal(true); };
+  const openCreate = () => { setEditLead(null); setForm({ ...blankForm, artist_id: '' }); setShowModal(true); };
   
   const openEdit = (l: Lead) => {
     setEditLead(l);
@@ -2032,6 +2036,13 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
     setShowModal(true);
   };
 
+  const formatTicketUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
@@ -2054,7 +2065,7 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
         header_image: form.header_image || form.poster_image,
         description: form.description.trim(),
         lineup: form.lineup.trim(),
-        ticket_link: form.ticket_link.trim(),
+        ticket_link: formatTicketUrl(form.ticket_link),
         ticket_price_starting: Number(form.ticket_price_starting) || 0,
         status: form.status,
         is_featured: form.is_featured,
@@ -2275,6 +2286,17 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
                   ) : (
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Inquire</div>
                   )}
+                  {evt.ticket_link && (
+                    <a
+                      href={formatTicketUrl(evt.ticket_link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={evt.ticket_link}
+                      style={{ fontSize: '0.68rem', color: '#64d2ff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}
+                    >
+                      <Ticket size={10} /> Ticket Link <ExternalLink size={9} />
+                    </a>
+                  )}
                 </div>
               </TD>
               <TD><StatusBadge status={evt.status} /></TD>
@@ -2385,13 +2407,45 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
           </FGrid>
 
           <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-            <Field label="Ticket Purchase Link / Platform URL">
+            {/* Dedicated Ticketing Platform URL input */}
+            <div style={{
+              padding: '0.85rem 1rem',
+              borderRadius: 10,
+              background: 'rgba(212,175,55,0.06)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Ticket size={14} /> Ticketing Platform URL (e.g. Eventbrite, Ticketmaster, Caribtix)
+                </span>
+                {form.ticket_link && (
+                  <a
+                    href={formatTicketUrl(form.ticket_link)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.72rem', color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 600 }}
+                  >
+                    Test Link <ExternalLink size={11} />
+                  </a>
+                )}
+              </div>
               <FInput
                 value={form.ticket_link}
                 onChange={v => setForm(f => ({ ...f, ticket_link: v }))}
-                placeholder="https://... (or leave blank to route inquiries to booking concierge)"
+                onBlur={() => {
+                  if (form.ticket_link.trim()) {
+                    setForm(f => ({ ...f, ticket_link: formatTicketUrl(f.ticket_link) }));
+                  }
+                }}
+                placeholder="https://www.eventbrite.com/e/your-event-id or ticketmaster.com/..."
               />
-            </Field>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                When set, the public &ldquo;Get Tickets&rdquo; button opens this URL directly in a new tab. If blank, ticket inquiries route to the booking concierge.
+              </span>
+            </div>
 
             <Field label="Event Description & Press Release">
               <FTextarea

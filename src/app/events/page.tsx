@@ -186,18 +186,20 @@ export default function Events() {
                     <div className="actions-cluster">
                       {evt.ticket_link ? (
                         <a
-                          href={evt.ticket_link}
+                          href={evt.ticket_link.startsWith('http') ? evt.ticket_link : `https://${evt.ticket_link}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-ticket"
+                          title="Get tickets on official ticketing platform"
                         >
                           <Ticket size={13} />
                           <span>Get Tickets</span>
                         </a>
                       ) : (
                         <Link
-                          href={`/booking?event=${encodeURIComponent(evt.title)}`}
+                          href={`/book?eventTitle=${encodeURIComponent(evt.title)}&venue=${encodeURIComponent(evt.venue)}&city=${encodeURIComponent(evt.city)}&date=${encodeURIComponent(evt.date)}`}
                           className="btn-ticket"
+                          title="Inquire with booking concierge"
                         >
                           <span>Book Talent</span>
                           <ArrowRight size={13} />
@@ -221,7 +223,7 @@ export default function Events() {
             Showtime Entertainment manages contracting, talent routing, and full technical rider execution for arenas and festivals across North America, Europe, and the Caribbean.
           </p>
         </div>
-        <Link href="/booking" className="btn btn-primary callout-btn">
+        <Link href="/book" className="btn btn-primary callout-btn">
           <span>Inquire With Concierge</span>
           <ArrowRight size={16} />
         </Link>
