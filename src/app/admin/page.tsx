@@ -1,15 +1,29 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Loader2, ShieldCheck } from 'lucide-react';
 
 export default function AdminRedirect() {
-  const router = useRouter();
+  const { user, isStaff, isAdmin, loading } = useAuth();
 
   useEffect(() => {
-    router.replace('/dashboard');
-  }, [router]);
+    if (loading) return;
+
+    if (user && (isAdmin || isStaff)) {
+      window.location.replace('/dashboard');
+    } else {
+      window.location.replace('/auth/login?redirect=/dashboard&admin=1');
+    }
+  }, [user, isStaff, isAdmin, loading]);
+
+  // Fallback timeout ensures prompt navigation even if auth state resolution is delayed
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.location.replace('/auth/login?redirect=/dashboard&admin=1');
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div
@@ -19,23 +33,47 @@ export default function AdminRedirect() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1rem',
+        gap: '1.25rem',
         color: 'var(--text-primary)',
         background: 'var(--bg-primary)',
       }}
     >
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          background: 'rgba(212,175,55,0.12)',
+          border: '1px solid rgba(212,175,55,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--accent)',
+          boxShadow: '0 0 24px rgba(212,175,55,0.2)',
+        }}
+      >
+        <ShieldCheck style={{ width: 30, height: 30 }} />
+      </div>
       <Loader2
         style={{
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
           color: 'var(--accent)',
           animation: 'spin 1s linear infinite',
         }}
       />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-        Redirecting to Showtime Admin Dashboard…
-      </p>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-primary)', margin: '0 0 4px' }}>
+          Executive Admin Portal
+        </p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+          Directing to secure administrative authentication…
+        </p>
+      </div>
+      <noscript>
+        <meta httpEquiv="refresh" content="0;url=/auth/login?redirect=/dashboard&admin=1" />
+      </noscript>
     </div>
   );
 }

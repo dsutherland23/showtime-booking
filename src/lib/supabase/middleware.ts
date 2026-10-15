@@ -52,12 +52,13 @@ export async function updateSession(request: NextRequest) {
   const isPortalRoute = pathname.startsWith('/portal');
   const isAuthRoute = pathname.startsWith('/auth');
 
-  // If visiting /admin, seamlessly redirect to /dashboard
+  // If visiting /admin, seamlessly redirect to Executive Admin Login or dashboard
   if (isAdminRoute) {
     if (!user) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = '/auth/login';
       loginUrl.searchParams.set('redirect', '/dashboard');
+      loginUrl.searchParams.set('admin', '1');
       return NextResponse.redirect(loginUrl);
     }
     const dashUrl = request.nextUrl.clone();
