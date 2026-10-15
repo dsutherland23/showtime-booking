@@ -199,10 +199,10 @@ function StatCard({
 }
 
 function ABtn({
-  onClick, children, variant = 'primary', size = 'md', disabled = false, title, type = 'button',
+  onClick, children, variant = 'primary', size = 'md', disabled = false, title, type,
 }: {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
   size?: 'sm' | 'md'; disabled?: boolean; title?: string; type?: 'button' | 'submit' | 'reset';
 }) {
   const [hov, setHov] = useState(false);
@@ -211,6 +211,12 @@ function ABtn({
       background: hov ? 'linear-gradient(135deg,#ffde7a,#e5bd44)' : 'var(--accent-gradient)',
       color: '#07050e', fontWeight: 600,
       boxShadow: hov ? '0 6px 20px rgba(212,175,55,0.4)' : '0 4px 14px rgba(212,175,55,0.25)',
+    },
+    success: {
+      background: hov ? 'linear-gradient(135deg, #34d95f 0%, #229940 100%)' : 'linear-gradient(135deg, #30d158 0%, #1f8b3a 100%)',
+      color: '#07050e', fontWeight: 700,
+      boxShadow: hov ? '0 6px 22px rgba(48,209,88,0.55)' : '0 4px 14px rgba(48,209,88,0.35)',
+      border: '1px solid rgba(48,209,88,0.6)',
     },
     secondary: {
       background: hov ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
@@ -227,9 +233,10 @@ function ABtn({
       border: `1px solid ${hov ? 'rgba(255,69,58,0.5)' : 'rgba(255,69,58,0.2)'}`,
     },
   };
+  const resolvedType = type || (onClick ? 'button' : 'submit');
   return (
     <button
-      type={type}
+      type={resolvedType}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -599,13 +606,13 @@ function FGrid({ children, cols }: { children: React.ReactNode; cols?: number })
   );
 }
 
-function FActions({ onCancel, saving, label = 'Save' }: { onCancel: () => void; saving?: boolean; label?: string }) {
+function FActions({ onCancel, saving, label = 'Save', saved = false }: { onCancel: () => void; saving?: boolean; label?: string; saved?: boolean }) {
   return (
     <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-      <ABtn variant="ghost" onClick={onCancel}>Cancel</ABtn>
-      <ABtn variant="primary" disabled={saving}>
-        {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-        {saving ? 'Saving…' : label}
+      <ABtn variant="ghost" onClick={onCancel} type="button">Cancel</ABtn>
+      <ABtn variant={saved ? 'success' : 'primary'} type="submit" disabled={saving}>
+        {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+        {saving ? 'Saving…' : saved ? '✓ Saved!' : label}
       </ABtn>
     </div>
   );
@@ -669,23 +676,85 @@ function ConfirmDlg({ open, title, message, onConfirm, onCancel }: {
 }
 
 function Toast({ message, type, onDone }: { message: string; type: 'success' | 'error'; onDone: () => void }) {
-  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  useEffect(() => { const t = setTimeout(onDone, 4000); return () => clearTimeout(t); }, [onDone]);
   return (
-    <div style={{
-      position: 'fixed', bottom: '1.5rem', right: '1rem', left: '1rem', zIndex: 9999,
-      maxWidth: 380, marginLeft: 'auto',
-      background: type === 'success' ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)',
-      border: `1px solid ${type === 'success' ? 'rgba(48,209,88,0.4)' : 'rgba(255,69,58,0.4)'}`,
-      borderRadius: 'var(--radius-md)',
-      padding: '0.75rem 1.1rem',
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
-      color: type === 'success' ? '#30d158' : '#ff453a',
-      fontSize: '0.875rem', fontWeight: 500,
-      boxShadow: 'var(--shadow-lg)',
-      animation: 'fadeInUp 0.3s ease',
-    }}>
-      {type === 'success' ? <CheckCircle size={15} /> : <XCircle size={15} />}
-      {message}
+    <div
+      role="alert"
+      style={{
+        position: 'fixed',
+        top: '1.25rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 999999,
+        minWidth: 320,
+        maxWidth: 'min(92vw, 540px)',
+        background: type === 'success'
+          ? 'linear-gradient(135deg, rgba(14, 34, 20, 0.98) 0%, rgba(8, 20, 12, 0.98) 100%)'
+          : 'linear-gradient(135deg, rgba(46, 14, 14, 0.98) 0%, rgba(26, 8, 8, 0.98) 100%)',
+        border: `1.5px solid ${type === 'success' ? '#30d158' : '#ff453a'}`,
+        borderRadius: 12,
+        padding: '0.85rem 1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '0.9rem',
+        boxShadow: type === 'success'
+          ? '0 16px 48px rgba(0,0,0,0.8), 0 0 32px rgba(48,209,88,0.35)'
+          : '0 16px 48px rgba(0,0,0,0.8), 0 0 32px rgba(255,69,58,0.35)',
+        animation: 'toastSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        backdropFilter: 'blur(16px)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 9,
+          background: type === 'success' ? 'rgba(48,209,88,0.2)' : 'rgba(255,69,58,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: type === 'success' ? '#30d158' : '#ff453a',
+          flexShrink: 0
+        }}>
+          {type === 'success' ? <CheckCircle size={22} /> : <XCircle size={22} />}
+        </div>
+        <div>
+          <div style={{
+            fontSize: '0.88rem',
+            fontWeight: 800,
+            color: type === 'success' ? '#30d158' : '#ff453a',
+            letterSpacing: '0.01em',
+            lineHeight: 1.2
+          }}>
+            {type === 'success' ? '✓ Saved Successfully' : '⚠️ Action Error'}
+          </div>
+          <div style={{
+            fontSize: '0.82rem',
+            color: 'rgba(255,255,255,0.95)',
+            marginTop: 3,
+            lineHeight: 1.3
+          }}>
+            {message}
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={onDone}
+        type="button"
+        title="Dismiss notification"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'rgba(255,255,255,0.6)',
+          cursor: 'pointer',
+          padding: '6px',
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.background = 'transparent'; }}
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }
@@ -909,6 +978,7 @@ function BookingsSection({
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [detailItem, setDetailItem] = useState<{ type: 'lead'; data: Lead } | { type: 'booking'; data: Booking } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedLead, setSavedLead] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
@@ -951,8 +1021,13 @@ function BookingsSection({
       const data = { ...form, budget: parseFloat(form.budget) || 0, source: 'Admin Portal' };
       if (editLead) await db.updateLead(editLead.id, data);
       else await db.createLead(data);
-      setShowModal(false); onRefresh();
+      setSavedLead(true);
       showToast(editLead ? 'Lead updated.' : 'Lead created.', 'success');
+      setTimeout(() => {
+        setSavedLead(false);
+        setShowModal(false);
+        onRefresh();
+      }, 600);
     } catch { showToast('Failed to save lead.', 'error'); }
     finally { setSaving(false); }
   };
@@ -1638,7 +1713,7 @@ function BookingsSection({
           <div style={{ marginTop: '0.9rem' }}>
             <Field label="Details / Notes"><FTextarea value={form.details} onChange={v => setForm(f => ({ ...f, details: v }))} rows={3} placeholder="Booking inquiry details…" /></Field>
           </div>
-          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+          <FActions onCancel={() => setShowModal(false)} saving={saving} saved={savedLead} />
         </form>
       </Modal>
       <ConfirmDlg open={!!confirm} title="Remove Lead" message="This will permanently delete the lead." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
@@ -1657,6 +1732,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<Artist | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedArtist, setSavedArtist] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const CATEGORIES = ['All', 'Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'];
@@ -1676,8 +1752,13 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     try {
       if (editItem) await db.updateArtistProfile(editItem.id, form);
       else await db.createArtist(form);
-      setShowModal(false); onRefresh();
+      setSavedArtist(true);
       showToast(editItem ? 'Artist updated.' : 'Artist added.', 'success');
+      setTimeout(() => {
+        setSavedArtist(false);
+        setShowModal(false);
+        onRefresh();
+      }, 600);
     } catch { showToast('Failed to save artist.', 'error'); }
     finally { setSaving(false); }
   };
@@ -1873,7 +1954,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
             <Field label="Technical Rider"><FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={2} /></Field>
             <Field label="Hospitality Rider"><FTextarea value={form.hospitality_rider} onChange={v => setForm(f => ({ ...f, hospitality_rider: v }))} rows={2} /></Field>
           </div>
-          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+          <FActions onCancel={() => setShowModal(false)} saving={saving} saved={savedArtist} />
         </form>
       </Modal>
       <ConfirmDlg open={!!confirm} title="Remove Artist" message="This will permanently delete the artist profile." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
@@ -1893,6 +1974,7 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<ShowEvent | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedEvent, setSavedEvent] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const CATEGORIES: ShowEvent['category'][] = ['Festival', 'Concert', 'Arena Tour', 'Club Showcase', 'Gala'];
@@ -1983,9 +2065,13 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
       } else {
         await db.createEvent(data);
       }
-      setShowModal(false);
-      onRefresh();
+      setSavedEvent(true);
       showToast(editItem ? 'Event updated & published to site!' : 'New event published to live site!', 'success');
+      setTimeout(() => {
+        setSavedEvent(false);
+        setShowModal(false);
+        onRefresh();
+      }, 600);
     } catch {
       showToast('Failed to save event.', 'error');
     } finally {
@@ -2352,7 +2438,7 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
             </div>
           </div>
 
-          <FActions onCancel={() => setShowModal(false)} saving={saving} />
+          <FActions onCancel={() => setShowModal(false)} saving={saving} saved={savedEvent} />
         </form>
       </Modal>
 
@@ -6043,18 +6129,21 @@ function ContentSection({ sections, onRefresh, showToast }: {
   const [stats, setStats] = useState<HomepageStatItem[]>(SEED_HOMEPAGE_CONFIG.stats);
   const [statsLoading, setStatsLoading] = useState(true);
   const [savingStats, setSavingStats] = useState(false);
+  const [savedStats, setSavedStats] = useState(false);
 
   // ── 2. Festival Marquee State ───────────────────────────────────────────────
   const [marqueeEyebrow, setMarqueeEyebrow] = useState<string>(SEED_HOMEPAGE_CONFIG.marquee.eyebrow);
   const [marqueeItems, setMarqueeItems] = useState<string[]>(SEED_HOMEPAGE_CONFIG.marquee.items);
   const [newMarqueeItem, setNewMarqueeItem] = useState('');
   const [savingMarquee, setSavingMarquee] = useState(false);
+  const [savedMarquee, setSavedMarquee] = useState(false);
 
   // ── 3. Custom Sections State ────────────────────────────────────────────────
   const [selectedType, setSelectedType] = useState<string>('All');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<WebsiteSection | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedSection, setSavedSection] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const TYPES: WebsiteSection['type'][] = ['hero', 'announcement', 'features', 'cta', 'footer'];
@@ -6114,7 +6203,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
     setSavingStats(true);
     try {
       await db.updateHomepageConfig({ stats });
+      setSavedStats(true);
       showToast('Key statistics bar updated and live on website.', 'success');
+      setTimeout(() => setSavedStats(false), 3500);
     } catch {
       showToast('Failed to save statistics bar.', 'error');
     } finally {
@@ -6157,7 +6248,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
           items: marqueeItems.length > 0 ? marqueeItems : SEED_HOMEPAGE_CONFIG.marquee.items,
         }
       });
+      setSavedMarquee(true);
       showToast('Festival & promoter marquee published to live website.', 'success');
+      setTimeout(() => setSavedMarquee(false), 3500);
     } catch {
       showToast('Failed to save marquee.', 'error');
     } finally {
@@ -6178,9 +6271,16 @@ function ContentSection({ sections, onRefresh, showToast }: {
     try {
       if (editItem) await db.updateWebsiteSection(editItem.id, form);
       else await db.createWebsiteSection(form);
-      setShowModal(false); onRefresh();
+      setSavedSection(true);
       showToast(editItem ? 'Website section updated.' : 'New section published to live site.', 'success');
-    } catch { showToast('Failed to save.', 'error'); }
+      setTimeout(() => {
+        setSavedSection(false);
+        setShowModal(false);
+        onRefresh();
+      }, 700);
+    } catch { 
+      showToast('Failed to save website section.', 'error'); 
+    }
     finally { setSaving(false); }
   };
 
@@ -6311,9 +6411,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
               <ABtn variant="secondary" size="sm" onClick={handleAddStat}>
                 <Plus size={13} /> Add Stat Item
               </ABtn>
-              <ABtn variant="primary" size="sm" onClick={handleSaveStats} disabled={savingStats}>
-                {savingStats ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-                {savingStats ? 'Saving…' : 'Save Statistics Bar'}
+              <ABtn variant={savedStats ? 'success' : 'primary'} size="sm" onClick={handleSaveStats} disabled={savingStats}>
+                {savingStats ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : savedStats ? <CheckCircle size={13} /> : <Save size={13} />}
+                {savingStats ? 'Saving…' : savedStats ? '✓ Saved & Live!' : 'Save Statistics Bar'}
               </ABtn>
             </div>
           </div>
@@ -6441,9 +6541,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-            <ABtn variant="primary" size="md" onClick={handleSaveStats} disabled={savingStats}>
-              {savingStats ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
-              {savingStats ? 'Saving…' : 'Publish Statistics Bar to Website'}
+            <ABtn variant={savedStats ? 'success' : 'primary'} size="md" onClick={handleSaveStats} disabled={savingStats}>
+              {savingStats ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : savedStats ? <CheckCircle size={14} /> : <Save size={14} />}
+              {savingStats ? 'Saving…' : savedStats ? '✓ Published to Website!' : 'Publish Statistics Bar to Website'}
             </ABtn>
           </div>
         </div>
@@ -6468,9 +6568,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
               <ABtn variant="ghost" size="sm" onClick={handleResetMarquee}>
                 <RotateCcw size={12} /> Reset Defaults
               </ABtn>
-              <ABtn variant="primary" size="sm" onClick={handleSaveMarquee} disabled={savingMarquee}>
-                {savingMarquee ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-                {savingMarquee ? 'Saving…' : 'Save Festival Marquee'}
+              <ABtn variant={savedMarquee ? 'success' : 'primary'} size="sm" onClick={handleSaveMarquee} disabled={savingMarquee}>
+                {savingMarquee ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : savedMarquee ? <CheckCircle size={13} /> : <Save size={13} />}
+                {savingMarquee ? 'Saving…' : savedMarquee ? '✓ Marquee Saved!' : 'Save Festival Marquee'}
               </ABtn>
             </div>
           </div>
@@ -6661,9 +6761,9 @@ function ContentSection({ sections, onRefresh, showToast }: {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-            <ABtn variant="primary" size="md" onClick={handleSaveMarquee} disabled={savingMarquee}>
-              {savingMarquee ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
-              {savingMarquee ? 'Saving…' : 'Publish Festival Marquee to Website'}
+            <ABtn variant={savedMarquee ? 'success' : 'primary'} size="md" onClick={handleSaveMarquee} disabled={savingMarquee}>
+              {savingMarquee ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : savedMarquee ? <CheckCircle size={14} /> : <Save size={14} />}
+              {savingMarquee ? 'Saving…' : savedMarquee ? '✓ Published to Website!' : 'Publish Festival Marquee to Website'}
             </ABtn>
           </div>
         </div>
@@ -6774,7 +6874,7 @@ function ContentSection({ sections, onRefresh, showToast }: {
                   aspect="wide"
                 />
               </div>
-              <FActions onCancel={() => setShowModal(false)} saving={saving} />
+              <FActions onCancel={() => setShowModal(false)} saving={saving} saved={savedSection} />
             </form>
           </Modal>
           <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
@@ -7584,6 +7684,7 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
   const [auditLogging, setAuditLogging] = useState(true);
 
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -7594,7 +7695,9 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
       localStorage.setItem('st_settings_currency', currency);
     }
     setSaving(false);
+    setSaved(true);
     showToast('Platform settings successfully saved.', 'success');
+    setTimeout(() => setSaved(false), 3500);
   };
 
   const handleExportBackup = () => {
@@ -7707,9 +7810,9 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               </Field>
             </div>
             <div style={{ marginTop: '1.4rem' }}>
-              <ABtn variant="primary" disabled={saving}>
-                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-                {saving ? 'Saving…' : 'Save Agency Settings'}
+              <ABtn variant={saved ? 'success' : 'primary'} type="submit" disabled={saving}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+                {saving ? 'Saving…' : saved ? '✓ Settings Saved!' : 'Save Agency Settings'}
               </ABtn>
             </div>
           </form>
@@ -7768,9 +7871,9 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               </Field>
             </div>
             <div style={{ marginTop: '1.4rem' }}>
-              <ABtn variant="primary" disabled={saving}>
-                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-                {saving ? 'Saving…' : 'Save Policies'}
+              <ABtn variant={saved ? 'success' : 'primary'} type="submit" disabled={saving}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+                {saving ? 'Saving…' : saved ? '✓ Policies Saved!' : 'Save Policies'}
               </ABtn>
             </div>
           </form>
@@ -7817,9 +7920,9 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               </Field>
             </div>
             <div style={{ marginTop: '1.4rem' }}>
-              <ABtn variant="primary" disabled={saving}>
-                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
-                {saving ? 'Saving…' : 'Save Security Policies'}
+              <ABtn variant={saved ? 'success' : 'primary'} type="submit" disabled={saving}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+                {saving ? 'Saving…' : saved ? '✓ Security Saved!' : 'Save Security Policies'}
               </ABtn>
             </div>
           </form>

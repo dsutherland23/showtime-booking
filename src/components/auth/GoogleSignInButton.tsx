@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { db } from '@/utils/db';
-import { auth, googleProvider } from '@/lib/firebase/client';
+import { auth, googleProvider, getSafeAuth } from '@/lib/firebase/client';
 import { signInWithPopup } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 
@@ -58,7 +58,8 @@ export default function GoogleSignInButton({ text, onVerified, onError }: Google
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const activeAuth = auth || getSafeAuth();
+      const result = await signInWithPopup(activeAuth, googleProvider);
       const user = result.user;
       if (!user.email) {
         throw new Error('Google did not return an email address.');

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { db } from '@/utils/db';
-import { auth, appleProvider } from '@/lib/firebase/client';
+import { auth, appleProvider, getSafeAuth } from '@/lib/firebase/client';
 import { signInWithPopup } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 
@@ -52,7 +52,8 @@ export default function AppleSignInButton({ text, onVerified, onError }: AppleSi
   const handleAppleSignIn = async () => {
     setLoading(true);
     try {
-      const result = await signInWithPopup(auth, appleProvider);
+      const activeAuth = auth || getSafeAuth();
+      const result = await signInWithPopup(activeAuth, appleProvider);
       const user = result.user;
       if (!user.email) {
         throw new Error('Apple did not provide an email address.');
