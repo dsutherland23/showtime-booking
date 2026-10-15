@@ -3,11 +3,11 @@ services:
     name: showtime-booking
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --no-audit --no-fund && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_VERSION
-        value: 20
+        value: 22
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -16,3 +16,4 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SITE_URL
         value: https://showtimeservices.com
+

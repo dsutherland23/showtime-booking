@@ -124,6 +124,7 @@ export default function RootLayout({
                     <h4>Portals</h4>
                     <Link href="/portal/client">Client Portal</Link>
                     <Link href="/portal/artist">Artist Hub</Link>
+                    <Link href="/admin">Admin Portal</Link>
                     <Link href="/about">About Us</Link>
                     <Link href="/book">Book an Artist</Link>
                   </div>

@@ -130,6 +130,9 @@ function LoginForm() {
           }
 
           localStorage.setItem('st_active_user_id', data.user.id);
+          if (typeof document !== 'undefined') {
+            document.cookie = `st_active_user_id=${encodeURIComponent(data.user.id)}; path=/; max-age=604800; SameSite=Lax`;
+          }
 
           const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
             'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
@@ -167,6 +170,9 @@ function LoginForm() {
       }
 
       localStorage.setItem('st_active_user_id', matched.id);
+      if (typeof document !== 'undefined') {
+        document.cookie = `st_active_user_id=${encodeURIComponent(matched.id)}; path=/; max-age=604800; SameSite=Lax`;
+      }
       if (switchUser) {
         await switchUser(matched.id);
       }

@@ -121,6 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           created_at: targetUser.created_at
         });
         localStorage.setItem('st_active_user_id', targetUser.id);
+        if (typeof document !== 'undefined') {
+          document.cookie = `st_active_user_id=${encodeURIComponent(targetUser.id)}; path=/; max-age=604800; SameSite=Lax`;
+        }
       }
     } catch (err) {
       console.error('Failed to switch user:', err);
@@ -356,12 +359,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         await loadProfile(session.user.id, supabaseClient, session.user);
       } else {
         const cachedUserId = localStorage.getItem('st_active_user_id');
         if (!cachedUserId) {
+          setUser(null);
           setProfile(null);
         }
       }
@@ -379,6 +383,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     setSession(null);
     localStorage.removeItem('st_active_user_id');
+    if (typeof document !== 'undefined') {
+      document.cookie = 'st_active_user_id=; path=/; max-age=0; SameSite=Lax';
+    }
   };
 
   const hasPermission = (permission: string): boolean => {

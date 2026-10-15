@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 interface ShowtimeLogoProps {
@@ -12,13 +13,14 @@ interface ShowtimeLogoProps {
   title?: string;
 }
 
-// Module-level timestamp array ensures rapid clicks survive re-renders and route transitions
+// Module-level state ensures rapid clicks survive re-renders and route transitions
 let globalLogoClickHistory: number[] = [];
+let singleClickTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Showtime Logo Component with 5-rapid-click administrative entry trigger.
  * Standard single clicks navigate home (/), while clicking 5 times quickly
- * within 3.8 seconds unlocks the Executive Admin Login portal.
+ * within 4.5 seconds unlocks the Executive Admin Login portal.
  */
 export function ShowtimeLogo({
   height = '30px',
@@ -28,35 +30,34 @@ export function ShowtimeLogo({
   title = 'Showtime Entertainment Global'
 }: ShowtimeLogoProps) {
   const { isStaff, isAdmin } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
   const [pulse, setPulse] = useState(false);
 
-  const registerClick = (e: React.SyntheticEvent) => {
-    if (onClick) onClick();
+  const registerClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
 
     const now = Date.now();
-    // Keep clicks occurring within the last 3800ms
-    globalLogoClickHistory = globalLogoClickHistory.filter(t => now - t < 3800);
+    // Keep clicks occurring within the last 4500ms
+    globalLogoClickHistory = globalLogoClickHistory.filter(t => now - t < 4500);
     globalLogoClickHistory.push(now);
 
     const clickCount = globalLogoClickHistory.length;
 
-    // If rapid clicks are in progress (2 or more clicks within the window),
-    // prevent default Link navigation to avoid canceling subsequent clicks
-    if (clickCount >= 2) {
-      e.preventDefault();
-      e.stopPropagation();
+    if (singleClickTimer) {
+      clearTimeout(singleClickTimer);
+      singleClickTimer = null;
     }
 
-    // Subtle micro-pulse feedback on clicks 3+ so the user knows rapid clicks are registering
-    if (clickCount >= 3) {
+    // Subtle micro-pulse feedback on clicks 2+ so the user knows rapid clicks are registering
+    if (clickCount >= 2) {
       setPulse(true);
-      setTimeout(() => setPulse(false), 200);
+      setTimeout(() => setPulse(false), 180);
     }
 
     // Check for 5 rapid clicks
     if (clickCount >= 5) {
-      e.preventDefault();
-      e.stopPropagation();
       globalLogoClickHistory = [];
 
       try {
@@ -65,12 +66,30 @@ export function ShowtimeLogo({
         }
       } catch {}
 
-      // If already logged in as staff or admin, route straight to dashboard
-      const target = (isAdmin || isStaff)
+      // Check both context and localStorage so even before hydration completes it knows if logged in
+      const hasCachedSession = typeof window !== 'undefined' && Boolean(localStorage.getItem('st_active_user_id'));
+      const target = (isAdmin || isStaff || hasCachedSession)
         ? '/dashboard'
         : '/auth/login?redirect=/dashboard&admin=1';
 
       window.location.assign(target);
+      return;
+    }
+
+    // Standard single click: wait briefly to see if user is multi-clicking; if not, navigate home
+    if (clickCount === 1) {
+      if (onClick) onClick();
+      singleClickTimer = setTimeout(() => {
+        singleClickTimer = null;
+        if (globalLogoClickHistory.length === 1) {
+          globalLogoClickHistory = [];
+          if (pathname !== '/') {
+            router.push('/');
+          } else if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }
+      }, 320);
     }
   };
 
@@ -87,7 +106,7 @@ export function ShowtimeLogo({
         WebkitUserSelect: 'none',
         transition: 'transform 0.15s ease, filter 0.15s ease',
         transform: pulse ? 'scale(1.08)' : 'scale(1)',
-        filter: pulse ? 'drop-shadow(0 0 10px rgba(212,175,55,0.7))' : 'none',
+        filter: pulse ? 'drop-shadow(0 0 10px rgba(212,175,55,0.75))' : 'none',
         ...style,
       }}
       onClick={registerClick}
@@ -105,3 +124,4 @@ export function ShowtimeLogo({
 }
 
 export default ShowtimeLogo;
+

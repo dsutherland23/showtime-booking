@@ -44,6 +44,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const localUserCookie = request.cookies.get('st_active_user_id')?.value;
+  const isAuthenticated = Boolean(user || localUserCookie);
+
   const { pathname } = request.nextUrl;
 
   // ── Protected route groups ────────────────────────────────
@@ -54,7 +57,7 @@ export async function updateSession(request: NextRequest) {
 
   // If visiting /admin, seamlessly redirect to Executive Admin Login or dashboard
   if (isAdminRoute) {
-    if (!user) {
+    if (!isAuthenticated) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = '/auth/login';
       loginUrl.searchParams.set('redirect', '/dashboard');
@@ -67,15 +70,15 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Not authenticated — redirect to login for protected routes
-  if (!user && (isDashboardRoute || isPortalRoute)) {
+  if (!isAuthenticated && (isDashboardRoute || isPortalRoute)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/auth/login';
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated — redirect away from auth pages
-  if (user && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/verify-email') {
+  // Authenticated — redirect away from auth pages (unless explicitly opening ?admin=1 login)
+  if (isAuthenticated && isAuthRoute && pathname !== '/auth/callback' && pathname !== '/auth/verify-email' && request.nextUrl.searchParams.get('admin') !== '1') {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
     return NextResponse.redirect(homeUrl);
@@ -83,3 +86,4 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse;
 }
+
