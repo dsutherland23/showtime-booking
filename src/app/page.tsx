@@ -11,7 +11,8 @@ import { HeroSection } from '@/components/ui/3d-hero-section-boxes';
 
 /* ── Animated Counter ── */
 function useCountUp(target: number, duration = 2000) {
-  const [value, setValue] = React.useState(0);
+  // Initialize with target so slow connections, crawlers, and initial paint see real metrics immediately
+  const [value, setValue] = React.useState(target);
   const ref = useRef<HTMLSpanElement>(null);
   const animated = useRef(false);
 
@@ -22,6 +23,7 @@ function useCountUp(target: number, duration = 2000) {
       ([entry]) => {
         if (entry.isIntersecting && !animated.current) {
           animated.current = true;
+          setValue(0);
           const start = performance.now();
           const tick = (now: number) => {
             const elapsed = now - start;
@@ -34,7 +36,7 @@ function useCountUp(target: number, duration = 2000) {
           requestAnimationFrame(tick);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.25 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -530,7 +532,7 @@ export default function Home() {
 
                   <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
                     <Link href="/contact" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#d4af37] hover:text-[#d4af37] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
-                      Verify Compliance <ArrowRight className="w-4 h-4" />
+                      Consult Compliance Team <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
@@ -598,7 +600,7 @@ export default function Home() {
 
                   <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
                     <Link href="/services" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#a855f7] hover:text-[#a855f7] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
-                      Verify Riders <ArrowRight className="w-4 h-4" />
+                      Explore Production Services <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
@@ -655,8 +657,8 @@ export default function Home() {
               </p>
               <div className="events-metrics">
                 <div className="em-item">
-                  <span className="em-num">500+</span>
-                  <span className="em-label">Confirmed Gigs</span>
+                  <span className="em-num">1,000+</span>
+                  <span className="em-label">Events Produced</span>
                 </div>
                 <div className="em-item">
                   <span className="em-num">7M+</span>

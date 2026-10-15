@@ -57,8 +57,11 @@ export default function Contact() {
             <div className="contact-info-item">
               <MapPin className="contact-icon-tiny" />
               <div>
-                <strong>Offices</strong>
-                <p>Kingston, Jamaica &bull; London, United Kingdom</p>
+                <strong>Offices &amp; Terminals</strong>
+                <p style={{ lineHeight: '1.5' }}>
+                  <strong>Kingston:</strong> 12 Knutsford Boulevard, New Kingston, Kingston 5, Jamaica<br />
+                  <strong>London:</strong> 25 Berkeley Square, Mayfair, London W1J 6HN, United Kingdom
+                </p>
               </div>
             </div>
 

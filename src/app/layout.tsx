@@ -153,7 +153,7 @@ export default function RootLayout({
                       .
                     </p>
                   </div>
-                  <p>Kingston, Jamaica &bull; London, United Kingdom</p>
+                  <p>Kingston: 12 Knutsford Blvd, Kingston 5 &bull; London: 25 Berkeley Sq, Mayfair W1J 6HN</p>
                 </div>
               </footer>
               <StickyCTA />

@@ -1,20 +1,70 @@
 'use client';
 
-import React from 'react';
-import { Briefcase, Plane, ShieldCheck, Music, Award, Headphones, Compass, HeartHandshake } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  Briefcase, Plane, ShieldCheck, Music, Award, Headphones,
+  Compass, HeartHandshake, Globe, Sparkles, Megaphone,
+  DollarSign, Calendar, Clock, CheckCircle, ArrowRight
+} from 'lucide-react';
 import Link from 'next/link';
+import { db, AgencyService, SEED_SERVICES } from '@/utils/db';
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  'music': <Music className="service-icon" />,
+  'heart-handshake': <HeartHandshake className="service-icon" />,
+  'plane': <Plane className="service-icon" />,
+  'headphones': <Headphones className="service-icon" />,
+  'shield-check': <ShieldCheck className="service-icon" />,
+  'compass': <Compass className="service-icon" />,
+  'award': <Award className="service-icon" />,
+  'briefcase': <Briefcase className="service-icon" />,
+  'globe': <Globe className="service-icon" />,
+  'sparkles': <Sparkles className="service-icon" />,
+  'megaphone': <Megaphone className="service-icon" />,
+  'dollarsign': <DollarSign className="service-icon" />,
+  'calendar': <Calendar className="service-icon" />,
+  'clock': <Clock className="service-icon" />,
+  'check-circle': <CheckCircle className="service-icon" />,
+};
+
+function renderServiceIcon(iconKey: string) {
+  const key = (iconKey || '').toLowerCase();
+  return ICON_MAP[key] || <Briefcase className="service-icon" />;
+}
 
 export default function Services() {
-  const serviceList = [
-    { icon: <Music className="service-icon" />, title: 'Talent Booking', desc: 'Direct contracting for reggae, dancehall, and international roster performers, with secure invoice management.' },
-    { icon: <HeartHandshake className="service-icon" />, title: 'Artist Representation', desc: 'Elite career planning, brand alignment, global synchronization license placements, and media uploader suites.' },
-    { icon: <Plane className="service-icon" />, title: 'Tour Routing & Routing', desc: 'Full routing optimization across North America, Europe, the United Kingdom, and Middle East territories.' },
-    { icon: <Headphones className="service-icon" />, title: 'Production Management', desc: 'Stage sound system checks, lighting backline specs alignment, and on-site acoustic coordination.' },
-    { icon: <ShieldCheck className="service-icon" />, title: 'Visa & Work Permits', desc: 'Legally vetted US O-1/O-2 petitions, UK Certificate of Sponsorship (CoS), and European work clearances.' },
-    { icon: <Compass className="service-icon" />, title: 'Event Logistics', desc: 'Premium ground transportation, flight bookings, accommodation, and hospitality rider execution.' },
-    { icon: <Award className="service-icon" />, title: 'PR & Press Marketing', desc: 'Press kit packaging, media interviews, campaign strategies, and social footprint growth operations.' },
-    { icon: <Briefcase className="service-icon" />, title: 'Financial Settlements', desc: 'Multi-currency payment gateways (Stripe, Wise, Bank Wire) with automated tax withholding calculations.' }
-  ];
+  const [services, setServices] = useState<AgencyService[]>(SEED_SERVICES);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchServices = async () => {
+      try {
+        const data = await db.getServices();
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          setServices(data.filter(s => s.active !== false));
+        }
+      } catch (err) {
+        console.error('Failed to load agency services:', err);
+      }
+    };
+
+    fetchServices();
+
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<AgencyService[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setServices(customEvent.detail.filter(s => s.active !== false));
+      } else {
+        fetchServices();
+      }
+    };
+
+    window.addEventListener('st_services_updated', handleUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('st_services_updated', handleUpdate);
+    };
+  }, []);
 
   return (
     <div className="services-viewport container luxury-bg">
@@ -25,17 +75,45 @@ export default function Services() {
       </div>
 
       <div className="grid-3 service-grid">
-        {serviceList.map((srv, idx) => (
-          <div key={idx} className="luxury-card service-card">
-            <div className="icon-wrapper-box">{srv.icon}</div>
-            <h3>{srv.title}</h3>
-            <p>{srv.desc}</p>
+        {services.map((srv) => (
+          <div key={srv.id} className="luxury-card service-card">
+            <div className="service-card-top">
+              <div className="icon-wrapper-box">{renderServiceIcon(srv.icon)}</div>
+              {srv.category && (
+                <span className="service-cat-pill">{srv.category}</span>
+              )}
+            </div>
+
+            <div className="service-body">
+              <h3>{srv.title}</h3>
+              <p>{srv.desc}</p>
+            </div>
+
+            <div className="service-footer">
+              {srv.turnaround && (
+                <span className="service-turnaround">
+                  <Clock size={12} className="inline-icon" /> {srv.turnaround}
+                </span>
+              )}
+              {srv.action_label && srv.action_url ? (
+                <Link href={srv.action_url} className="service-link">
+                  <span>{srv.action_label}</span>
+                  <ArrowRight size={13} />
+                </Link>
+              ) : (
+                <Link href="/book" className="service-link">
+                  <span>Inquire</span>
+                  <ArrowRight size={13} />
+                </Link>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
       <div className="services-cta-block">
         <div className="luxury-card cta-box-inner">
+          <span className="gold-badge">Custom Engagements</span>
           <h3>Need a Custom Logistics Blueprint?</h3>
           <p>Consult with our lead logistics agents or submit event details to obtain travel and permit estimations.</p>
           <div className="cta-buttons">
@@ -53,37 +131,114 @@ export default function Services() {
 
         .service-grid {
           margin-top: var(--spacing-xl);
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 1.5rem;
         }
 
         .service-card {
           display: flex;
           flex-direction: column;
-          align-items: flex-start;
-          gap: 12px;
+          justify-content: space-between;
+          padding: 1.5rem;
+          border-radius: 12px;
+          background: rgba(18, 14, 28, 0.7);
+          border: 1px solid rgba(212, 175, 55, 0.15);
+          transition: all 0.25s ease;
+        }
+
+        .service-card:hover {
+          border-color: rgba(212, 175, 55, 0.45);
+          transform: translateY(-3px);
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.1);
+        }
+
+        .service-card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1rem;
         }
 
         .icon-wrapper-box {
           background: rgba(212, 175, 55, 0.08);
-          border: 1px solid rgba(212, 175, 55, 0.15);
+          border: 1px solid rgba(212, 175, 55, 0.2);
           width: 44px;
           height: 44px;
-          border-radius: var(--radius-md);
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+
+        .service-cat-pill {
+          font-size: 0.68rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          padding: 3px 8px;
+          border-radius: 100px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-muted);
+        }
+
+        .service-body {
+          flex: 1;
         }
 
         .service-card h3 {
           font-family: var(--font-body);
           font-size: 1.15rem;
           font-weight: 600;
-          color: var(--gold-primary);
+          color: #fff;
+          margin-bottom: 0.5rem;
         }
 
         .service-card p {
-          font-size: 0.85rem;
+          font-size: 0.86rem;
           color: var(--text-secondary);
-          line-height: 1.5;
+          line-height: 1.55;
+          margin: 0;
+        }
+
+        .service-footer {
+          margin-top: 1.25rem;
+          padding-top: 1rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+        }
+
+        .service-turnaround {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.75rem;
+          color: var(--gold-primary);
+          font-weight: 500;
+        }
+
+        :global(.inline-icon) {
+          vertical-align: middle;
+        }
+
+        .service-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--accent);
+          text-decoration: none;
+          transition: transform 0.2s ease, color 0.2s ease;
+        }
+
+        .service-link:hover {
+          color: #fff;
+          transform: translateX(2px);
         }
 
         .services-cta-block {

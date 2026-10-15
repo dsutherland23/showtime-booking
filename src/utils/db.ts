@@ -307,6 +307,21 @@ export interface AccessibilityConfig {
   limitations_content: string;
 }
 
+export interface AgencyService {
+  id: string;
+  title: string;
+  desc: string;
+  icon: string;
+  category: string;
+  active: boolean;
+  order?: number;
+  turnaround?: string;
+  action_label?: string;
+  action_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Integration {
   id: string;
   name: string;
@@ -1856,6 +1871,105 @@ export const SEED_ACCESSIBILITY_CONFIG: AccessibilityConfig = {
   limitations_content: 'Despite our best efforts, some legacy sections or external portal components may occasionally exhibit minor barriers. We resolve these promptly as they are identified. If you encounter any accessibility issues, please use the compliance reporting form on the right to notify us immediately.'
 };
 
+export const SEED_SERVICES: AgencyService[] = [
+  {
+    id: 'srv-talent-booking',
+    title: 'Talent Booking',
+    desc: 'Direct contracting for reggae, dancehall, and international roster performers, with secure invoice management.',
+    icon: 'music',
+    category: 'Booking & Representation',
+    active: true,
+    order: 1,
+    turnaround: '24-48h Response',
+    action_label: 'Book Roster Talent',
+    action_url: '/book'
+  },
+  {
+    id: 'srv-artist-rep',
+    title: 'Artist Representation',
+    desc: 'Elite career planning, brand alignment, global synchronization license placements, and media uploader suites.',
+    icon: 'heart-handshake',
+    category: 'Booking & Representation',
+    active: true,
+    order: 2,
+    turnaround: 'Dedicated Agent',
+    action_label: 'Explore Roster',
+    action_url: '/talent'
+  },
+  {
+    id: 'srv-tour-routing',
+    title: 'Tour Routing & Logistics',
+    desc: 'Full routing optimization across North America, Europe, the United Kingdom, and Middle East territories.',
+    icon: 'plane',
+    category: 'Logistics',
+    active: true,
+    order: 3,
+    turnaround: 'Turnkey Routing',
+    action_label: 'Request Routing',
+    action_url: '/contact'
+  },
+  {
+    id: 'srv-prod-mgmt',
+    title: 'Production Management',
+    desc: 'Stage sound system checks, lighting backline specs alignment, and on-site acoustic coordination.',
+    icon: 'headphones',
+    category: 'Production',
+    active: true,
+    order: 4,
+    turnaround: 'Full Technical Rider',
+    action_label: 'Consult Production',
+    action_url: '/contact'
+  },
+  {
+    id: 'srv-visas-permits',
+    title: 'Visa & Work Permits',
+    desc: 'Legally vetted US O-1/O-2 petitions, UK Certificate of Sponsorship (CoS), and European work clearances.',
+    icon: 'shield-check',
+    category: 'Legal & Compliance',
+    active: true,
+    order: 5,
+    turnaround: 'Expedited Filing',
+    action_label: 'Consult Compliance',
+    action_url: '/contact'
+  },
+  {
+    id: 'srv-event-logistics',
+    title: 'Event Logistics',
+    desc: 'Premium ground transportation, flight bookings, accommodation, and hospitality rider execution.',
+    icon: 'compass',
+    category: 'Logistics',
+    active: true,
+    order: 6,
+    turnaround: '24/7 Operations',
+    action_label: 'Plan Event',
+    action_url: '/book'
+  },
+  {
+    id: 'srv-pr-press',
+    title: 'PR & Press Marketing',
+    desc: 'Press kit packaging, media interviews, campaign strategies, and social footprint growth operations.',
+    icon: 'award',
+    category: 'Marketing',
+    active: true,
+    order: 7,
+    turnaround: 'Full Campaign Lifecycle',
+    action_label: 'Marketing Inquiry',
+    action_url: '/contact'
+  },
+  {
+    id: 'srv-financial-settlements',
+    title: 'Financial Settlements',
+    desc: 'Multi-currency payment gateways (Stripe, Wise, Bank Wire) with automated tax withholding calculations.',
+    icon: 'briefcase',
+    category: 'Finance',
+    active: true,
+    order: 8,
+    turnaround: 'Automated Escrow',
+    action_label: 'Escrow Details',
+    action_url: '/contact'
+  }
+];
+
 const SEED_INTEGRATIONS: Integration[] = [
   {
     id: 'int-stripe',
@@ -3295,6 +3409,130 @@ export const db = {
     return updated;
   },
 
+  // --- AGENCY SERVICES CRUD ---
+  async getServices(): Promise<AgencyService[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('website_sections').select('*').eq('id', 'services_list').single();
+        if (!error && data?.content) {
+          const parsed = JSON.parse(data.content);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed as AgencyService[];
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+    const current = getStoreValue<AgencyService>('st_services', SEED_SERVICES);
+    return [...current].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  },
+
+  async createService(item: Omit<AgencyService, 'id' | 'created_at' | 'updated_at'>): Promise<AgencyService> {
+    const list = await this.getServices();
+    const newService: AgencyService = {
+      ...item,
+      id: `srv-${Date.now()}`,
+      order: item.order ?? (list.length + 1),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const updated = [...list, newService];
+    setStoreValue('st_services', updated);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'services_list',
+          type: 'features',
+          title: 'Agency Services Catalog',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_services_updated', { detail: updated }));
+    }
+    return newService;
+  },
+
+  async updateService(id: string, updates: Partial<AgencyService>): Promise<AgencyService> {
+    const list = await this.getServices();
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) throw new Error('Service not found');
+    const updatedItem: AgencyService = {
+      ...list[idx],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    const updatedList = [...list];
+    updatedList[idx] = updatedItem;
+    setStoreValue('st_services', updatedList);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'services_list',
+          type: 'features',
+          title: 'Agency Services Catalog',
+          content: JSON.stringify(updatedList),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_services_updated', { detail: updatedList }));
+    }
+    return updatedItem;
+  },
+
+  async deleteService(id: string): Promise<boolean> {
+    const list = await this.getServices();
+    const updated = list.filter(s => s.id !== id);
+    setStoreValue('st_services', updated);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'services_list',
+          type: 'features',
+          title: 'Agency Services Catalog',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_services_updated', { detail: updated }));
+    }
+    return true;
+  },
+
+  async resetServices(): Promise<AgencyService[]> {
+    setStoreValue('st_services', SEED_SERVICES);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'services_list',
+          type: 'features',
+          title: 'Agency Services Catalog',
+          content: JSON.stringify(SEED_SERVICES),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_services_updated', { detail: SEED_SERVICES }));
+    }
+    return SEED_SERVICES;
+  },
+
   // --- INTEGRATIONS ---
   async getIntegrations(): Promise<Integration[]> {
     return getStoreValue('st_integrations', SEED_INTEGRATIONS);
@@ -3502,7 +3740,7 @@ export const db = {
       'st_users', 'st_artists_v2', 'st_leads', 'st_bookings', 'st_contracts',
       'st_invoices', 'st_tasks', 'st_notifs', 'st_venues', 'st_customers',
       'st_ticket_tiers', 'st_promo_codes', 'st_campaigns', 'st_ad_placements',
-      'st_website_sections', 'st_homepage_config', 'st_about_config', 'st_privacy_config', 'st_accessibility_config',
+      'st_website_sections', 'st_services', 'st_homepage_config', 'st_about_config', 'st_privacy_config', 'st_accessibility_config',
       'st_integrations', 'st_events', 'st_settings_domain',
       'st_settings_currency', 'st_settings_policy'
     ];

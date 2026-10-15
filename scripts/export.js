@@ -54,4 +54,22 @@ for (const file of htmlFiles) {
 if (fs.existsSync('./public/_headers')) fs.copyFileSync('./public/_headers', path.join(outDir, '_headers'));
 if (fs.existsSync('./public/_redirects')) fs.copyFileSync('./public/_redirects', path.join(outDir, '_redirects'));
 
+// Ensure 404.html is available for static hosting providers (Render, Netlify, Cloudflare Pages)
+const notFoundSources = [
+  path.join(outDir, '_not-found.html'),
+  path.join(outDir, 'not-found.html'),
+  path.join(appDir, '_not-found.html'),
+  path.join(appDir, 'not-found.html'),
+];
+for (const nf of notFoundSources) {
+  if (fs.existsSync(nf)) {
+    fs.copyFileSync(nf, path.join(outDir, '404.html'));
+    const notFoundDir = path.join(outDir, '404');
+    fs.mkdirSync(notFoundDir, { recursive: true });
+    fs.copyFileSync(nf, path.join(notFoundDir, 'index.html'));
+    console.log(`[Export] Generated 404 fallback from ${nf}`);
+    break;
+  }
+}
+
 console.log(`[Export] Successfully exported ${htmlFiles.length} pages and static assets to ${outDir}`);

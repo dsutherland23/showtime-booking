@@ -12,7 +12,8 @@ import {
   docTotals, effectiveDocStatus,
   HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG,
   AboutUsConfig, PrivacySectionItem, PrivacyPolicyConfig, AccessibilityConfig,
-  SEED_ABOUT_CONFIG, SEED_PRIVACY_CONFIG, SEED_ACCESSIBILITY_CONFIG
+  SEED_ABOUT_CONFIG, SEED_PRIVACY_CONFIG, SEED_ACCESSIBILITY_CONFIG,
+  AgencyService, SEED_SERVICES
 } from '@/utils/db';
 import {
   LayoutDashboard, Calendar, Music, MapPin, Users, Ticket, Receipt,
@@ -28,7 +29,7 @@ import {
   Key, Copy, Server, Database, Cpu, Zap, UserCheck, FileCode, RotateCcw,
   HelpCircle, BookOpen, ChevronDown, Rocket, Lightbulb,
   ArrowRight, FileCheck, FilePlus, Split, Share2, Landmark,
-  Award, Compass, Target
+  Award, Compass, Target, Briefcase, Plane, Headphones, HeartHandshake
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'marketing',    label: 'Marketing',     icon: Megaphone,       section: 'Growth',          permission: 'manage_marketing' },
   { id: 'advertising',  label: 'Advertising',   icon: Radio,           section: 'Growth',          permission: 'manage_advertising' },
   { id: 'content',            label: 'Content CMS',           icon: FileText,    section: 'Website', permission: 'manage_content' },
+  { id: 'page_services',      label: 'Services Page',         icon: Briefcase,   section: 'Website', permission: 'manage_content' },
   { id: 'page_about',         label: 'About Us Page',         icon: Compass,     section: 'Website', permission: 'manage_content' },
   { id: 'page_privacy',       label: 'Privacy Policy',        icon: ShieldCheck, section: 'Website', permission: 'manage_content' },
   { id: 'page_accessibility', label: 'Accessibility Page',    icon: Award,       section: 'Website', permission: 'manage_content' },
@@ -6182,9 +6184,9 @@ function AdvertisingSection({ ads, onRefresh, showToast }: {
 
 function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
   sections: WebsiteSection[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
-  initialSubTab?: 'stats' | 'marquee' | 'sections' | 'about' | 'privacy' | 'accessibility';
+  initialSubTab?: 'stats' | 'marquee' | 'sections' | 'services' | 'about' | 'privacy' | 'accessibility';
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'marquee' | 'sections' | 'about' | 'privacy' | 'accessibility'>(initialSubTab || 'stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'marquee' | 'sections' | 'services' | 'about' | 'privacy' | 'accessibility'>(initialSubTab || 'stats');
 
   useEffect(() => {
     if (initialSubTab) {
@@ -6216,6 +6218,27 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
   const TYPES: WebsiteSection['type'][] = ['hero', 'announcement', 'features', 'cta', 'footer'];
   const blank = { type: 'hero' as WebsiteSection['type'], title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true };
   const [form, setForm] = useState(blank);
+
+  // ── 3.5 Services State ──────────────────────────────────────────────────────
+  const [servicesList, setServicesList] = useState<AgencyService[]>(SEED_SERVICES);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [savingService, setSavingService] = useState(false);
+  const [savedService, setSavedService] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [editingService, setEditingService] = useState<AgencyService | null>(null);
+  const blankService = {
+    title: '',
+    desc: '',
+    icon: 'music',
+    category: 'Booking & Representation',
+    active: true,
+    order: 1,
+    turnaround: '24-48h Response',
+    action_label: 'Book Roster Talent',
+    action_url: '/book'
+  };
+  const [serviceForm, setServiceForm] = useState(blankService);
+  const [serviceConfirmDelete, setServiceConfirmDelete] = useState<string | null>(null);
 
   // ── 4. About Us State ───────────────────────────────────────────────────────
   const [aboutConfig, setAboutConfig] = useState<AboutUsConfig>(SEED_ABOUT_CONFIG);
@@ -6249,6 +6272,13 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
         }
       }
       if (mounted) setStatsLoading(false);
+    });
+
+    db.getServices().then(res => {
+      if (mounted && Array.isArray(res) && res.length > 0) {
+        setServicesList(res);
+      }
+      if (mounted) setServicesLoading(false);
     });
 
     db.getAboutConfig().then(cfg => {
@@ -6394,6 +6424,127 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
     try { await db.deleteWebsiteSection(id); onRefresh(); showToast('Section removed.', 'success'); }
     catch { showToast('Failed to delete.', 'error'); }
     finally { setConfirm(null); }
+  };
+
+  // ── Services Handlers ───────────────────────────────────────────────────────
+  const handleToggleServiceActive = async (srv: AgencyService) => {
+    try {
+      const updated = await db.updateService(srv.id, { active: !srv.active });
+      setServicesList(prev => prev.map(s => s.id === srv.id ? updated : s));
+      showToast(`Service "${srv.title}" is now ${!srv.active ? 'Active & Live' : 'Hidden'}.`, 'success');
+    } catch {
+      showToast('Failed to toggle service status.', 'error');
+    }
+  };
+
+  const handleOpenNewService = () => {
+    setEditingService(null);
+    setServiceForm({
+      ...blankService,
+      order: servicesList.length + 1
+    });
+    setShowServiceModal(true);
+  };
+
+  const handleOpenEditService = (srv: AgencyService) => {
+    setEditingService(srv);
+    setServiceForm({
+      title: srv.title,
+      desc: srv.desc,
+      icon: srv.icon || 'music',
+      category: srv.category || 'Booking & Representation',
+      active: srv.active !== false,
+      order: srv.order ?? 1,
+      turnaround: srv.turnaround || '',
+      action_label: srv.action_label || '',
+      action_url: srv.action_url || ''
+    });
+    setShowServiceModal(true);
+  };
+
+  const handleSaveService = async () => {
+    if (!serviceForm.title.trim()) {
+      showToast('Service title is required.', 'error');
+      return;
+    }
+    setSavingService(true);
+    try {
+      if (editingService) {
+        const updated = await db.updateService(editingService.id, {
+          title: serviceForm.title.trim(),
+          desc: serviceForm.desc.trim(),
+          icon: serviceForm.icon,
+          category: serviceForm.category.trim(),
+          active: serviceForm.active,
+          order: Number(serviceForm.order) || 1,
+          turnaround: serviceForm.turnaround.trim(),
+          action_label: serviceForm.action_label.trim(),
+          action_url: serviceForm.action_url.trim()
+        });
+        setServicesList(prev => prev.map(s => s.id === editingService.id ? updated : s));
+        showToast(`Service "${updated.title}" updated successfully.`, 'success');
+      } else {
+        const created = await db.createService({
+          title: serviceForm.title.trim(),
+          desc: serviceForm.desc.trim(),
+          icon: serviceForm.icon,
+          category: serviceForm.category.trim(),
+          active: serviceForm.active,
+          order: Number(serviceForm.order) || (servicesList.length + 1),
+          turnaround: serviceForm.turnaround.trim(),
+          action_label: serviceForm.action_label.trim(),
+          action_url: serviceForm.action_url.trim()
+        });
+        setServicesList(prev => [...prev, created]);
+        showToast(`New service "${created.title}" created successfully.`, 'success');
+      }
+      setShowServiceModal(false);
+      setSavedService(true);
+      setTimeout(() => setSavedService(false), 3500);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to save service.', 'error');
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  const handleDeleteService = async (id: string) => {
+    try {
+      await db.deleteService(id);
+      setServicesList(prev => prev.filter(s => s.id !== id));
+      setServiceConfirmDelete(null);
+      showToast('Service deleted from catalog.', 'success');
+    } catch {
+      showToast('Failed to delete service.', 'error');
+    }
+  };
+
+  const handleResetServices = async () => {
+    try {
+      const res = await db.resetServices();
+      setServicesList(res);
+      showToast('Reset to 8 default agency services.', 'success');
+    } catch {
+      showToast('Failed to reset services.', 'error');
+    }
+  };
+
+  const handleMoveService = async (idx: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= servicesList.length) return;
+    const copy = [...servicesList];
+    const [moved] = copy.splice(idx, 1);
+    copy.splice(targetIdx, 0, moved);
+    const reordered = copy.map((item, i) => ({ ...item, order: i + 1 }));
+    setServicesList(reordered);
+    try {
+      for (const item of reordered) {
+        await db.updateService(item.id, { order: item.order });
+      }
+      showToast('Services reordered.', 'success');
+    } catch {
+      // ignore
+    }
   };
 
   // ── About Us Handlers ───────────────────────────────────────────────────────
@@ -6579,6 +6730,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
   const filtered = sections.filter(s => selectedType === 'All' || s.type === selectedType);
 
   const getLivePreviewUrl = () => {
+    if (activeSubTab === 'services') return '/services';
     if (activeSubTab === 'about') return '/about';
     if (activeSubTab === 'privacy') return '/privacy';
     if (activeSubTab === 'accessibility') return '/accessibility';
@@ -6586,6 +6738,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
   };
 
   const getLivePreviewLabel = () => {
+    if (activeSubTab === 'services') return 'Services Page';
     if (activeSubTab === 'about') return 'About Us Page';
     if (activeSubTab === 'privacy') return 'Privacy Policy';
     if (activeSubTab === 'accessibility') return 'Accessibility Statement';
@@ -6611,6 +6764,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
             { id: 'stats', label: 'Key Statistics Bar', icon: Activity },
             { id: 'marquee', label: 'Festivals & Promoters', icon: Star },
             { id: 'sections', label: 'Hero & Banners CMS', icon: FileText },
+            { id: 'services', label: 'Services Page', icon: Briefcase },
             { id: 'about', label: 'About Us Page', icon: Compass },
             { id: 'privacy', label: 'Privacy Policy', icon: ShieldCheck },
             { id: 'accessibility', label: 'Accessibility Statement', icon: Award },
@@ -7140,6 +7294,461 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
             </form>
           </Modal>
           <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 3.5: SERVICES PAGE ════════════════════ */}
+      {activeSubTab === 'services' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Briefcase size={16} color="var(--accent)" />
+                Showtime Agency Services Catalog
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Create, edit, toggle visibility, and reorder full-service capabilities published on <code style={{ color: 'var(--accent)' }}>/services</code>.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetServices}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <a href="/services" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                <ABtn variant="secondary" size="sm">
+                  <ExternalLink size={12} /> Preview Live Page
+                </ABtn>
+              </a>
+              <ABtn variant="primary" size="sm" onClick={handleOpenNewService}>
+                <Plus size={13} /> Add New Service
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Saved Notification Banner */}
+          {savedService && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              background: 'rgba(48,209,88,0.12)',
+              border: '1px solid rgba(48,209,88,0.3)',
+              color: '#30d158',
+              fontSize: '0.82rem',
+              fontWeight: 600
+            }}>
+              <CheckCircle size={16} />
+              <span>Services catalog updated and synchronized with live website.</span>
+            </div>
+          )}
+
+          {/* Quick Metrics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0.85rem 1rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Total Catalog</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', marginTop: 4 }}>{servicesList.length}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0.85rem 1rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Active on Website</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#30d158', marginTop: 4 }}>{servicesList.filter(s => s.active !== false).length}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '0.85rem 1rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Hidden / Draft</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ff9f0a', marginTop: 4 }}>{servicesList.filter(s => s.active === false).length}</div>
+            </div>
+          </div>
+
+          {/* Services Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '1rem'
+          }}>
+            {servicesList.map((srv, idx) => {
+              const isActive = srv.active !== false;
+              return (
+                <div
+                  key={srv.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${isActive ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 12,
+                    padding: '1.15rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    transition: 'all 0.2s ease',
+                    opacity: isActive ? 1 : 0.65
+                  }}
+                >
+                  <div>
+                    {/* Top Row: Icon + Category + Order + Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          background: 'rgba(212,175,55,0.1)',
+                          border: '1px solid rgba(212,175,55,0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--accent)'
+                        }}>
+                          {(() => {
+                            const match = [
+                              { key: 'music', icon: Music },
+                              { key: 'heart-handshake', icon: HeartHandshake },
+                              { key: 'plane', icon: Plane },
+                              { key: 'headphones', icon: Headphones },
+                              { key: 'shield-check', icon: ShieldCheck },
+                              { key: 'compass', icon: Compass },
+                              { key: 'award', icon: Award },
+                              { key: 'briefcase', icon: Briefcase },
+                              { key: 'globe', icon: Globe },
+                              { key: 'sparkles', icon: Sparkles },
+                              { key: 'megaphone', icon: Megaphone },
+                              { key: 'dollarsign', icon: DollarSign },
+                              { key: 'calendar', icon: Calendar },
+                              { key: 'clock', icon: Clock },
+                              { key: 'check-circle', icon: CheckCircle }
+                            ].find(i => i.key === (srv.icon || '').toLowerCase());
+                            const IconComp = match ? match.icon : Briefcase;
+                            return <IconComp size={18} />;
+                          })()}
+                        </div>
+                        <div>
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            padding: '2px 7px',
+                            borderRadius: 100,
+                            background: 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: 'var(--text-muted)'
+                          }}>
+                            {srv.category || 'General'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                          #{srv.order || idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleServiceActive(srv)}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: 100,
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: isActive ? 'rgba(48,209,88,0.15)' : 'rgba(255,159,10,0.15)',
+                            color: isActive ? '#30d158' : '#ff9f0a'
+                          }}
+                        >
+                          {isActive ? '● Active' : '○ Hidden'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#fff', margin: '0 0 0.4rem 0' }}>
+                      {srv.title}
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                      {srv.desc}
+                    </p>
+
+                    {/* Metadata tags */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.85rem' }}>
+                      {srv.turnaround && (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--accent)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: 'rgba(212,175,55,0.06)',
+                          padding: '2px 8px',
+                          borderRadius: 6
+                        }}>
+                          <Clock size={11} /> {srv.turnaround}
+                        </span>
+                      )}
+                      {srv.action_label && srv.action_url && (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--text-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: 'rgba(255,255,255,0.04)',
+                          padding: '2px 8px',
+                          borderRadius: 6
+                        }}>
+                          <Link2 size={11} /> {srv.action_label} &rarr; {srv.action_url}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div style={{
+                    marginTop: '1rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    {/* Reorder Buttons */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveService(idx, 'up')}
+                        disabled={idx === 0}
+                        title="Move Up"
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)',
+                          borderRadius: 6,
+                          padding: '3px 6px',
+                          cursor: idx === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveService(idx, 'down')}
+                        disabled={idx === servicesList.length - 1}
+                        title="Move Down"
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          color: idx === servicesList.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--text-secondary)',
+                          borderRadius: 6,
+                          padding: '3px 6px',
+                          cursor: idx === servicesList.length - 1 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+
+                    {/* Edit & Delete Buttons */}
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <ABtn variant="secondary" size="sm" onClick={() => handleOpenEditService(srv)}>
+                        <Edit2 size={12} /> Edit
+                      </ABtn>
+                      <button
+                        type="button"
+                        onClick={() => setServiceConfirmDelete(srv.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ff453a',
+                          padding: '4px 6px',
+                          cursor: 'pointer',
+                          borderRadius: 6
+                        }}
+                        title="Delete Service"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Modal for Service Create / Edit */}
+          <Modal
+            open={showServiceModal}
+            onClose={() => setShowServiceModal(false)}
+            title={editingService ? 'Edit Agency Service' : 'Add New Agency Service'}
+            width={640}
+          >
+            <form onSubmit={e => { e.preventDefault(); handleSaveService(); }}>
+              <FGrid cols={2}>
+                <Field label="Service Title *">
+                  <FInput
+                    value={serviceForm.title}
+                    onChange={v => setServiceForm(f => ({ ...f, title: v }))}
+                    placeholder="e.g. Tour Routing & Logistics"
+                  />
+                </Field>
+                <Field label="Category">
+                  <FSelect
+                    value={serviceForm.category}
+                    onChange={v => setServiceForm(f => ({ ...f, category: v }))}
+                    options={[
+                      { value: 'Booking & Representation', label: 'Booking & Representation' },
+                      { value: 'Logistics', label: 'Logistics' },
+                      { value: 'Production', label: 'Production' },
+                      { value: 'Legal & Compliance', label: 'Legal & Compliance' },
+                      { value: 'Marketing', label: 'Marketing' },
+                      { value: 'Finance', label: 'Finance' },
+                      { value: 'VIP Services', label: 'VIP Services' },
+                    ]}
+                  />
+                </Field>
+
+                <Field label="Turnaround / SLA Tag">
+                  <FInput
+                    value={serviceForm.turnaround}
+                    onChange={v => setServiceForm(f => ({ ...f, turnaround: v }))}
+                    placeholder="e.g. 24–48h Response or Turnkey Routing"
+                  />
+                </Field>
+
+                <Field label="Order Position">
+                  <FInput
+                    value={String(serviceForm.order)}
+                    onChange={v => setServiceForm(f => ({ ...f, order: Number(v) || 1 }))}
+                    type="number"
+                    placeholder="1"
+                  />
+                </Field>
+
+                <Field label="Action Button Label">
+                  <FInput
+                    value={serviceForm.action_label}
+                    onChange={v => setServiceForm(f => ({ ...f, action_label: v }))}
+                    placeholder="e.g. Book Roster Talent or Contact Our Team"
+                  />
+                </Field>
+
+                <Field label="Action Button URL">
+                  <FInput
+                    value={serviceForm.action_url}
+                    onChange={v => setServiceForm(f => ({ ...f, action_url: v }))}
+                    placeholder="e.g. /book or /contact"
+                  />
+                </Field>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.45rem' }}>
+                    Select Service Icon
+                  </label>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(105px, 1fr))',
+                    gap: '0.45rem',
+                    background: 'rgba(255,255,255,0.02)',
+                    padding: '0.6rem',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.08)'
+                  }}>
+                    {[
+                      { key: 'music', label: 'Music', icon: Music },
+                      { key: 'heart-handshake', label: 'Partnership', icon: HeartHandshake },
+                      { key: 'plane', label: 'Tour & Flights', icon: Plane },
+                      { key: 'headphones', label: 'Stage Audio', icon: Headphones },
+                      { key: 'shield-check', label: 'Visas/Legal', icon: ShieldCheck },
+                      { key: 'compass', label: 'Logistics', icon: Compass },
+                      { key: 'award', label: 'PR & Press', icon: Award },
+                      { key: 'briefcase', label: 'Settlement', icon: Briefcase },
+                      { key: 'globe', label: 'Global World', icon: Globe },
+                      { key: 'sparkles', label: 'VIP Special', icon: Sparkles },
+                      { key: 'megaphone', label: 'Marketing', icon: Megaphone },
+                      { key: 'dollarsign', label: 'Finances', icon: DollarSign },
+                      { key: 'calendar', label: 'Dates/Tours', icon: Calendar },
+                      { key: 'clock', label: '24/7 Support', icon: Clock },
+                      { key: 'check-circle', label: 'Verified', icon: CheckCircle },
+                    ].map(ic => {
+                      const IconComp = ic.icon;
+                      const isSel = (serviceForm.icon || '').toLowerCase() === ic.key;
+                      return (
+                        <button
+                          key={ic.key}
+                          type="button"
+                          onClick={() => setServiceForm(f => ({ ...f, icon: ic.key }))}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '6px 4px',
+                            borderRadius: 6,
+                            background: isSel ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${isSel ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                            color: isSel ? 'var(--accent)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            fontSize: '0.68rem',
+                            fontWeight: isSel ? 700 : 400
+                          }}
+                        >
+                          <IconComp size={16} />
+                          <span>{ic.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <Field label="Description Paragraph *">
+                    <FTextarea
+                      value={serviceForm.desc}
+                      onChange={v => setServiceForm(f => ({ ...f, desc: v }))}
+                      rows={3}
+                      placeholder="Detailed explanation of the agency capability..."
+                    />
+                  </Field>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    color: '#fff',
+                    marginTop: '0.25rem'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceForm.active}
+                      onChange={e => setServiceForm(f => ({ ...f, active: e.target.checked }))}
+                      style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                    />
+                    <span>Active &amp; Visible on Public <code style={{ color: 'var(--accent)' }}>/services</code> Page</span>
+                  </label>
+                </div>
+              </FGrid>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+                <ABtn variant="ghost" onClick={() => setShowServiceModal(false)}>Cancel</ABtn>
+                <ABtn variant="primary" type="submit" disabled={savingService}>
+                  {savingService ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+                  {savingService ? 'Saving…' : 'Save Service'}
+                </ABtn>
+              </div>
+            </form>
+          </Modal>
+
+          <ConfirmDlg
+            open={!!serviceConfirmDelete}
+            title="Delete Agency Service"
+            message="Are you sure you want to remove this capability from the services catalog? This action will immediately remove it from /services."
+            onConfirm={() => serviceConfirmDelete && handleDeleteService(serviceConfirmDelete)}
+            onCancel={() => setServiceConfirmDelete(null)}
+          />
         </div>
       )}
 
@@ -9676,6 +10285,7 @@ export default function AdminPortal() {
       case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={loadData} showToast={showToast} />;
       case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={loadData} showToast={showToast} />;
       case 'content':            return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} />;
+      case 'page_services':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="services" />;
       case 'page_about':         return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="about" />;
       case 'page_privacy':       return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="privacy" />;
       case 'page_accessibility': return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="accessibility" />;
