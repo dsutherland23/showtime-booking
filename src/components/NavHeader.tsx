@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Menu, X, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { ShowtimeLogo } from '@/components/ShowtimeLogo';
 
 export function NavHeader() {
   const router = useRouter();
@@ -61,15 +62,10 @@ export function NavHeader() {
   return (
     <header className={`global-header glassmorphism${scrolled ? ' nav-scrolled' : ''}`}>
       <div className="nav-container">
-        <Link
-          href="/"
-          className="logo-brand"
-          style={{ display: 'flex', alignItems: 'center' }}
+        <ShowtimeLogo
           onClick={() => setMobileMenuOpen(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="Showtime Services" className="logo-image" style={{ height: '30px' }} />
-        </Link>
+          height="30px"
+        />
 
         {/* Desktop Menu */}
         <nav className="nav-menu" aria-label="Main navigation">

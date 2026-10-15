@@ -39,15 +39,20 @@ export default function ClientPortal() {
     if (!user) return;
     try {
       const allBks = await db.getBookings();
-      const clientBks = allBks.filter(b => b.client_id === user.id || b.client_name.toLowerCase().includes(profile?.last_name?.toLowerCase() || ''));
+      const clientEmail = (user.email || profile?.email || '').toLowerCase().trim();
+      // Strict tenant isolation: user A can only view their own bookings
+      const clientBks = allBks.filter(b => 
+        (b.client_id && b.client_id === user.id) ||
+        (clientEmail && b.client_email && b.client_email.toLowerCase().trim() === clientEmail)
+      );
       setBookings(clientBks);
 
+      const bkIdSet = new Set(clientBks.map(b => b.id));
       const allCtrs = await db.getContracts();
-      const bkIds = clientBks.map(b => b.id);
-      setContracts(allCtrs.filter(c => bkIds.includes(c.booking_id)));
+      setContracts(allCtrs.filter(c => bkIdSet.has(c.booking_id)));
 
       const allInvs = await db.getInvoices();
-      setInvoices(allInvs.filter(i => bkIds.includes(i.booking_id)));
+      setInvoices(allInvs.filter(i => bkIdSet.has(i.booking_id)));
 
       const chatMsgs = await db.getMessages(user.id, 'staff');
       setMessages(chatMsgs);

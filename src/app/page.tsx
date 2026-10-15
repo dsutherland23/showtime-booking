@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { db, Artist } from '@/utils/db';
+import { db, Artist, HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG } from '@/utils/db';
 import { ArrowRight, Star, Music, Award, ShieldAlert, MapPin, Users, HelpCircle } from 'lucide-react';
 import { FlowArt, FlowSection } from '@/components/ui/story-scroll';
 import { DottedSurface } from '@/components/ui/dotted-surface';
@@ -55,31 +55,32 @@ function StatCounter({ end, suffix, label }: { end: number; suffix: string; labe
   );
 }
 
-function StatsBar() {
+function StatsBar({ stats }: { stats?: HomepageStatItem[] }) {
+  const items = stats && stats.length > 0 ? stats : SEED_HOMEPAGE_CONFIG.stats;
   return (
     <section className="stats-bar" aria-label="Key statistics">
       <div className="stats-bar-grid">
-        <StatCounter end={200} suffix="+" label="Artists Represented" />
-        <StatCounter end={35}  suffix="+" label="Countries Toured" />
-        <StatCounter end={1000} suffix="+" label="Events Produced" />
-        <StatCounter end={98}  suffix="%" label="Client Satisfaction" />
+        {items.map((s, idx) => (
+          <StatCounter 
+            key={s.id || `stat-${idx}`} 
+            end={Number(s.end) || 0} 
+            suffix={s.suffix || ''} 
+            label={s.label || ''} 
+          />
+        ))}
       </div>
     </section>
   );
 }
 
 /* ── Marquee Section ── */
-const MARQUEE_ITEMS = [
-  'Reggae Sumfest', 'Glastonbury', 'Coachella', 'One Love', 'Caribbean Carnival',
-  'Notting Hill', 'Rototom Sunsplash', 'Rebel Salute', 'Jazz & Blues Festival',
-  'Carifesta', 'Rocksteady', 'Siren Festival'
-];
-
-function MarqueeSection() {
-  const doubled = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+function MarqueeSection({ marquee }: { marquee?: HomepageConfig['marquee'] }) {
+  const cfg = marquee && marquee.items && marquee.items.length > 0 ? marquee : SEED_HOMEPAGE_CONFIG.marquee;
+  const items = cfg.items.length > 0 ? cfg.items : SEED_HOMEPAGE_CONFIG.marquee.items;
+  const doubled = [...items, ...items];
   return (
     <section className="marquee-section" aria-label="Events and festivals">
-      <p className="marquee-eyebrow">Trusted by global festivals &amp; promoters</p>
+      <p className="marquee-eyebrow">{cfg.eyebrow || 'Trusted by global festivals & promoters'}</p>
       <div className="marquee-track" aria-hidden="true">
         {doubled.map((item, i) => (
           <React.Fragment key={i}>
@@ -208,6 +209,7 @@ function ArtistCardPremiumCycling({ categoryArtists }: {
 
 export default function Home() {
   const router = useRouter();
+  const [hpConfig, setHpConfig] = React.useState<HomepageConfig>(SEED_HOMEPAGE_CONFIG);
   const [reggaePool, setReggaePool] = React.useState<Artist[]>([]);
   const [dancehallPool, setDancehallPool] = React.useState<Artist[]>([]);
   const [djPool, setDjPool] = React.useState<Artist[]>([]);
@@ -216,6 +218,24 @@ export default function Home() {
   const [socaAfroPool, setSocaAfroPool] = React.useState<Artist[]>([]);
 
   useEffect(() => {
+    // Load dynamic homepage config
+    db.getHomepageConfig().then((cfg) => {
+      if (cfg) setHpConfig(cfg);
+    });
+
+    const onConfigUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<HomepageConfig>;
+      if (customEvent.detail) {
+        setHpConfig(customEvent.detail);
+      } else {
+        db.getHomepageConfig().then((cfg) => {
+          if (cfg) setHpConfig(cfg);
+        });
+      }
+    };
+
+    window.addEventListener('st_homepage_config_updated', onConfigUpdate);
+
     const loadFeatured = async () => {
       const all = await db.getArtists();
 
@@ -242,6 +262,10 @@ export default function Home() {
       setSocaAfroPool(sortFeaturedFirst(socaAfro));
     };
     loadFeatured();
+
+    return () => {
+      window.removeEventListener('st_homepage_config_updated', onConfigUpdate);
+    };
   }, []);
 
   return (
@@ -251,10 +275,10 @@ export default function Home() {
       <HeroSection />
 
       {/* ── 1b. STATS COUNTER BAR ── */}
-      <StatsBar />
+      <StatsBar stats={hpConfig.stats} />
 
       {/* ── 1c. CLIENT LOGOS MARQUEE ── */}
-      <MarqueeSection />
+      <MarqueeSection marquee={hpConfig.marquee} />
 
       {/* ── 2. CATEGORIES ── */}
       <section className="section-pad border-t border-white/5 bg-[#07050e]">

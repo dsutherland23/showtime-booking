@@ -59,7 +59,9 @@ export async function POST(request: Request) {
         if (existing) {
           return NextResponse.json({ success: false, error: 'Email already exists' }, { status: 400 });
         }
-        const newUser = await d1.createUser(payload);
+        // Public registration strictly permits Client or Artist roles only
+        const safeRole = payload.role === 'Artist' ? 'Artist' : 'Client';
+        const newUser = await d1.createUser({ ...payload, role: safeRole });
         const token = 'st_token_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         await d1.createSession(newUser.id, token, expiresAt);

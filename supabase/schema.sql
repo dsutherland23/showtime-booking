@@ -272,10 +272,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 
 -- =========================================================================
--- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES (2026 Enterprise Standards)
 -- =========================================================================
 
--- Enable RLS on core tables
+-- Enable RLS on all sensitive tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
@@ -285,24 +285,151 @@ ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Basic standard policies
-CREATE POLICY "Public profiles are visible to everyone" ON users 
-    FOR SELECT USING (true);
+-- Security helper functions
+CREATE OR REPLACE FUNCTION auth_is_staff()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid()
+      AND r.name IN ('Super Admin', 'Admin', 'Booking Agent', 'Artist Manager', 'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent')
+  );
+$$;
 
-CREATE POLICY "Public artists are visible to everyone" ON artists 
-    FOR SELECT USING (true);
+CREATE OR REPLACE FUNCTION auth_is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = auth.uid()
+      AND r.name IN ('Super Admin', 'Admin')
+  );
+$$;
 
-CREATE POLICY "Clients can view their own details" ON clients 
-    FOR SELECT USING (true); -- Usually scoped to matching email/user reference in production
+-- 1. USERS & PROFILES TABLE
+-- Strict Tenant Boundary: Users can ONLY view and update their own record; Admins/Staff can manage all
+CREATE POLICY "Users can view own profile" ON users 
+    FOR SELECT USING (auth.uid() = id OR auth_is_staff());
 
-CREATE POLICY "Bookings visible based on client or artist" ON bookings
-    FOR SELECT USING (true); -- Scoped dynamically in code or via auth policies in Supabase RLS
+CREATE POLICY "Users can update own profile" ON users 
+    FOR UPDATE USING (auth.uid() = id OR auth_is_admin())
+    WITH CHECK (auth.uid() = id OR auth_is_admin());
 
-CREATE POLICY "Contracts visible based on booking" ON contracts
-    FOR SELECT USING (true);
+CREATE POLICY "Admins can insert users" ON users
+    FOR INSERT WITH CHECK (auth.uid() = id OR auth_is_admin());
 
-CREATE POLICY "Invoices visible to billing role or associated client" ON invoices
-    FOR SELECT USING (true);
+CREATE POLICY "Admins can delete users" ON users
+    FOR DELETE USING (auth_is_admin());
+
+-- 2. ARTISTS TABLE
+-- Public can browse active artists; Artists/Managers can manage their own profile; Staff can manage all
+CREATE POLICY "Public can view active artists" ON artists 
+    FOR SELECT USING (availability_status = 'Active' OR manager_id = auth.uid() OR id = auth.uid() OR auth_is_staff());
+
+CREATE POLICY "Artists and managers can update own profile" ON artists
+    FOR UPDATE USING (manager_id = auth.uid() OR id = auth.uid() OR auth_is_staff())
+    WITH CHECK (manager_id = auth.uid() OR id = auth.uid() OR auth_is_staff());
+
+-- 3. CLIENTS TABLE
+-- Clients can ONLY view and update their own client record; Staff can view all
+CREATE POLICY "Clients can view own client profile" ON clients 
+    FOR SELECT USING (user_id = auth.uid() OR auth_is_staff());
+
+CREATE POLICY "Clients can update own client profile" ON clients 
+    FOR UPDATE USING (user_id = auth.uid() OR auth_is_staff())
+    WITH CHECK (user_id = auth.uid() OR auth_is_staff());
+
+-- 4. BOOKINGS TABLE
+-- Strict Tenant Boundary: Client A CANNOT view Client B's bookings; Artists only view their own bookings
+CREATE POLICY "Clients and artists can view own bookings" ON bookings
+    FOR SELECT USING (
+        client_id = auth.uid()
+        OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+        OR artist_id IN (SELECT id FROM artists WHERE manager_id = auth.uid() OR id = auth.uid())
+        OR auth_is_staff()
+    );
+
+CREATE POLICY "Clients can submit own bookings" ON bookings
+    FOR INSERT WITH CHECK (
+        client_id = auth.uid()
+        OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+        OR auth_is_staff()
+    );
+
+CREATE POLICY "Authorized parties can update bookings" ON bookings
+    FOR UPDATE USING (
+        client_id = auth.uid()
+        OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+        OR auth_is_staff()
+    );
+
+-- 5. CONTRACTS TABLE
+-- Visible ONLY to booking participants (Client, Artist, or Staff)
+CREATE POLICY "Booking participants can view contracts" ON contracts
+    FOR SELECT USING (
+        booking_id IN (
+            SELECT id FROM bookings
+            WHERE client_id = auth.uid()
+               OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+               OR artist_id IN (SELECT id FROM artists WHERE manager_id = auth.uid() OR id = auth.uid())
+        )
+        OR auth_is_staff()
+    );
+
+CREATE POLICY "Booking participants can sign contracts" ON contracts
+    FOR UPDATE USING (
+        booking_id IN (
+            SELECT id FROM bookings
+            WHERE client_id = auth.uid()
+               OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+               OR artist_id IN (SELECT id FROM artists WHERE manager_id = auth.uid() OR id = auth.uid())
+        )
+        OR auth_is_staff()
+    );
+
+-- 6. INVOICES TABLE
+-- Invoices visible strictly to the billed client or finance staff
+CREATE POLICY "Clients can view own invoices" ON invoices
+    FOR SELECT USING (
+        client_id = auth.uid()
+        OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+        OR booking_id IN (
+            SELECT id FROM bookings
+            WHERE client_id = auth.uid()
+               OR client_id IN (SELECT id FROM clients WHERE user_id = auth.uid())
+        )
+        OR auth_is_staff()
+    );
+
+-- 7. PAYMENTS TABLE
+-- Visible strictly to paying client or finance staff
+CREATE POLICY "Clients can view own payments" ON payments
+    FOR SELECT USING (
+        client_id = auth.uid()
+        OR invoice_id IN (SELECT id FROM invoices WHERE client_id = auth.uid())
+        OR auth_is_staff()
+    );
+
+CREATE POLICY "Clients can record own payments" ON payments
+    FOR INSERT WITH CHECK (
+        client_id = auth.uid()
+        OR auth_is_staff()
+    );
+
+-- 8. AUDIT LOGS TABLE
+-- Accessible exclusively to staff
+CREATE POLICY "Staff only audit log access" ON audit_logs
+    FOR SELECT USING (auth_is_staff());
 
 
 -- =========================================================================

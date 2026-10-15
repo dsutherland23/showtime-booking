@@ -129,26 +129,28 @@ function ArtistPortalContent() {
 
       let targetArtist: Artist | null = null;
 
-      // 1. Check if an artist ID was explicitly requested or forced
-      const artId = forcedArtistId || requestedArtistId;
+      // 1. Only Admin and Staff may inspect other artists via artistId parameter
+      const artId = (isAdmin || isStaff) ? (forcedArtistId || requestedArtistId) : null;
       if (artId) {
         targetArtist = artistsList.find(a => a.id === artId) || null;
       }
 
-      // 2. If no target artist yet, match by authenticated user
+      // 2. For Artists and Artist Managers, strictly match by their own account
       if (!targetArtist && user) {
         if (user.role === 'Artist') {
           targetArtist = artistsList.find(a => 
-            (profile?.first_name && a.stage_name.toLowerCase().includes(profile.first_name.toLowerCase())) ||
-            (profile?.last_name && a.stage_name.toLowerCase().includes(profile.last_name.toLowerCase()))
-          ) || artistsList.find(a => a.manager_id === user.id) || null;
+            a.id === user.id ||
+            a.manager_id === user.id ||
+            (profile?.first_name && a.stage_name.toLowerCase().trim() === `${profile.first_name} ${profile.last_name || ''}`.toLowerCase().trim()) ||
+            (profile?.first_name && a.stage_name.toLowerCase().trim() === profile.first_name.toLowerCase().trim())
+          ) || null;
         } else if (user.role === 'Artist Manager') {
           targetArtist = artistsList.find(a => a.manager_id === user.id) || null;
         }
       }
 
-      // 3. Fallback for Admin, Staff, or Demo test mode: pick top headliner
-      if (!targetArtist && (isAdmin || isStaff || artistsList.length > 0)) {
+      // 3. Fallback ONLY for Admin/Staff reviewing the portal
+      if (!targetArtist && (isAdmin || isStaff)) {
         targetArtist = artistsList.find(a => a.id === 'art-shenseea') ||
                        artistsList.find(a => a.id === 'art-beenie-man') ||
                        artistsList[0] || null;
@@ -185,8 +187,11 @@ function ArtistPortalContent() {
     loadArtistData();
   }, [loadArtistData]);
 
-  // Handle Switch Artist in console
+  // Handle Switch Artist in console (strictly restricted to Admin, Staff, or Artist Manager)
   const handleSwitchArtist = (newArtistId: string) => {
+    if (!isAdmin && !isStaff && user?.role !== 'Artist Manager') {
+      return;
+    }
     setLoading(true);
     loadArtistData(newArtistId);
   };
@@ -305,11 +310,11 @@ function ArtistPortalContent() {
       <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4rem 1.5rem' }}>
         <div className="luxury-card" style={{ maxWidth: 460, margin: '0 auto', padding: '2.5rem' }}>
           <Users style={{ width: 48, height: 48, color: 'var(--gold-primary)', marginBottom: '1rem' }} />
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.75rem' }}>No Artist Profile Connected</h2>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.75rem' }}>Artist Profile Pending Linking</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
-            Please select an artist from the management roster or contact the Showtime booking desk to link your profile.
+            Your account is verified as an Artist, but has not yet been linked to an active roster profile. Please contact your assigned Showtime booking agent or administration to complete verification.
           </p>
-          {allArtists.length > 0 && (
+          {(isAdmin || isStaff) && allArtists.length > 0 ? (
             <select
               onChange={e => handleSwitchArtist(e.target.value)}
               className="select-custom"
@@ -320,6 +325,10 @@ function ArtistPortalContent() {
                 <option key={a.id} value={a.id}>{a.stage_name} ({a.category})</option>
               ))}
             </select>
+          ) : (
+            <a href="/contact" className="btn btn-secondary" style={{ display: 'inline-flex', padding: '0.65rem 1.4rem' }}>
+              Contact Booking Desk
+            </a>
           )}
         </div>
       </div>
@@ -364,21 +373,23 @@ function ArtistPortalContent() {
           </div>
         </div>
 
-        {/* Workspace Quick Switcher for Admins, Managers & Agents */}
-        <div className="header-actions">
-          <div className="artist-selector-box">
-            <span className="selector-label">Roster Workspace</span>
-            <select
-              value={artistProfile.id}
-              onChange={e => handleSwitchArtist(e.target.value)}
-              className="artist-dropdown-select"
-            >
-              {allArtists.map(a => (
-                <option key={a.id} value={a.id}>{a.stage_name} ({a.category})</option>
-              ))}
-            </select>
+        {/* Workspace Quick Switcher strictly for Admins, Staff & Multi-Artist Managers */}
+        {(isAdmin || isStaff || (user?.role === 'Artist Manager' && allArtists.filter(a => a.manager_id === user.id).length > 1)) && (
+          <div className="header-actions">
+            <div className="artist-selector-box">
+              <span className="selector-label">Roster Workspace</span>
+              <select
+                value={artistProfile.id}
+                onChange={e => handleSwitchArtist(e.target.value)}
+                className="artist-dropdown-select"
+              >
+                {(isAdmin || isStaff ? allArtists : allArtists.filter(a => a.manager_id === user?.id)).map(a => (
+                  <option key={a.id} value={a.id}>{a.stage_name} ({a.category})</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Primary Tab Navigation */}

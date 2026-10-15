@@ -61,7 +61,7 @@ export default function RegisterPage() {
   const handleGoogleVerified = async (profile: VerifiedGoogleProfile) => {
     setError('');
     const user = await signInWithVerifiedGoogle(profile, role);
-    window.location.href = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
+    window.location.href = user.role === 'Artist' ? '/portal/artist' : '/portal/client';
   };
 
   const validate = (): string => {

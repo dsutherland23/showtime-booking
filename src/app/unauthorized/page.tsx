@@ -28,10 +28,15 @@ export default function UnauthorizedPage() {
           {profile ? ` Your current role (${profile.role}) does not have the required permissions.` : ' Please sign in to continue.'}
         </p>
         <div className="unauth-actions">
-          <Link href={portalLink.href} className="btn btn-primary" style={{ gap: '0.5rem' }}>
-            {portalLink.label}
+          <Link href="/auth/login?redirect=/dashboard" className="btn btn-primary" style={{ gap: '0.5rem' }}>
+            Sign In as Admin
           </Link>
-          <Link href="/" className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+          {profile && portalLink.href !== '/auth/login' && (
+            <Link href={portalLink.href} className="btn btn-secondary" style={{ gap: '0.5rem' }}>
+              {portalLink.label}
+            </Link>
+          )}
+          <Link href="/" className="btn btn-tertiary" style={{ gap: '0.5rem' }}>
             <ArrowLeft className="w-4 h-4" />
             Go Home
           </Link>

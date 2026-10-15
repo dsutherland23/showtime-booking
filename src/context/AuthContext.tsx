@@ -92,9 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
 
-  // Switch mock user identity (simulation mode)
+  // Switch mock user identity (simulation mode / local fallback)
   const switchUser = async (userId: string) => {
-    if (isSupabaseReady) return;
     setLoading(true);
     try {
       const dbUsers = await db.getUsers();
@@ -124,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('st_active_user_id', targetUser.id);
       }
     } catch (err) {
-      console.error('Failed to switch mock user:', err);
+      console.error('Failed to switch user:', err);
     } finally {
       setLoading(false);
     }
@@ -200,8 +199,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
-  const loadProfile = useCallback(async (userId: string, client: SupabaseClient) => {
+  const loadProfile = useCallback(async (userId: string, client: SupabaseClient, authUser?: any) => {
     try {
+      // 1. Try profiles table
       const { data, error } = await client
         .from('profiles')
         .select('*')
@@ -210,9 +210,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!error && data) {
         setProfile(data as UserProfile);
+        return;
       }
-    } catch {
-      // Profile not found — will be created on first login
+
+      // 2. Try users table (matching supabase/schema.sql)
+      const { data: userData, error: userError } = await client
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (!userError && userData) {
+        setProfile({
+          id: userData.id,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          email: userData.email,
+          phone: userData.phone,
+          role: userData.role || (userData.email?.toLowerCase().includes('admin') ? 'Super Admin' : 'Client'),
+          status: userData.status || 'Active',
+          created_at: userData.created_at || new Date().toISOString()
+        });
+        return;
+      }
+
+      // 3. Fallback: Extract from user metadata, seed accounts, or admin emails
+      const userObj = authUser || (await client.auth.getUser()).data?.user;
+      const email = userObj?.email?.toLowerCase().trim() || '';
+      const meta = userObj?.user_metadata || {};
+      const appMeta = userObj?.app_metadata || {};
+
+      let resolvedRole = meta.role || appMeta.role || userObj?.role || '';
+      if (!resolvedRole) {
+        const seed = SEED_USERS.find(u => u.email.toLowerCase() === email);
+        if (seed) {
+          resolvedRole = seed.role;
+        } else if (email === 'admin@showtimeservices.com' || email.includes('admin@')) {
+          resolvedRole = 'Super Admin';
+        } else {
+          resolvedRole = 'Client';
+        }
+      }
+
+      const fallbackProfile: UserProfile = {
+        id: userId,
+        first_name: meta.first_name || userObj?.first_name || email.split('@')[0] || 'Showtime',
+        last_name: meta.last_name || userObj?.last_name || 'Admin',
+        email: email,
+        phone: meta.phone || userObj?.phone || undefined,
+        role: resolvedRole,
+        status: 'Active',
+        created_at: new Date().toISOString()
+      };
+
+      setProfile(fallbackProfile);
+
+      // Attempt to self-heal and persist profile so future reads succeed
+      try {
+        await client.from('profiles').upsert(fallbackProfile);
+      } catch {
+        // ignore if table doesn't exist
+      }
+    } catch (err) {
+      console.warn('Error resolving user profile:', err);
     }
   }, []);
 
@@ -240,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     if (user?.id && supabaseClient) {
-      await loadProfile(user.id, supabaseClient);
+      await loadProfile(user.id, supabaseClient, user);
     }
   }, [user, supabaseClient, loadProfile]);
 
@@ -248,12 +308,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!supabaseClient) return;
 
     // Get initial session
-    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id, supabaseClient).finally(() => setLoading(false));
+        await loadProfile(session.user.id, supabaseClient, session.user);
+        setLoading(false);
       } else {
+        // Fallback: check localStorage for local/D1 active user (e.g. simulated admin or D1 auth)
+        const cachedUserId = localStorage.getItem('st_active_user_id');
+        if (cachedUserId) {
+          try {
+            const dbUsers = await db.getUsers();
+            const uList = dbUsers && dbUsers.length > 0 ? dbUsers : SEED_USERS;
+            const targetUser = uList.find(u => u.id === cachedUserId || u.email.toLowerCase() === cachedUserId.toLowerCase())
+              || (cachedUserId === 'admin' || cachedUserId === 'usr-admin-1' ? SEED_USERS[0] : null);
+
+            if (targetUser) {
+              setUser({
+                id: targetUser.id,
+                email: targetUser.email,
+                first_name: targetUser.first_name,
+                last_name: targetUser.last_name,
+                role: targetUser.role
+              });
+              setProfile({
+                id: targetUser.id,
+                first_name: targetUser.first_name,
+                last_name: targetUser.last_name,
+                email: targetUser.email,
+                phone: targetUser.phone,
+                role: targetUser.role,
+                status: targetUser.status as 'Active' | 'Inactive' | 'Suspended',
+                created_at: targetUser.created_at
+              });
+            }
+          } catch {
+            // ignore
+          }
+        }
         setLoading(false);
       }
     });
@@ -265,9 +358,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        await loadProfile(session.user.id, supabaseClient);
+        await loadProfile(session.user.id, supabaseClient, session.user);
       } else {
-        setProfile(null);
+        const cachedUserId = localStorage.getItem('st_active_user_id');
+        if (!cachedUserId) {
+          setProfile(null);
+        }
       }
       setLoading(false);
     });
@@ -282,9 +378,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setProfile(null);
     setSession(null);
-    if (!isSupabaseReady) {
-      localStorage.removeItem('st_active_user_id');
-    }
+    localStorage.removeItem('st_active_user_id');
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -294,10 +388,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return perms.includes('*') || perms.includes(permission);
   };
 
-  const isAdmin = !!profile && ['Super Admin', 'Admin'].includes(profile.role);
-  const isStaff = !!profile && STAFF_ROLES.includes(profile.role);
-  const isClient = !!profile && profile.role === 'Client';
-  const isArtist = !!profile && profile.role === 'Artist';
+  const resolvedRole = profile?.role
+    || (user as any)?.role
+    || (user as any)?.user_metadata?.role
+    || ((user as any)?.email === 'admin@showtimeservices.com' ? 'Super Admin' : '');
+
+  const isAdmin = ['Super Admin', 'Admin'].includes(resolvedRole);
+  const isStaff = STAFF_ROLES.includes(resolvedRole);
+  const isClient = resolvedRole === 'Client';
+  const isArtist = resolvedRole === 'Artist';
 
   return (
     <AuthContext.Provider

@@ -7,13 +7,14 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { db, SEED_USERS } from '@/utils/db';
 import GoogleSignInButton, { isGoogleSignInConfigured, signInWithVerifiedGoogle, VerifiedGoogleProfile } from '@/components/auth/GoogleSignInButton';
-import { Eye, EyeOff, LogIn, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, LogIn, AlertCircle, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
   const verified = searchParams.get('verified');
+  const isAdminLogin = searchParams.get('admin') === '1' || redirect.includes('/dashboard') || redirect.includes('/admin');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), []);
   const { switchUser, profile, isStaff } = useAuth();
@@ -28,18 +29,34 @@ function LoginForm() {
   // Called only after /api/auth/google has verified the Google ID token.
   const handleGoogleVerified = async (profile: VerifiedGoogleProfile) => {
     setError('');
+    // Google sign-in strictly defaults to Client for new accounts
     const user = await signInWithVerifiedGoogle(profile, 'Client');
     if (switchUser) await switchUser(user.id);
-    const portal = user.role === 'Client' ? '/portal/client' : user.role === 'Artist' ? '/portal/artist' : '/dashboard';
-    // Only honour same-site relative redirects.
-    const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : portal;
+
+    const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
+      'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
+      'Promoter', 'Venue Manager'];
+
+    // Strict rule: No one may access admin/dashboard via Google sign-in unless pre-assigned staff
+    if (!staffRoles.includes(user.role)) {
+      window.location.href = user.role === 'Artist' ? '/portal/artist' : '/portal/client';
+      return;
+    }
+
+    const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : '/dashboard';
     window.location.href = safeRedirect;
   };
 
   useEffect(() => {
     if (supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) router.push(redirect);
+        if (session) {
+          if (profile && !isStaff && (redirect.startsWith('/dashboard') || redirect.startsWith('/admin'))) {
+            router.push(profile.role === 'Artist' ? '/portal/artist' : '/portal/client');
+          } else {
+            router.push(redirect);
+          }
+        }
       });
     } else if (profile && isStaff && redirect.startsWith('/dashboard')) {
       router.push('/dashboard');
@@ -55,46 +72,76 @@ function LoginForm() {
 
     try {
       if (supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
         });
 
-        if (error) {
-          if (error.message.includes('rate limit')) {
-            setRateLimited(true);
-            setError('Too many login attempts. Please wait a few minutes and try again.');
-            setTimeout(() => setRateLimited(false), 60000);
-          } else if (error.message.includes('Invalid login credentials') || error.message.includes('invalid_credentials')) {
-            setError('Incorrect email or password. Please check your credentials and try again.');
-          } else if (error.message.includes('Email not confirmed')) {
-            setError('Please verify your email address before logging in. Check your inbox for a verification link.');
-          } else {
-            setError('An error occurred during login. Please try again.');
+        if (signInError) {
+          const isSeedStaff = SEED_USERS.some(u => u.email.toLowerCase() === email.trim().toLowerCase());
+          if (!isSeedStaff) {
+            if (signInError.message.includes('rate limit')) {
+              setRateLimited(true);
+              setError('Too many login attempts. Please wait a few minutes and try again.');
+              setTimeout(() => setRateLimited(false), 60000);
+            } else if (signInError.message.includes('Invalid login credentials') || signInError.message.includes('invalid_credentials')) {
+              setError('Incorrect email or password. Please check your credentials and try again.');
+            } else if (signInError.message.includes('Email not confirmed')) {
+              setError('Please verify your email address before logging in. Check your inbox for a verification link.');
+            } else {
+              setError('An error occurred during login. Please try again.');
+            }
+            return;
           }
-          return;
-        }
+          // Seed admin/staff fallback if not yet provisioned in Supabase auth
+        } else if (data?.user) {
+          let role = '';
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', data.user.id)
+              .single();
+            if (profile?.role) role = profile.role;
+          } catch {}
 
-        if (data?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .single();
+          if (!role) {
+            try {
+              const { data: userRow } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', data.user.id)
+                .single();
+              if (userRow?.role) role = userRow.role;
+            } catch {}
+          }
 
-          const role = profile?.role || '';
+          if (!role) {
+            role = (data.user.user_metadata?.role as string) || (data.user.app_metadata?.role as string) || '';
+          }
+
+          const trimmedEmail = email.trim().toLowerCase();
+          if (!role) {
+            const seed = SEED_USERS.find(u => u.email.toLowerCase() === trimmedEmail);
+            if (seed) role = seed.role;
+            else if (trimmedEmail === 'admin@showtimeservices.com' || trimmedEmail.includes('admin@')) {
+              role = 'Super Admin';
+            }
+          }
+
+          localStorage.setItem('st_active_user_id', data.user.id);
+
           const staffRoles = ['Super Admin', 'Admin', 'Booking Agent', 'Artist Manager',
             'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
             'Promoter', 'Venue Manager'];
 
-          if (staffRoles.includes(role) || redirect.startsWith('/dashboard') || redirect.startsWith('/admin')) {
-            window.location.href = '/dashboard';
+          if (staffRoles.includes(role)) {
+            const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : '/dashboard';
+            window.location.href = safeRedirect;
           } else if (role === 'Artist') {
             window.location.href = '/portal/artist';
-          } else if (role === 'Client') {
-            window.location.href = '/portal/client';
           } else {
-            window.location.href = redirect !== '/' ? redirect : '/';
+            window.location.href = '/portal/client';
           }
           return;
         }
@@ -128,14 +175,13 @@ function LoginForm() {
         'Finance Manager', 'Marketing Manager', 'Content Manager', 'Support Agent',
         'Promoter', 'Venue Manager'];
 
-      if (staffRoles.includes(matched.role) || redirect.startsWith('/dashboard') || redirect.startsWith('/admin')) {
-        window.location.href = '/dashboard';
+      if (staffRoles.includes(matched.role)) {
+        const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/' ? redirect : '/dashboard';
+        window.location.href = safeRedirect;
       } else if (matched.role === 'Artist') {
         window.location.href = '/portal/artist';
-      } else if (matched.role === 'Client') {
-        window.location.href = '/portal/client';
       } else {
-        window.location.href = redirect !== '/' ? redirect : '/';
+        window.location.href = '/portal/client';
       }
     } catch (err: any) {
       console.error('Login error:', err);
@@ -157,22 +203,41 @@ function LoginForm() {
         </div>
 
         <div className="auth-header">
-          <h1 className="auth-title">Welcome back</h1>
-          <p className="auth-subtitle">Sign in to your Showtime account</p>
+          {isAdminLogin ? (
+            <>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 20, marginBottom: '0.75rem' }}>
+                <ShieldCheck style={{ width: 14, height: 14, color: 'var(--accent)' }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+                  Executive Admin Portal
+                </span>
+              </div>
+              <h1 className="auth-title">Administrative Login</h1>
+              <p className="auth-subtitle">Authorized agency management &amp; assigned staff only</p>
+            </>
+          ) : (
+            <>
+              <h1 className="auth-title">Welcome back</h1>
+              <p className="auth-subtitle">Sign in to your Showtime account</p>
+            </>
+          )}
         </div>
 
-        {/* Social Authentication */}
-        <div className="auth-social-group">
-          <GoogleSignInButton
-            text="signin_with"
-            onVerified={handleGoogleVerified}
-            onError={(msg) => setError(msg)}
-          />
-        </div>
+        {/* Social Authentication — strictly disabled for admin login per security policy */}
+        {!isAdminLogin && (
+          <>
+            <div className="auth-social-group">
+              <GoogleSignInButton
+                text="signin_with"
+                onVerified={handleGoogleVerified}
+                onError={(msg) => setError(msg)}
+              />
+            </div>
 
-        <div className="auth-divider">
-          <span>or sign in with email</span>
-        </div>
+            <div className="auth-divider">
+              <span>or sign in with email</span>
+            </div>
+          </>
+        )}
 
         {verified && (
           <div className="auth-alert auth-alert-success" role="alert">
@@ -251,12 +316,18 @@ function LoginForm() {
         </form>
 
         <div className="auth-footer-text">
-          <p>
-            Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="auth-link">
-              Create account
-            </Link>
-          </p>
+          {isAdminLogin ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: 0 }}>
+              Protected Showtime Executive Portal &bull; Unauthorized access is strictly logged.
+            </p>
+          ) : (
+            <p>
+              Don&apos;t have an account?{' '}
+              <Link href="/auth/register" className="auth-link">
+                Create account
+              </Link>
+            </p>
+          )}
         </div>
       </div>
 

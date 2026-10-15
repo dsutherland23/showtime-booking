@@ -10,6 +10,7 @@ import { StickyCTA } from '@/components/StickyCTA';
 import { CookieConsent } from '@/components/CookieConsent';
 import Link from 'next/link';
 import React from 'react';
+import { ShowtimeLogo } from '@/components/ShowtimeLogo';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
 
@@ -103,10 +104,7 @@ export default function RootLayout({
               <footer className="global-footer" role="contentinfo">
                 <div className="footer-container">
                   <div className="footer-brand-section">
-                    <Link href="/" className="logo-brand" style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/images/logo.png" alt="Showtime Services" className="logo-image" style={{ height: '26px' }} />
-                    </Link>
+                    <ShowtimeLogo height="26px" style={{ marginBottom: '1.25rem' }} />
                     <p className="footer-bio">
                       Crafting extraordinary live entertainment experiences worldwide.
                       Connecting elite Caribbean and international talent with global stages.

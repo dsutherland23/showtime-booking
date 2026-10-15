@@ -9,7 +9,8 @@ import {
   User, TicketTier, PromoCode, MarketingCampaign, AdPlacement,
   WebsiteSection, Integration, ShowEvent,
   BillingDoc, BillingDocType, BillingDocStatus, BillingLineItem, BillingPayment,
-  docTotals, effectiveDocStatus
+  docTotals, effectiveDocStatus,
+  HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG
 } from '@/utils/db';
 import {
   LayoutDashboard, Calendar, Music, MapPin, Users, Ticket, Receipt,
@@ -692,11 +693,19 @@ function Toast({ message, type, onDone }: { message: string; type: 'success' | '
 function AccessDenied() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1rem', padding: '2rem' }}>
-      <Shield size={48} color="var(--text-muted)" style={{ opacity: 0.35 }} />
-      <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Access Restricted</h2>
-      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: 320, margin: 0 }}>
-        You don't have permission to view this section. Contact your administrator if you believe this is an error.
+      <Shield size={48} color="var(--accent)" style={{ opacity: 0.5 }} />
+      <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Administrative Access Restricted</h2>
+      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center', maxWidth: 380, margin: 0 }}>
+        The Showtime Executive Dashboard is strictly reserved for the Administrator and assigned agency staff members.
       </p>
+      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+        <a href="/" style={{ textDecoration: 'none' }}>
+          <ABtn variant="secondary" size="md">Return to Home</ABtn>
+        </a>
+        <a href="/portal/client" style={{ textDecoration: 'none' }}>
+          <ABtn variant="primary" size="md">Go to Client Portal</ABtn>
+        </a>
+      </div>
     </div>
   );
 }
@@ -6028,6 +6037,20 @@ function AdvertisingSection({ ads, onRefresh, showToast }: {
 function ContentSection({ sections, onRefresh, showToast }: {
   sections: WebsiteSection[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
 }) {
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'marquee' | 'sections'>('stats');
+
+  // ── 1. Key Statistics State ─────────────────────────────────────────────────
+  const [stats, setStats] = useState<HomepageStatItem[]>(SEED_HOMEPAGE_CONFIG.stats);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [savingStats, setSavingStats] = useState(false);
+
+  // ── 2. Festival Marquee State ───────────────────────────────────────────────
+  const [marqueeEyebrow, setMarqueeEyebrow] = useState<string>(SEED_HOMEPAGE_CONFIG.marquee.eyebrow);
+  const [marqueeItems, setMarqueeItems] = useState<string[]>(SEED_HOMEPAGE_CONFIG.marquee.items);
+  const [newMarqueeItem, setNewMarqueeItem] = useState('');
+  const [savingMarquee, setSavingMarquee] = useState(false);
+
+  // ── 3. Custom Sections State ────────────────────────────────────────────────
   const [selectedType, setSelectedType] = useState<string>('All');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<WebsiteSection | null>(null);
@@ -6038,6 +6061,111 @@ function ContentSection({ sections, onRefresh, showToast }: {
   const blank = { type: 'hero' as WebsiteSection['type'], title: '', subtitle: '', content: '', buttonText: '', image_url: '', active: true };
   const [form, setForm] = useState(blank);
 
+  // Load Homepage Config on Mount
+  useEffect(() => {
+    let mounted = true;
+    db.getHomepageConfig().then((cfg) => {
+      if (mounted && cfg) {
+        if (cfg.stats && Array.isArray(cfg.stats) && cfg.stats.length > 0) {
+          setStats(cfg.stats);
+        }
+        if (cfg.marquee) {
+          if (cfg.marquee.eyebrow) setMarqueeEyebrow(cfg.marquee.eyebrow);
+          if (Array.isArray(cfg.marquee.items) && cfg.marquee.items.length > 0) {
+            setMarqueeItems(cfg.marquee.items);
+          }
+        }
+      }
+      if (mounted) setStatsLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  // ── Stats Handlers ──────────────────────────────────────────────────────────
+  const handleUpdateStat = (idx: number, field: keyof HomepageStatItem, val: any) => {
+    setStats(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const handleAddStat = () => {
+    setStats(prev => [
+      ...prev,
+      { id: `stat-${Date.now()}`, end: 50, suffix: '+', label: 'New Milestone' }
+    ]);
+  };
+
+  const handleRemoveStat = (idx: number) => {
+    if (stats.length <= 1) {
+      showToast('At least one statistic counter must be preserved.', 'error');
+      return;
+    }
+    setStats(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleResetStats = () => {
+    setStats(SEED_HOMEPAGE_CONFIG.stats);
+    showToast('Reset to default statistics. Click "Save Statistics" to publish.', 'success');
+  };
+
+  const handleSaveStats = async () => {
+    setSavingStats(true);
+    try {
+      await db.updateHomepageConfig({ stats });
+      showToast('Key statistics bar updated and live on website.', 'success');
+    } catch {
+      showToast('Failed to save statistics bar.', 'error');
+    } finally {
+      setSavingStats(false);
+    }
+  };
+
+  // ── Marquee Handlers ────────────────────────────────────────────────────────
+  const handleAddMarqueeItem = (itemToAdd?: string) => {
+    const text = (itemToAdd || newMarqueeItem).trim();
+    if (!text) return;
+    if (marqueeItems.some(i => i.toLowerCase() === text.toLowerCase())) {
+      showToast(`"${text}" is already in the marquee list.`, 'error');
+      return;
+    }
+    setMarqueeItems(prev => [...prev, text]);
+    if (!itemToAdd) setNewMarqueeItem('');
+  };
+
+  const handleRemoveMarqueeItem = (idx: number) => {
+    if (marqueeItems.length <= 1) {
+      showToast('At least one festival or promoter item must be preserved.', 'error');
+      return;
+    }
+    setMarqueeItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleResetMarquee = () => {
+    setMarqueeEyebrow(SEED_HOMEPAGE_CONFIG.marquee.eyebrow);
+    setMarqueeItems(SEED_HOMEPAGE_CONFIG.marquee.items);
+    showToast('Reset to default festival partners. Click "Save Marquee" to publish.', 'success');
+  };
+
+  const handleSaveMarquee = async () => {
+    setSavingMarquee(true);
+    try {
+      await db.updateHomepageConfig({
+        marquee: {
+          eyebrow: marqueeEyebrow.trim() || 'Trusted by global festivals & promoters',
+          items: marqueeItems.length > 0 ? marqueeItems : SEED_HOMEPAGE_CONFIG.marquee.items,
+        }
+      });
+      showToast('Festival & promoter marquee published to live website.', 'success');
+    } catch {
+      showToast('Failed to save marquee.', 'error');
+    } finally {
+      setSavingMarquee(false);
+    }
+  };
+
+  // ── Custom Section Handlers ─────────────────────────────────────────────────
   const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
   const openEdit = (s: WebsiteSection) => {
     setEditItem(s);
@@ -6075,116 +6203,583 @@ function ContentSection({ sections, onRefresh, showToast }: {
   const filtered = sections.filter(s => selectedType === 'All' || s.type === selectedType);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: 4 }}>Filter Type:</span>
-          {['All', ...TYPES].map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setSelectedType(t)}
-              style={{
-                background: selectedType === t ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${selectedType === t ? 'rgba(212,175,55,0.35)' : 'rgba(255,255,255,0.06)'}`,
-                color: selectedType === t ? 'var(--accent)' : 'var(--text-muted)',
-                padding: '3px 8px',
-                borderRadius: 6,
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: selectedType === t ? 600 : 400
-              }}
-            >
-              {t.toUpperCase()}
-            </button>
-          ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* ── Top Level Sub-Navigation Tabs ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem',
+        padding: '0.5rem 0.6rem',
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 10
+      }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('stats')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '6px 14px',
+              borderRadius: 7,
+              fontSize: '0.8rem',
+              fontWeight: activeSubTab === 'stats' ? 600 : 400,
+              background: activeSubTab === 'stats' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
+              border: `1px solid ${activeSubTab === 'stats' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
+              color: activeSubTab === 'stats' ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Activity size={13} />
+            Key Statistics Bar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('marquee')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '6px 14px',
+              borderRadius: 7,
+              fontSize: '0.8rem',
+              fontWeight: activeSubTab === 'marquee' ? 600 : 400,
+              background: activeSubTab === 'marquee' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
+              border: `1px solid ${activeSubTab === 'marquee' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
+              color: activeSubTab === 'marquee' ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Star size={13} />
+            Festivals &amp; Promoters (Marquee)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('sections')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '6px 14px',
+              borderRadius: 7,
+              fontSize: '0.8rem',
+              fontWeight: activeSubTab === 'sections' ? 600 : 400,
+              background: activeSubTab === 'sections' ? 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(212,175,55,0.08) 100%)' : 'transparent',
+              border: `1px solid ${activeSubTab === 'sections' ? 'rgba(212,175,55,0.4)' : 'transparent'}`,
+              color: activeSubTab === 'sections' ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <FileText size={13} />
+            Hero &amp; Banners CMS
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.6rem' }}>
-          <a href="/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-            <ABtn variant="secondary" size="sm"><ExternalLink size={12} /> View Live Website</ABtn>
-          </a>
-          <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Section</ABtn>
-        </div>
+        <a href="/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+          <ABtn variant="secondary" size="sm"><ExternalLink size={12} /> View Live Website</ABtn>
+        </a>
       </div>
 
-      <Tbl>
-        <TH cols={['Section', 'Type', 'Title & Subtitle', 'Call To Action', 'Status', 'Actions']} />
-        <tbody>
-          {filtered.length === 0 ? (
-            <tr><td colSpan={6}><Empty icon={FileText} msg="No website sections found" /></td></tr>
-          ) : filtered.map(s => (
-            <TR key={s.id}>
-              <TD><span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--accent)' }}>{s.id}</span></TD>
-              <TD><StatusBadge status={s.type} /></TD>
-              <TD>
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.title}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{s.subtitle || s.content?.slice(0, 50)}</div>
-              </TD>
-              <TD><span style={{ fontWeight: 500, color: 'var(--accent)' }}>{s.buttonText || '—'}</span></TD>
-              <TD>
-                <button
-                  type="button"
-                  onClick={() => handleToggleActive(s)}
-                  style={{
-                    background: s.active ? 'rgba(48,209,88,0.15)' : 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${s.active ? 'rgba(48,209,88,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                    color: s.active ? '#30d158' : 'var(--text-muted)',
-                    padding: '3px 8px',
-                    borderRadius: 5,
-                    fontSize: '0.72rem',
+      {/* ════════════════════ SUBTAB 1: KEY STATISTICS BAR ════════════════════ */}
+      {activeSubTab === 'stats' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Activity size={16} color="var(--accent)" />
+                Key Statistics Bar Editor
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Edit numbers, suffixes, and labels displayed in the high-impact stats counter directly under the homepage hero.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetStats}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <ABtn variant="secondary" size="sm" onClick={handleAddStat}>
+                <Plus size={13} /> Add Stat Item
+              </ABtn>
+              <ABtn variant="primary" size="sm" onClick={handleSaveStats} disabled={savingStats}>
+                {savingStats ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+                {savingStats ? 'Saving…' : 'Save Statistics Bar'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Live Visual Preview matching Screenshot */}
+          <div style={{
+            background: 'linear-gradient(180deg, rgba(20,16,36,0.95) 0%, rgba(10,8,18,0.98) 100%)',
+            border: '1px solid rgba(212,175,55,0.3)',
+            borderRadius: 14,
+            padding: '1.25rem 1.5rem',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0.6rem' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Sparkles size={12} /> Live Website Preview &bull; Key Statistics Bar
+              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Synchronized with homepage</span>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.max(1, Math.min(stats.length, 4))}, minmax(0, 1fr))`,
+              gap: '1.25rem',
+              padding: '1rem 0.5rem'
+            }}>
+              {stats.map((s, idx) => (
+                <div key={s.id || idx} style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <span style={{
+                    fontSize: 'clamp(1.6rem, 2.8vw, 2.4rem)',
+                    fontWeight: 800,
+                    color: 'var(--accent)',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.1,
+                    textShadow: '0 0 25px rgba(212,175,55,0.25)'
+                  }}>
+                    {s.end}{s.suffix}
+                  </span>
+                  <span style={{
+                    fontSize: '0.74rem',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    color: 'rgba(255, 255, 255, 0.75)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em'
+                  }}>
+                    {s.label || 'Metric Label'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Editable Form Cards Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '1rem'
+          }}>
+            {stats.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                style={{
+                  background: 'rgba(255,255,255,0.025)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Statistic #{idx + 1}
+                  </span>
+                  {stats.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveStat(idx)}
+                      title="Remove statistic"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'rgba(239,68,68,0.7)',
+                        cursor: 'pointer',
+                        padding: 3,
+                        borderRadius: 4,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.5rem' }}>
+                  <Field label="Counter Target (End)">
+                    <FInput
+                      type="number"
+                      value={String(item.end)}
+                      onChange={v => handleUpdateStat(idx, 'end', Number(v) || 0)}
+                      placeholder="e.g. 200"
+                    />
+                  </Field>
+                  <Field label="Suffix">
+                    <FInput
+                      value={item.suffix}
+                      onChange={v => handleUpdateStat(idx, 'suffix', v)}
+                      placeholder="e.g. +"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Descriptive Label (Under Number)">
+                  <FInput
+                    value={item.label}
+                    onChange={v => handleUpdateStat(idx, 'label', v)}
+                    placeholder="e.g. Artists Represented"
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
+            <ABtn variant="primary" size="md" onClick={handleSaveStats} disabled={savingStats}>
+              {savingStats ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+              {savingStats ? 'Saving…' : 'Publish Statistics Bar to Website'}
+            </ABtn>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 2: FESTIVALS & PROMOTERS MARQUEE ════════════════════ */}
+      {activeSubTab === 'marquee' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Header with Title and Action Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Star size={16} color="var(--accent)" />
+                Trusted Festivals &amp; Promoters Marquee
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Manage the partner ticker list and eyebrow headline seen scrolling below the statistics bar.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <ABtn variant="ghost" size="sm" onClick={handleResetMarquee}>
+                <RotateCcw size={12} /> Reset Defaults
+              </ABtn>
+              <ABtn variant="primary" size="sm" onClick={handleSaveMarquee} disabled={savingMarquee}>
+                {savingMarquee ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+                {savingMarquee ? 'Saving…' : 'Save Festival Marquee'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Live Visual Preview matching Screenshot */}
+          <div style={{
+            background: 'linear-gradient(180deg, rgba(20,16,36,0.95) 0%, rgba(10,8,18,0.98) 100%)',
+            border: '1px solid rgba(212,175,55,0.3)',
+            borderRadius: 14,
+            padding: '1.25rem 1.5rem',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0.6rem' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Sparkles size={12} /> Live Website Preview &bull; Festival &amp; Promoter Marquee
+              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Dynamic ticker preview</span>
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+              <p style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'var(--accent)',
+                marginBottom: '1.1rem'
+              }}>
+                {marqueeEyebrow || 'Trusted by global festivals & promoters'}
+              </p>
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.85rem',
+                flexWrap: 'wrap',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: 10,
+                padding: '0.9rem 1.25rem'
+              }}>
+                {marqueeItems.map((item, idx) => (
+                  <React.Fragment key={idx}>
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      letterSpacing: '0.02em'
+                    }}>
+                      {item}
+                    </span>
+                    {idx < marqueeItems.length - 1 && (
+                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', opacity: 0.7 }} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Configuration Form Card */}
+          <div style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 10,
+            padding: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.1rem'
+          }}>
+            <Field label="Section Eyebrow Headline">
+              <FInput
+                value={marqueeEyebrow}
+                onChange={v => setMarqueeEyebrow(v)}
+                placeholder="e.g. Trusted by global festivals & promoters"
+              />
+            </Field>
+
+            {/* Add New Festival input */}
+            <div>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.35rem' }}>
+                Add Festival or Promoter to Ticker
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ flex: 1 }}>
+                  <FInput
+                    value={newMarqueeItem}
+                    onChange={v => setNewMarqueeItem(v)}
+                    placeholder="Enter festival or event name (e.g. Carifesta, Rocksteady, Siren Festival)..."
+                  />
+                </div>
+                <ABtn variant="primary" size="md" onClick={() => handleAddMarqueeItem()}>
+                  <Plus size={13} /> Add to Marquee
+                </ABtn>
+              </div>
+            </div>
+
+            {/* Quick Preset Suggestions */}
+            <div>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
+                Quick Add Presets:
+              </span>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {['Rolling Loud', 'Tomorrowland', 'Summerfest', 'Boomtown Fair', 'Afro Nation', 'Wireless Festival', 'Essence Festival'].map(preset => {
+                  const alreadyAdded = marqueeItems.some(i => i.toLowerCase() === preset.toLowerCase());
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={alreadyAdded}
+                      onClick={() => handleAddMarqueeItem(preset)}
+                      style={{
+                        background: alreadyAdded ? 'rgba(255,255,255,0.02)' : 'rgba(212,175,55,0.1)',
+                        border: `1px solid ${alreadyAdded ? 'rgba(255,255,255,0.05)' : 'rgba(212,175,55,0.3)'}`,
+                        color: alreadyAdded ? 'rgba(255,255,255,0.3)' : 'var(--accent)',
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        fontSize: '0.72rem',
+                        cursor: alreadyAdded ? 'default' : 'pointer'
+                      }}
+                    >
+                      {alreadyAdded ? `✓ ${preset}` : `+ ${preset}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Items Tag List */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Active Marquee Items ({marqueeItems.length})
+                </label>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Click '×' to remove any item</span>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                padding: '0.75rem',
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 8,
+                minHeight: 60
+              }}>
+                {marqueeItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: 'rgba(212,175,55,0.12)',
+                      border: '1px solid rgba(212,175,55,0.3)',
+                      color: 'var(--text-primary)',
+                      padding: '4px 10px',
+                      borderRadius: 20,
+                      fontSize: '0.76rem',
+                      fontWeight: 500
+                    }}
+                  >
+                    <span>{item}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMarqueeItem(idx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'rgba(255,255,255,0.6)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        lineHeight: 1
+                      }}
+                      title={`Remove ${item}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
+            <ABtn variant="primary" size="md" onClick={handleSaveMarquee} disabled={savingMarquee}>
+              {savingMarquee ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+              {savingMarquee ? 'Saving…' : 'Publish Festival Marquee to Website'}
+            </ABtn>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════ SUBTAB 3: HERO & BANNERS CMS ════════════════════ */}
+      {activeSubTab === 'sections' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: 4 }}>Filter Type:</span>
+              {['All', ...TYPES].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setSelectedType(t)}
+                  style={{
+                    background: selectedType === t ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${selectedType === t ? 'rgba(212,175,55,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                    color: selectedType === t ? 'var(--accent)' : 'var(--text-muted)',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    fontWeight: selectedType === t ? 600 : 400
                   }}
                 >
-                  {s.active ? 'Published' : 'Hidden'}
+                  {t.toUpperCase()}
                 </button>
-              </TD>
-              <TD>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(s)}><Edit2 size={12} /></ABtn>
-                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(s.id)}><Trash2 size={12} /></ABtn>
-                </div>
-              </TD>
-            </TR>
-          ))}
-        </tbody>
-      </Tbl>
-
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Website Section' : 'Add Website Section'} width={620}>
-        <form onSubmit={handleSave}>
-          <FGrid>
-            <Field label="Section Type">
-              <FSelect value={form.type} onChange={v => setForm(f => ({ ...f, type: v as WebsiteSection['type'] }))} options={TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))} />
-            </Field>
-            <Field label="Status">
-              <FSelect value={form.active ? 'active' : 'inactive'} onChange={v => setForm(f => ({ ...f, active: v === 'active' }))} options={[{ value: 'active', label: 'Published (Live)' }, { value: 'inactive', label: 'Hidden / Draft' }]} />
-            </Field>
-            <div style={{ gridColumn: '1/-1' }}>
-              <Field label="Headline Title *"><FInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="Main bold headline..." /></Field>
+              ))}
             </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <Field label="Subtitle / Tagline"><FInput value={form.subtitle} onChange={v => setForm(f => ({ ...f, subtitle: v }))} placeholder="Secondary descriptive headline..." /></Field>
+
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Section</ABtn>
             </div>
-            <Field label="CTA Button Text"><FInput value={form.buttonText} onChange={v => setForm(f => ({ ...f, buttonText: v }))} placeholder="e.g. Book Headline Talent" /></Field>
-          </FGrid>
-
-          <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-            <Field label="Body Content / Paragraph">
-              <FTextarea value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} rows={3} placeholder="Detailed body copy..." />
-            </Field>
-
-            <FImageUpload
-              label="Background Banner (Wide 16:9)"
-              value={form.image_url}
-              onChange={v => setForm(f => ({ ...f, image_url: v }))}
-              aspect="wide"
-            />
           </div>
-          <FActions onCancel={() => setShowModal(false)} saving={saving} />
-        </form>
-      </Modal>
-      <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+
+          <Tbl>
+            <TH cols={['Section', 'Type', 'Title & Subtitle', 'Call To Action', 'Status', 'Actions']} />
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6}><Empty icon={FileText} msg="No website sections found" /></td></tr>
+              ) : filtered.map(s => (
+                <TR key={s.id}>
+                  <TD><span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--accent)' }}>{s.id}</span></TD>
+                  <TD><StatusBadge status={s.type} /></TD>
+                  <TD>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.title}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{s.subtitle || s.content?.slice(0, 50)}</div>
+                  </TD>
+                  <TD><span style={{ fontWeight: 500, color: 'var(--accent)' }}>{s.buttonText || '—'}</span></TD>
+                  <TD>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(s)}
+                      style={{
+                        background: s.active ? 'rgba(48,209,88,0.15)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${s.active ? 'rgba(48,209,88,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        color: s.active ? '#30d158' : 'var(--text-muted)',
+                        padding: '3px 8px',
+                        borderRadius: 5,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {s.active ? 'Published' : 'Hidden'}
+                    </button>
+                  </TD>
+                  <TD>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(s)}><Edit2 size={12} /></ABtn>
+                      <ABtn variant="danger" size="sm" onClick={() => setConfirm(s.id)}><Trash2 size={12} /></ABtn>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+            </tbody>
+          </Tbl>
+
+          <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Website Section' : 'Add Website Section'} width={620}>
+            <form onSubmit={handleSave}>
+              <FGrid>
+                <Field label="Section Type">
+                  <FSelect value={form.type} onChange={v => setForm(f => ({ ...f, type: v as WebsiteSection['type'] }))} options={TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))} />
+                </Field>
+                <Field label="Status">
+                  <FSelect value={form.active ? 'active' : 'inactive'} onChange={v => setForm(f => ({ ...f, active: v === 'active' }))} options={[{ value: 'active', label: 'Published (Live)' }, { value: 'inactive', label: 'Hidden / Draft' }]} />
+                </Field>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <Field label="Headline Title *"><FInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="Main bold headline..." /></Field>
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <Field label="Subtitle / Tagline"><FInput value={form.subtitle} onChange={v => setForm(f => ({ ...f, subtitle: v }))} placeholder="Secondary descriptive headline..." /></Field>
+                </div>
+                <Field label="CTA Button Text"><FInput value={form.buttonText} onChange={v => setForm(f => ({ ...f, buttonText: v }))} placeholder="e.g. Book Headline Talent" /></Field>
+              </FGrid>
+
+              <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Body Content / Paragraph">
+                  <FTextarea value={form.content} onChange={v => setForm(f => ({ ...f, content: v }))} rows={3} placeholder="Detailed body copy..." />
+                </Field>
+
+                <FImageUpload
+                  label="Background Banner (Wide 16:9)"
+                  value={form.image_url}
+                  onChange={v => setForm(f => ({ ...f, image_url: v }))}
+                  aspect="wide"
+                />
+              </div>
+              <FActions onCancel={() => setShowModal(false)} saving={saving} />
+            </form>
+          </Modal>
+          <ConfirmDlg open={!!confirm} title="Delete Section" message="This will permanently remove the website section." onConfirm={() => confirm && handleDelete(confirm)} onCancel={() => setConfirm(null)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -8045,8 +8640,22 @@ export default function AdminPortal() {
     finally { setDataLoading(false); }
   }, [user, showToast]);
 
-  useEffect(() => { if (!loading && !user) router.push('/auth/login'); }, [loading, user, router]);
-  useEffect(() => { if (user) loadData(); }, [user, loadData]);
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.push('/auth/login?redirect=/dashboard');
+      } else if (!isStaff && !isAdmin) {
+        const portal = profile?.role === 'Artist' ? '/portal/artist' : '/portal/client';
+        router.push(portal);
+      }
+    }
+  }, [loading, user, isStaff, isAdmin, profile, router]);
+
+  useEffect(() => {
+    if (user && (isStaff || isAdmin)) {
+      loadData();
+    }
+  }, [user, isStaff, isAdmin, loadData]);
 
   // Real-time listener for multi-tab and local booking events
   useEffect(() => {

@@ -47,13 +47,26 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Protected route groups ────────────────────────────────
-  const isAdminRoute = pathname.startsWith('/admin');
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDashboardRoute = pathname.startsWith('/dashboard');
   const isPortalRoute = pathname.startsWith('/portal');
   const isAuthRoute = pathname.startsWith('/auth');
 
+  // If visiting /admin, seamlessly redirect to /dashboard
+  if (isAdminRoute) {
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/auth/login';
+      loginUrl.searchParams.set('redirect', '/dashboard');
+      return NextResponse.redirect(loginUrl);
+    }
+    const dashUrl = request.nextUrl.clone();
+    dashUrl.pathname = '/dashboard';
+    return NextResponse.redirect(dashUrl);
+  }
+
   // Not authenticated — redirect to login for protected routes
-  if (!user && (isAdminRoute || isDashboardRoute || isPortalRoute)) {
+  if (!user && (isDashboardRoute || isPortalRoute)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/auth/login';
     loginUrl.searchParams.set('redirect', pathname);

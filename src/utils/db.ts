@@ -242,6 +242,21 @@ export interface WebsiteSection {
   active: boolean;
 }
 
+export interface HomepageStatItem {
+  id: string;
+  end: number;
+  suffix: string;
+  label: string;
+}
+
+export interface HomepageConfig {
+  stats: HomepageStatItem[];
+  marquee: {
+    eyebrow: string;
+    items: string[];
+  };
+}
+
 export interface Integration {
   id: string;
   name: string;
@@ -1672,6 +1687,23 @@ const SEED_WEBSITE_SECTIONS: WebsiteSection[] = [
   { id: 'sec-footer', type: 'footer', title: 'Showtime Entertainment Services Global', subtitle: 'Kingston • Miami • London • New York', content: 'Premier talent representation, tour routing, and festival backline infrastructure.', active: true }
 ];
 
+export const SEED_HOMEPAGE_CONFIG: HomepageConfig = {
+  stats: [
+    { id: 'stat-1', end: 200, suffix: '+', label: 'Artists Represented' },
+    { id: 'stat-2', end: 35, suffix: '+', label: 'Countries Toured' },
+    { id: 'stat-3', end: 1000, suffix: '+', label: 'Events Produced' },
+    { id: 'stat-4', end: 98, suffix: '%', label: 'Client Satisfaction' },
+  ],
+  marquee: {
+    eyebrow: 'Trusted by global festivals & promoters',
+    items: [
+      'Carifesta', 'Rocksteady', 'Siren Festival', 'Reggae Sumfest', 'Glastonbury',
+      'Coachella', 'One Love', 'Caribbean Carnival', 'Notting Hill', 'Rototom Sunsplash',
+      'Rebel Salute', 'Jazz & Blues Festival'
+    ]
+  }
+};
+
 const SEED_INTEGRATIONS: Integration[] = [
   {
     id: 'int-stripe',
@@ -2017,9 +2049,24 @@ const getStoreValue = <T>(key: string, seed: T[]): T[] => {
   }
 };
 
-const setStoreValue = <T>(key: string, data: T[]) => {
+const setStoreValue = <T>(key: string, data: T[] | T) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(key, JSON.stringify(data));
+  }
+};
+
+const getObjectStoreValue = <T>(key: string, seed: T): T => {
+  if (typeof window === 'undefined') return seed;
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    localStorage.setItem(key, JSON.stringify(seed));
+    return seed;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed ? (parsed as T) : seed;
+  } catch {
+    return seed;
   }
 };
 
@@ -2902,6 +2949,55 @@ export const db = {
     const filtered = secs.filter(s => s.id !== id);
     setStoreValue('st_website_sections', filtered);
     return true;
+  },
+
+  // --- HOMEPAGE STATS & MARQUEE CONFIGURATION ---
+  async getHomepageConfig(): Promise<HomepageConfig> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('website_sections').select('*').eq('id', 'homepage_config').single();
+        if (!error && data?.content) {
+          const parsed = JSON.parse(data.content);
+          if (parsed && Array.isArray(parsed.stats) && parsed.marquee) {
+            return parsed as HomepageConfig;
+          }
+        }
+      } catch {
+        // fallback to store
+      }
+    }
+    return getObjectStoreValue<HomepageConfig>('st_homepage_config', SEED_HOMEPAGE_CONFIG);
+  },
+
+  async updateHomepageConfig(updates: Partial<HomepageConfig>): Promise<HomepageConfig> {
+    const current = await this.getHomepageConfig();
+    const updated: HomepageConfig = {
+      stats: updates.stats !== undefined ? updates.stats : current.stats,
+      marquee: {
+        eyebrow: updates.marquee?.eyebrow !== undefined ? updates.marquee.eyebrow : current.marquee.eyebrow,
+        items: updates.marquee?.items !== undefined ? updates.marquee.items : current.marquee.items,
+      }
+    };
+    setStoreValue('st_homepage_config', updated);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('website_sections').upsert({
+          id: 'homepage_config',
+          type: 'features',
+          title: 'Homepage Stats & Marquee Configuration',
+          content: JSON.stringify(updated),
+          active: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_homepage_config_updated', { detail: updated }));
+    }
+    return updated;
   },
 
   // --- INTEGRATIONS ---
