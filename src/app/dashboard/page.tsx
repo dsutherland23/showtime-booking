@@ -8118,6 +8118,7 @@ function MaintenanceSection({ showToast }: { showToast: (msg: string, type: 'suc
                   src="https://www.paypalobjects.com/images/Debit_Credit.svg"
                   alt="Debit and Credit cards accepted"
                   style={{ height: '24px', maxWidth: '100%' }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
                 <div style={{
                   fontSize: '0.72rem',
@@ -8132,6 +8133,7 @@ function MaintenanceSection({ showToast }: { showToast: (msg: string, type: 'suc
                     src="https://www.paypalobjects.com/paypal-ui/logos/svg/paypal-wordmark-color.svg"
                     alt="PayPal"
                     style={{ height: '0.875rem', verticalAlign: 'middle' }}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 </div>
               </div>
