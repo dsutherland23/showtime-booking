@@ -1057,6 +1057,27 @@ const TalentDirectoryContent = () => {
           gap: 1rem;
           margin-top: 2rem;
         }
+
+        @media (max-width: 640px) {
+          dialog.admin-modal {
+            padding: 1.25rem 0.9rem !important;
+            width: 96% !important;
+            border-radius: var(--radius-md);
+            max-height: 92vh !important;
+          }
+
+          .modal-actions {
+            flex-direction: column-reverse;
+            gap: 0.5rem;
+          }
+
+          .modal-actions .btn {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+          }
+        }
       `}</style>
     </div>
   );

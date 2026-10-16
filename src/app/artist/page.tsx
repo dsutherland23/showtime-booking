@@ -740,242 +740,189 @@ function ArtistProfile() {
           </div>
         )}
 
-        {/* Top-Right Admin Banner Controls */}
-        {canManage && (
-          <div
-            className="banner-editor-dock"
-            style={{
-              position: 'absolute',
-              top: 20,
-              right: 24,
-              zIndex: 25,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              gap: '0.65rem',
-              maxWidth: '92vw',
-            }}
-          >
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => heroBannerInputRef.current?.click()}
-                style={{
-                  background: 'rgba(15, 23, 42, 0.82)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(212, 175, 55, 0.45)',
-                  color: '#fff',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: 8,
-                  fontSize: '0.76rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                }}
-              >
-                <Upload className="w-3.5 h-3.5 text-amber-400" />
-                Upload / Drop Banner
-              </button>
+        <div className="container hero-inner-alignment">
+          <div className="hero-top-bar">
+            <Link href="/talent" className="back-link">
+              <ChevronLeft className="w-4 h-4" /> Back to Directory
+            </Link>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!bannerEditMode) {
-                    setBannerDraftImage(artist.cover_image);
-                    const parsed = parseCoverPosition(artist.cover_position);
-                    setBannerPosX(parsed.x);
-                    setBannerPosY(parsed.y);
-                    setBannerZoom(artist.cover_zoom || 100);
-                  }
-                  setBannerEditMode(!bannerEditMode);
-                }}
-                style={{
-                  background: bannerEditMode ? 'var(--gold-gradient)' : 'rgba(15, 23, 42, 0.82)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(212, 175, 55, 0.55)',
-                  color: bannerEditMode ? '#0f172a' : 'var(--gold-primary)',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: 8,
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                }}
-              >
-                <Camera className="w-3.5 h-3.5" />
-                {bannerEditMode ? 'Editing Banner Alignment' : 'Align / Reposition Banner'}
-              </button>
-            </div>
+            {/* Admin Header Banner Alignment & Upload Dock */}
+            {canManage && (
+              <div className="banner-editor-dock">
+                <div className="banner-dock-buttons">
+                  <button
+                    type="button"
+                    onClick={() => heroBannerInputRef.current?.click()}
+                    className="banner-dock-btn"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Upload Banner</span>
+                  </button>
 
-            {/* Interactive Alignment & Framing Panel */}
-            {bannerEditMode && (
-              <div
-                style={{
-                  background: 'rgba(12, 16, 31, 0.94)',
-                  backdropFilter: 'blur(18px)',
-                  border: '1px solid rgba(212, 175, 55, 0.45)',
-                  borderRadius: 12,
-                  padding: '0.9rem 1.05rem',
-                  width: 340,
-                  maxWidth: '90vw',
-                  boxShadow: '0 18px 42px rgba(0,0,0,0.65)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem',
-                  color: '#fff',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Drag Banner or Adjust Sliders
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
-                    {bannerPosX}% X • {bannerPosY}% Y • {bannerZoom}%
-                  </span>
-                </div>
-
-                {/* Quick Vertical Presets */}
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[
-                    { label: 'Top (Face High)', y: 15 },
-                    { label: 'Upper-Mid', y: 35 },
-                    { label: 'Center', y: 50 },
-                    { label: 'Bottom', y: 80 },
-                  ].map(preset => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setBannerPosY(preset.y)}
-                      style={{
-                        flex: 1,
-                        padding: '3px 4px',
-                        fontSize: '0.66rem',
-                        fontWeight: 600,
-                        borderRadius: 5,
-                        cursor: 'pointer',
-                        background: Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.25)' : 'rgba(255,255,255,0.06)',
-                        border: `1px solid ${Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.6)' : 'rgba(255,255,255,0.12)'}`,
-                        color: Math.abs(bannerPosY - preset.y) <= 5 ? 'var(--gold-primary)' : '#cbd5e1',
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Vertical Alignment Slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
-                  <span style={{ width: 70, color: '#cbd5e1' }}>Vertical:</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bannerPosY}
-                    onChange={(e) => setBannerPosY(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
-                  />
-                </div>
-
-                {/* Horizontal Alignment Slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
-                  <span style={{ width: 70, color: '#cbd5e1' }}>Horizontal:</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bannerPosX}
-                    onChange={(e) => setBannerPosX(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
-                  />
-                </div>
-
-                {/* Zoom Slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
-                  <span style={{ width: 70, color: '#cbd5e1' }}>Zoom:</span>
-                  <input
-                    type="range"
-                    min={100}
-                    max={160}
-                    value={bannerZoom}
-                    onChange={(e) => setBannerZoom(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
-                  />
-                </div>
-
-                {/* Optional Direct Image URL input */}
-                <input
-                  type="text"
-                  value={bannerDraftImage}
-                  onChange={(e) => setBannerDraftImage(e.target.value)}
-                  placeholder="Or paste banner image URL..."
-                  style={{
-                    padding: '0.4rem 0.6rem',
-                    fontSize: '0.74rem',
-                    background: 'rgba(0,0,0,0.4)',
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: 6,
-                    color: '#fff',
-                  }}
-                />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
                   <button
                     type="button"
                     onClick={() => {
-                      setBannerEditMode(false);
-                      setBannerDraftImage(artist.cover_image);
+                      if (!bannerEditMode) {
+                        setBannerDraftImage(artist.cover_image);
+                        const parsed = parseCoverPosition(artist.cover_position);
+                        setBannerPosX(parsed.x);
+                        setBannerPosY(parsed.y);
+                        setBannerZoom(artist.cover_zoom || 100);
+                      }
+                      setBannerEditMode(!bannerEditMode);
                     }}
-                    style={{
-                      flex: 1,
-                      padding: '0.45rem 0.6rem',
-                      borderRadius: 6,
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.16)',
-                      color: '#e2e8f0',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
+                    className={`banner-dock-btn ${bannerEditMode ? 'active' : ''}`}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveBannerDirectly}
-                    style={{
-                      flex: 1.5,
-                      padding: '0.45rem 0.75rem',
-                      borderRadius: 6,
-                      background: 'var(--gold-gradient)',
-                      border: 'none',
-                      color: '#0f172a',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 5,
-                    }}
-                  >
-                    <Check className="w-3.5 h-3.5" /> Save Banner
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{bannerEditMode ? 'Close Align' : 'Align / Reposition'}</span>
                   </button>
                 </div>
+
+                {/* Interactive Alignment & Framing Panel */}
+                {bannerEditMode && (
+                  <div className="banner-alignment-panel">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Drag Banner or Adjust Sliders
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                        {bannerPosX}% X • {bannerPosY}% Y • {bannerZoom}%
+                      </span>
+                    </div>
+
+                    {/* Quick Vertical Presets */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[
+                        { label: 'Top', y: 15 },
+                        { label: 'Mid-High', y: 35 },
+                        { label: 'Center', y: 50 },
+                        { label: 'Bottom', y: 80 },
+                      ].map(preset => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => setBannerPosY(preset.y)}
+                          style={{
+                            flex: 1,
+                            padding: '4px 2px',
+                            fontSize: '0.66rem',
+                            fontWeight: 600,
+                            borderRadius: 5,
+                            cursor: 'pointer',
+                            background: Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.25)' : 'rgba(255,255,255,0.06)',
+                            border: `1px solid ${Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.6)' : 'rgba(255,255,255,0.12)'}`,
+                            color: Math.abs(bannerPosY - preset.y) <= 5 ? 'var(--gold-primary)' : '#cbd5e1',
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Vertical Alignment Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                      <span style={{ width: 70, color: '#cbd5e1' }}>Vertical:</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bannerPosY}
+                        onChange={(e) => setBannerPosY(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                      />
+                    </div>
+
+                    {/* Horizontal Alignment Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                      <span style={{ width: 70, color: '#cbd5e1' }}>Horizontal:</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bannerPosX}
+                        onChange={(e) => setBannerPosX(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                      />
+                    </div>
+
+                    {/* Zoom Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                      <span style={{ width: 70, color: '#cbd5e1' }}>Zoom:</span>
+                      <input
+                        type="range"
+                        min={100}
+                        max={160}
+                        value={bannerZoom}
+                        onChange={(e) => setBannerZoom(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                      />
+                    </div>
+
+                    {/* Optional Direct Image URL input */}
+                    <input
+                      type="text"
+                      value={bannerDraftImage}
+                      onChange={(e) => setBannerDraftImage(e.target.value)}
+                      placeholder="Or paste banner image URL..."
+                      style={{
+                        padding: '0.4rem 0.6rem',
+                        fontSize: '0.74rem',
+                        background: 'rgba(0,0,0,0.4)',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        borderRadius: 6,
+                        color: '#fff',
+                        width: '100%',
+                      }}
+                    />
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBannerEditMode(false);
+                          setBannerDraftImage(artist.cover_image);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '0.45rem 0.6rem',
+                          borderRadius: 6,
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.16)',
+                          color: '#e2e8f0',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveBannerDirectly}
+                        style={{
+                          flex: 1.5,
+                          padding: '0.45rem 0.75rem',
+                          borderRadius: 6,
+                          background: 'var(--gold-gradient)',
+                          border: 'none',
+                          color: '#0f172a',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5" /> Save Banner
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-
-        <div className="container hero-inner-alignment">
-          <Link href="/talent" className="back-link">
-            <ChevronLeft className="w-4 h-4" /> Back to Directory
-          </Link>
           
           <div className="hero-artist-info">
             <span className="artist-category-tag">{artist.category}</span>
@@ -1060,12 +1007,12 @@ function ArtistProfile() {
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
                         />
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(15,23,42,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div>
-                          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>{currentTrack.title}</div>
+                      <div className="embed-footer-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', padding: '0.75rem 1rem', background: 'rgba(15,23,42,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff', wordBreak: 'break-word' }}>{currentTrack.title}</div>
                           <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{currentTrack.subtitle || artist.stage_name}</div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                           <a
                             href={`https://www.youtube.com/watch?v=${currentVideoId}`}
                             target="_blank"
@@ -1145,11 +1092,12 @@ function ArtistProfile() {
                           setActiveTrackIndex(idx);
                           setShowEmbedPlayer(true);
                         }}
+                        className="tracklist-row-item"
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: '0.85rem',
+                          gap: '0.75rem',
                           padding: '0.65rem 0.85rem',
                           borderRadius: 10,
                           background: isSelected ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.025)',
@@ -1158,9 +1106,9 @@ function ArtistProfile() {
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
                           {vid ? (
-                            <div style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)', background: '#0f172a' }}>
+                            <div className="track-thumb-box" style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)', background: '#0f172a' }}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
@@ -1614,19 +1562,30 @@ function ArtistProfile() {
 
       <style jsx>{`
         .profile-hero-banner {
-          height: 380px;
+          min-height: 380px;
+          height: auto;
           background-size: cover;
           background-position: center;
           position: relative;
           display: flex;
           align-items: flex-end;
+          padding-top: 1.5rem;
           padding-bottom: 2rem;
+          box-sizing: border-box;
         }
 
         .hero-inner-alignment {
           display: flex;
           flex-direction: column;
-          gap: 4rem;
+          gap: 3.5rem;
+          width: 100%;
+        }
+
+        .hero-top-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
           width: 100%;
         }
 
@@ -1638,10 +1597,72 @@ function ArtistProfile() {
           font-size: 0.85rem;
           font-weight: 500;
           width: fit-content;
+          flex-shrink: 0;
         }
 
         .back-link:hover {
           color: #ffffff;
+        }
+
+        /* Banner Editor Dock & Alignment Controls */
+        .banner-editor-dock {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.65rem;
+          max-width: 100%;
+          z-index: 25;
+        }
+
+        .banner-dock-buttons {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .banner-dock-btn {
+          background: rgba(15, 23, 42, 0.82);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(212, 175, 55, 0.45);
+          color: #fff;
+          padding: 0.45rem 0.85rem;
+          border-radius: 8px;
+          font-size: 0.76rem;
+          font-weight: 600;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+          transition: all var(--transition-fast);
+        }
+
+        .banner-dock-btn:hover {
+          border-color: rgba(212, 175, 55, 0.8);
+        }
+
+        .banner-dock-btn.active {
+          background: var(--gold-gradient);
+          color: #0f172a;
+          border-color: rgba(212, 175, 55, 0.6);
+          font-weight: 700;
+        }
+
+        .banner-alignment-panel {
+          background: rgba(12, 16, 31, 0.95);
+          backdrop-filter: blur(18px);
+          border: 1px solid rgba(212, 175, 55, 0.45);
+          border-radius: 12px;
+          padding: 0.9rem 1.05rem;
+          width: 340px;
+          max-width: 100%;
+          box-sizing: border-box;
+          box-shadow: 0 18px 42px rgba(0,0,0,0.65);
+          display: flex;
+          flex-direction: column;
+          gap: 0.65rem;
+          color: #fff;
         }
 
         .hero-artist-info {
@@ -1659,15 +1680,17 @@ function ArtistProfile() {
         }
 
         .artist-stage-name {
-          font-size: clamp(2.5rem, 2rem + 3vw, 4rem);
+          font-size: clamp(1.85rem, 1.4rem + 2.5vw, 3.8rem);
           font-weight: 700;
           color: #ffffff;
+          word-break: break-word;
+          line-height: 1.12;
         }
 
         .artist-meta-row {
           display: flex;
           flex-wrap: wrap;
-          gap: 1.5rem;
+          gap: 1.25rem;
           align-items: center;
           font-size: 0.9rem;
           color: rgba(255, 255, 255, 0.8);
@@ -1683,6 +1706,7 @@ function ArtistProfile() {
           width: 16px;
           height: 16px;
           color: var(--gold-light);
+          flex-shrink: 0;
         }
 
         .status-badge {
@@ -1703,6 +1727,7 @@ function ArtistProfile() {
           border-radius: 50%;
           background: var(--color-success);
           box-shadow: 0 0 6px var(--color-success);
+          flex-shrink: 0;
         }
 
         /* Profile Layout */
@@ -1772,6 +1797,7 @@ function ArtistProfile() {
           cursor: pointer;
           transition: transform var(--transition-fast);
           box-shadow: 0 4px 10px rgba(212, 175, 55, 0.2);
+          flex-shrink: 0;
         }
 
         .audio-play-btn:hover {
@@ -1783,6 +1809,7 @@ function ArtistProfile() {
           display: flex;
           flex-direction: column;
           gap: 4px;
+          min-width: 0;
         }
 
         .track-title {
@@ -1821,8 +1848,9 @@ function ArtistProfile() {
         .time-duration {
           font-size: 0.7rem;
           color: var(--text-muted);
-          min-width: 60px;
+          min-width: 45px;
           text-align: right;
+          flex-shrink: 0;
         }
 
         .media-gallery-grid {
@@ -1905,6 +1933,7 @@ function ArtistProfile() {
           width: 16px;
           height: 16px;
           color: var(--gold-primary);
+          flex-shrink: 0;
         }
 
         .rider-col h4 {
@@ -2164,6 +2193,94 @@ function ArtistProfile() {
           color: var(--color-error);
         }
 
+        .modal-nav-tab {
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 0.76rem;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all var(--transition-fast);
+        }
+
+        .modal-track-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.65rem;
+          padding: 0.75rem 0.85rem;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .modal-track-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+
+        .modal-track-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.5rem;
+        }
+
+        .modal-gallery-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.55rem;
+          padding: 0.65rem 0.8rem;
+          border-radius: 8px;
+          background: rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .modal-gallery-top {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+
+        .modal-social-row {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          padding: 0.65rem 0.85rem;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .modal-social-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .modal-social-inputs {
+          display: grid;
+          grid-template-columns: 1fr 140px;
+          gap: 0.5rem;
+        }
+
+        .modal-add-social {
+          padding: 0.9rem;
+          border-radius: 10px;
+          background: rgba(255,255,255,0.025);
+          border: 1px dashed rgba(212,175,55,0.35);
+          display: grid;
+          grid-template-columns: 130px 1fr 130px auto;
+          gap: 0.6rem;
+          align-items: end;
+        }
+
+        .calendar-quick-add {
+          display: flex;
+          gap: 0.6rem;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
         .form-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -2266,6 +2383,188 @@ function ArtistProfile() {
           line-height: 1.6;
           color: var(--text-secondary);
         }
+
+        /* ── Comprehensive Small Mobile Screen Responsiveness (320px–640px) ── */
+        @media (max-width: 640px) {
+          .profile-hero-banner {
+            min-height: 340px;
+            padding-top: 1rem;
+            padding-bottom: 1.5rem;
+          }
+
+          .hero-inner-alignment {
+            gap: 1.25rem;
+          }
+
+          .hero-top-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.65rem;
+          }
+
+          .banner-editor-dock {
+            width: 100%;
+            align-items: stretch;
+          }
+
+          .banner-dock-buttons {
+            width: 100%;
+            justify-content: stretch;
+          }
+
+          .banner-dock-btn {
+            flex: 1 1 calc(50% - 0.25rem);
+            justify-content: center;
+            padding: 0.45rem 0.5rem;
+            font-size: 0.72rem;
+            text-align: center;
+          }
+
+          .banner-alignment-panel {
+            width: 100%;
+            max-width: 100%;
+            padding: 0.75rem 0.85rem;
+          }
+
+          .artist-stage-name {
+            font-size: clamp(1.6rem, 7vw, 2.4rem);
+          }
+
+          .artist-meta-row {
+            gap: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+          }
+
+          .card-padding {
+            padding: 1.15rem 0.9rem !important;
+          }
+
+          .profile-main-col h2 {
+            font-size: 1.2rem;
+          }
+
+          .audio-player-container {
+            padding: 0.85rem 0.75rem !important;
+            gap: 0.75rem !important;
+          }
+
+          .audio-play-btn {
+            width: 38px !important;
+            height: 38px !important;
+          }
+
+          .track-thumb-box {
+            width: 52px !important;
+            height: 34px !important;
+          }
+
+          .rider-col {
+            padding: 1.15rem 1rem !important;
+          }
+
+          .calendar-container {
+            padding: 12px 8px !important;
+          }
+
+          .calendar-days-grid {
+            gap: 2px !important;
+          }
+
+          .day-cell {
+            font-size: 0.7rem !important;
+            min-height: 28px;
+          }
+
+          .calendar-legend {
+            gap: 0.85rem !important;
+            font-size: 0.68rem !important;
+          }
+
+          dialog.admin-modal {
+            padding: 1.15rem 0.85rem !important;
+            width: 96% !important;
+            max-height: 92vh !important;
+            border-radius: var(--radius-md);
+          }
+
+          .modal-header h3 {
+            font-size: 1.05rem;
+          }
+
+          .modal-nav-tab {
+            flex: 1 1 calc(50% - 0.35rem);
+            text-align: center;
+            padding: 7px 4px;
+            font-size: 0.72rem;
+            white-space: normal;
+          }
+
+          .modal-track-inputs {
+            grid-template-columns: 1fr;
+          }
+
+          .modal-social-inputs {
+            grid-template-columns: 1fr;
+          }
+
+          .modal-add-social {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+          }
+
+          .modal-add-social button {
+            width: 100%;
+          }
+
+          .calendar-quick-add {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .calendar-quick-add input[type="date"],
+          .calendar-quick-add button {
+            width: 100%;
+          }
+
+          .modal-actions {
+            flex-direction: column-reverse;
+            gap: 0.5rem;
+          }
+
+          .modal-actions .btn {
+            width: 100%;
+            text-align: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+          }
+        }
+
+        /* ── Extra-Compact Phones (iPhone SE, 320px–380px) ── */
+        @media (max-width: 380px) {
+          .card-padding {
+            padding: 1rem 0.75rem !important;
+          }
+
+          .artist-stage-name {
+            font-size: clamp(1.45rem, 6.5vw, 1.9rem);
+          }
+
+          .track-thumb-box {
+            width: 44px !important;
+            height: 30px !important;
+          }
+
+          .calendar-legend {
+            gap: 0.65rem !important;
+            font-size: 0.65rem !important;
+          }
+
+          .day-cell {
+            font-size: 0.65rem !important;
+          }
+        }
       `}</style>
 
       {/* Edit Profile Modal Dialog — 5-Tab 2026 Agency EPK Editor */}
@@ -2297,24 +2596,21 @@ function ArtistProfile() {
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           {([
             { id: 'overview', label: '1. Overview & Bio' },
-            { id: 'showcase', label: '2. YouTube & Audio Showcase' },
-            { id: 'socials', label: '3. Social Footprint' },
-            { id: 'calendar', label: '4. Availability Calendar' },
+            { id: 'showcase', label: '2. YouTube Showcase' },
+            { id: 'socials', label: '3. Socials' },
+            { id: 'calendar', label: '4. Calendar' },
             { id: 'riders', label: '5. Riders' },
           ] as const).map(t => (
             <button
               key={t.id}
               type="button"
               onClick={() => setEditModalTab(t.id)}
+              className="modal-nav-tab"
               style={{
                 background: editModalTab === t.id ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
                 border: `1px solid ${editModalTab === t.id ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.09)'}`,
                 color: editModalTab === t.id ? 'var(--gold-primary)' : 'var(--text-secondary)',
-                padding: '6px 12px',
-                borderRadius: 8,
-                fontSize: '0.76rem',
                 fontWeight: editModalTab === t.id ? 700 : 500,
-                cursor: 'pointer',
               }}
             >
               {t.label}
@@ -2518,39 +2814,45 @@ function ArtistProfile() {
                   return (
                     <div
                       key={trk.id || idx}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '64px 1fr auto',
-                        gap: '0.75rem',
-                        alignItems: 'center',
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: 8,
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.08)'
-                      }}
+                      className="modal-track-row"
                     >
-                      {vid ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
-                          alt={trk.title}
-                          onError={(e) => {
-                            const img = e.currentTarget;
-                            if (!img.dataset.fallback) {
-                              img.dataset.fallback = '1';
-                              img.src = `https://img.youtube.com/vi/${vid}/0.jpg`;
-                            } else {
-                              img.src = artist.profile_image || '/images/artist_reggae.jpg';
-                            }
-                          }}
-                          style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 5 }}
-                        />
-                      ) : (
-                        <div style={{ width: 64, height: 40, borderRadius: 5, background: 'rgba(212,175,55,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Video className="w-4 h-4 text-amber-400" />
+                      <div className="modal-track-top">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                          {vid ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
+                              alt={trk.title}
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (!img.dataset.fallback) {
+                                  img.dataset.fallback = '1';
+                                  img.src = `https://img.youtube.com/vi/${vid}/0.jpg`;
+                                } else {
+                                  img.src = artist.profile_image || '/images/artist_reggae.jpg';
+                                }
+                              }}
+                              style={{ width: 56, height: 36, objectFit: 'cover', borderRadius: 5, flexShrink: 0 }}
+                            />
+                          ) : (
+                            <div style={{ width: 44, height: 36, borderRadius: 5, background: 'rgba(212,175,55,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Video className="w-4 h-4 text-amber-400" />
+                            </div>
+                          )}
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--gold-primary)', whiteSpace: 'nowrap' }}>
+                            Track #{idx + 1}
+                          </span>
                         </div>
-                      )}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveShowcaseTrack(trk.id)}
+                          title="Remove Track"
+                          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="modal-track-inputs">
                         <input
                           type="text"
                           value={trk.title}
@@ -2559,7 +2861,7 @@ function ArtistProfile() {
                             setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, title: val } : item));
                           }}
                           placeholder="Track / Performance Title"
-                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem' }}
+                          style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem', width: '100%' }}
                         />
                         <input
                           type="text"
@@ -2569,17 +2871,9 @@ function ArtistProfile() {
                             setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, youtube_url: val } : item));
                           }}
                           placeholder="https://www.youtube.com/watch?v=..."
-                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.8rem' }}
+                          style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.8rem', width: '100%' }}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveShowcaseTrack(trk.id)}
-                        title="Remove Track"
-                        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   );
                 })}
@@ -2690,23 +2984,62 @@ function ArtistProfile() {
                     {mediaGallery.map((med, idx) => (
                       <div
                         key={idx}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '84px 1fr auto auto',
-                          gap: '0.65rem',
-                          alignItems: 'center',
-                          padding: '0.55rem 0.75rem',
-                          borderRadius: 8,
-                          background: 'rgba(0,0,0,0.3)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                        }}
+                        className="modal-gallery-row"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={med.url}
-                          alt={`Gallery ${idx + 1}`}
-                          style={{ width: 84, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)' }}
-                        />
+                        <div className="modal-gallery-top">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={med.url}
+                            alt={`Gallery ${idx + 1}`}
+                            style={{ width: 64, height: 42, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}
+                          />
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Photo #{idx + 1}</span>
+                          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+                            <label
+                              title="Replace photo from computer"
+                              style={{
+                                background: 'rgba(212,175,55,0.12)',
+                                border: '1px solid rgba(212,175,55,0.35)',
+                                color: 'var(--gold-primary)',
+                                padding: '5px 9px',
+                                borderRadius: 6,
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <Camera className="w-3.5 h-3.5" /> Change
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      const dataUrl = reader.result as string;
+                                      setMediaGallery(prev => prev.map((item, i) => i === idx ? { ...item, type: 'Image', url: dataUrl } : item));
+                                    };
+                                    reader.readAsDataURL(f);
+                                  }
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setMediaGallery(prev => prev.filter((_, i) => i !== idx))}
+                              title="Remove photo"
+                              style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                         <input
                           type="text"
                           value={med.url}
@@ -2715,51 +3048,8 @@ function ArtistProfile() {
                             setMediaGallery(prev => prev.map((item, i) => i === idx ? { ...item, url: val } : item));
                           }}
                           placeholder="Image URL or upload file..."
-                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.78rem' }}
+                          style={{ width: '100%', padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.78rem' }}
                         />
-                        <label
-                          title="Replace photo from computer"
-                          style={{
-                            background: 'rgba(212,175,55,0.12)',
-                            border: '1px solid rgba(212,175,55,0.35)',
-                            color: 'var(--gold-primary)',
-                            padding: '6px 10px',
-                            borderRadius: 6,
-                            fontSize: '0.74rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          <Camera className="w-3.5 h-3.5" /> Change
-                          <input
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  const dataUrl = reader.result as string;
-                                  setMediaGallery(prev => prev.map((item, i) => i === idx ? { ...item, type: 'Image', url: dataUrl } : item));
-                                };
-                                reader.readAsDataURL(f);
-                              }
-                            }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setMediaGallery(prev => prev.filter((_, i) => i !== idx))}
-                          title="Remove photo"
-                          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -2769,13 +3059,13 @@ function ArtistProfile() {
                   </p>
                 )}
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <input
                     type="text"
                     value={newGalleryImageUrl}
                     onChange={(e) => setNewGalleryImageUrl(e.target.value)}
                     placeholder="Or paste an image URL (https://...) to add to gallery"
-                    style={{ flex: 1, padding: '0.5rem 0.7rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem' }}
+                    style={{ flex: '1 1 180px', minWidth: 0, padding: '0.5rem 0.7rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem' }}
                   />
                   <button
                     type="button"
@@ -2785,7 +3075,7 @@ function ArtistProfile() {
                       setNewGalleryImageUrl('');
                     }}
                     className="btn btn-secondary"
-                    style={{ padding: '0 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                    style={{ padding: '0.5rem 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
                   >
                     + Add Image URL
                   </button>
@@ -2805,53 +3095,48 @@ function ArtistProfile() {
                 {Object.entries(socialsEdit).map(([plat, data]) => (
                   <div
                     key={plat}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '120px 1fr 150px auto',
-                      gap: '0.65rem',
-                      alignItems: 'center',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: 8,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.08)'
-                    }}
+                    className="modal-social-row"
                   >
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gold-primary)' }}>{plat}</div>
-                    <input
-                      type="text"
-                      value={data?.url || ''}
-                      onChange={(e) => {
-                        const url = e.target.value;
-                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], url } }));
-                      }}
-                      placeholder={`https://${plat.toLowerCase().replace(/\s+/g, '')}.com/...`}
-                      style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.82rem' }}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={data?.followers ?? 0}
-                      onChange={(e) => {
-                        const followers = Number(e.target.value) || 0;
-                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], followers } }));
-                      }}
-                      placeholder="Followers"
-                      style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.82rem', fontWeight: 600 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSocialPlatform(plat)}
-                      title={`Remove ${plat}`}
-                      style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="modal-social-top">
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gold-primary)' }}>{plat}</div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSocialPlatform(plat)}
+                        title={`Remove ${plat}`}
+                        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="modal-social-inputs">
+                      <input
+                        type="text"
+                        value={data?.url || ''}
+                        onChange={(e) => {
+                          const url = e.target.value;
+                          setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], url } }));
+                        }}
+                        placeholder={`https://${plat.toLowerCase().replace(/\s+/g, '')}.com/...`}
+                        style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.82rem', width: '100%' }}
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={data?.followers ?? 0}
+                        onChange={(e) => {
+                          const followers = Number(e.target.value) || 0;
+                          setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], followers } }));
+                        }}
+                        placeholder="Followers"
+                        style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.82rem', fontWeight: 600, width: '100%' }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* Add Additional Platform */}
-              <div style={{ padding: '0.9rem', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(212,175,55,0.35)', display: 'grid', gridTemplateColumns: '140px 1fr 140px auto', gap: '0.6rem', alignItems: 'end' }}>
+              <div className="modal-add-social">
                 <div className="form-group">
                   <label>Platform</label>
                   <select value={newSocialPlatform} onChange={(e) => setNewSocialPlatform(e.target.value)}>
@@ -2885,7 +3170,7 @@ function ArtistProfile() {
                   type="button"
                   onClick={handleAddSocialPlatform}
                   className="btn btn-primary"
-                  style={{ height: 40, padding: '0 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                  style={{ height: 42, padding: '0 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap', justifyContent: 'center' }}
                 >
                   + Add / Update
                 </button>
@@ -2901,7 +3186,7 @@ function ArtistProfile() {
               </div>
 
               {/* Quick Date Picker Add */}
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="calendar-quick-add">
                 <input
                   type="date"
                   value={customBlockDate}
@@ -2917,7 +3202,7 @@ function ArtistProfile() {
                     }
                   }}
                   className="btn btn-secondary"
-                  style={{ padding: '0.55rem 1rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.55rem 1rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                 >
                   Toggle Selected Date
                 </button>
