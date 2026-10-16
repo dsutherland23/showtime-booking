@@ -13,6 +13,28 @@ export interface User {
   created_at: string;
 }
 
+export interface ArtistTrack {
+  id: string;
+  title: string;
+  subtitle?: string;
+  youtube_url: string;
+  duration?: string;
+}
+
+/**
+ * Extracts an 11-character YouTube Video ID from any YouTube URL format
+ * (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, music.youtube.com/watch?v=, youtube.com/embed/)
+ */
+export function extractYouTubeId(input?: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  const regex = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+  const match = trimmed.match(regex);
+  return match ? match[1] : null;
+}
+
 export interface Artist {
   id: string;
   stage_name: string;
@@ -20,13 +42,17 @@ export interface Artist {
   category: string;
   genre: string;
   bio: string;
+  location?: string;
   profile_image: string;
   cover_image: string;
   booking_status: 'Available' | 'Booked' | 'On Tour' | 'On Hold';
   availability_status: 'Active' | 'Inactive';
   manager_id?: string;
   socials?: Record<string, { url: string; followers: number }>;
-  media?: { type: 'Image' | 'Video' | 'Audio'; url: string }[];
+  media?: { type: 'Image' | 'Video' | 'Audio'; url: string; title?: string }[];
+  showcase_tracks?: ArtistTrack[];
+  featured_youtube_url?: string;
+  blocked_dates?: string[];
   technical_rider?: string;
   hospitality_rider?: string;
   is_featured?: boolean;
@@ -2754,14 +2780,36 @@ export const db = {
   // --- ARTIST AVAILABILITY ---
   async getArtistAvailability(artistId: string): Promise<string[]> {
     // Returns list of blocked/unavailable dates as strings (YYYY-MM-DD)
-    if (typeof window === 'undefined') return [];
+    const artist = await this.getArtistById(artistId);
+    const artistBlocked = Array.isArray(artist?.blocked_dates) ? artist.blocked_dates : [];
+    if (typeof window === 'undefined') return artistBlocked;
     const raw = localStorage.getItem(`st_avail_${artistId}`);
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw) as string[];
-    } catch {
-      return [];
+    if (!raw) {
+      if (artistBlocked.length > 0) {
+        localStorage.setItem(`st_avail_${artistId}`, JSON.stringify(artistBlocked));
+      }
+      return artistBlocked;
     }
+    try {
+      const parsed = JSON.parse(raw) as string[];
+      const merged = Array.from(new Set([...parsed, ...artistBlocked])).sort();
+      return merged;
+    } catch {
+      return artistBlocked;
+    }
+  },
+
+  async setArtistAvailability(artistId: string, dates: string[]): Promise<string[]> {
+    const clean = Array.from(new Set(dates.filter(Boolean))).sort();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`st_avail_${artistId}`, JSON.stringify(clean));
+    }
+    try {
+      await this.updateArtistProfile(artistId, { blocked_dates: clean });
+    } catch {
+      // ignore if artist not yet in list
+    }
+    return clean;
   },
 
   async toggleArtistDate(artistId: string, dateStr: string): Promise<string[]> {
@@ -2772,18 +2820,17 @@ export const db = {
     } else {
       blockedDates.push(dateStr); // add -> block date
     }
-    localStorage.setItem(`st_avail_${artistId}`, JSON.stringify(blockedDates));
-    return blockedDates;
+    return this.setArtistAvailability(artistId, blockedDates);
   },
 
   async blockArtistDate(artistId: string, dateStr: string): Promise<string[]> {
     const blockedDates = await this.getArtistAvailability(artistId);
     if (!blockedDates.includes(dateStr)) {
       blockedDates.push(dateStr);
-      localStorage.setItem(`st_avail_${artistId}`, JSON.stringify(blockedDates));
     }
-    return blockedDates;
+    return this.setArtistAvailability(artistId, blockedDates);
   },
+
 
   // --- TASKS ---
   async getTasks(): Promise<Task[]> {

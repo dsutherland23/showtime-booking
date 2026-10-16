@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   db,
-  Lead, Booking, Task, Notification, Invoice, Artist, Venue, Customer,
+  Lead, Booking, Task, Notification, Invoice, Artist, ArtistTrack, extractYouTubeId, Venue, Customer,
   User, TicketTier, PromoCode, MarketingCampaign, AdPlacement,
   WebsiteSection, Integration, ShowEvent,
   BillingDoc, BillingDocType, BillingDocStatus, BillingLineItem, BillingPayment,
@@ -1733,7 +1733,7 @@ function BookingsSection({
   );
 }
 
-// ─── Artists Section ──────────────────────────────────────────────────────────
+// ─── Artists Section (2026 Agency EPK & Roster CMS) ───────────────────────────
 
 function ArtistsSection({ artists, onRefresh, showToast }: {
   artists: Artist[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
@@ -1742,30 +1742,197 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [selectedCat, setSelectedCat] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [showModal, setShowModal] = useState(false);
+  const [modalTab, setModalTab] = useState<'overview' | 'showcase' | 'socials' | 'calendar' | 'riders'>('overview');
   const [editItem, setEditItem] = useState<Artist | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedArtist, setSavedArtist] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
+  // YouTube Showcase state inside modal
+  const [showcaseTracks, setShowcaseTracks] = useState<ArtistTrack[]>([]);
+  const [newTrackTitle, setNewTrackTitle] = useState('');
+  const [newTrackSubtitle, setNewTrackSubtitle] = useState('');
+  const [newTrackUrl, setNewTrackUrl] = useState('');
+  const [newTrackDuration, setNewTrackDuration] = useState('');
+
+  // Social Footprint state inside modal
+  const [socialsEdit, setSocialsEdit] = useState<Record<string, { url: string; followers: number }>>({});
+  const [newSocialPlatform, setNewSocialPlatform] = useState('TikTok');
+  const [newSocialUrl, setNewSocialUrl] = useState('');
+  const [newSocialFollowers, setNewSocialFollowers] = useState('');
+
+  // Availability Calendar state inside modal
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [calMonthOffset, setCalMonthOffset] = useState(0);
+  const [customDateInput, setCustomDateInput] = useState('');
+
   const CATEGORIES = ['All', 'Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'];
   const STATUSES = ['All', 'Available', 'Booked', 'On Tour', 'On Hold'];
 
-  const blank = { stage_name: '', legal_name: '', category: 'Reggae Artists', genre: '', bio: '', profile_image: '', cover_image: '', booking_status: 'Available' as Artist['booking_status'], availability_status: 'Active' as Artist['availability_status'], technical_rider: '', hospitality_rider: '', is_featured: false };
+  const blank = {
+    stage_name: '',
+    legal_name: '',
+    category: 'Reggae Artists',
+    genre: '',
+    location: 'Jamaica',
+    bio: '',
+    profile_image: '',
+    cover_image: '',
+    booking_status: 'Available' as Artist['booking_status'],
+    availability_status: 'Active' as Artist['availability_status'],
+    technical_rider: '',
+    hospitality_rider: '',
+    is_featured: false
+  };
   const [form, setForm] = useState(blank);
 
-  const openCreate = () => { setEditItem(null); setForm(blank); setShowModal(true); };
-  const openEdit = (a: Artist) => {
-    setEditItem(a);
-    setForm({ stage_name: a.stage_name, legal_name: a.legal_name, category: a.category, genre: a.genre, bio: a.bio, profile_image: a.profile_image, cover_image: a.cover_image, booking_status: a.booking_status, availability_status: a.availability_status, technical_rider: a.technical_rider || '', hospitality_rider: a.hospitality_rider || '', is_featured: a.is_featured || false });
+  const openCreate = () => {
+    setEditItem(null);
+    setForm(blank);
+    setModalTab('overview');
+    setShowcaseTracks([]);
+    setSocialsEdit({
+      Instagram: { url: '', followers: 0 },
+      Spotify: { url: '', followers: 0 },
+      YouTube: { url: '', followers: 0 },
+    });
+    setBlockedDates([]);
+    setCalMonthOffset(0);
     setShowModal(true);
   };
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSaving(true);
+
+  const openEdit = async (a: Artist, initialTab: 'overview' | 'showcase' | 'socials' | 'calendar' | 'riders' = 'overview') => {
+    setEditItem(a);
+    setModalTab(initialTab);
+    setForm({
+      stage_name: a.stage_name,
+      legal_name: a.legal_name,
+      category: a.category,
+      genre: a.genre,
+      location: a.location || 'Jamaica',
+      bio: a.bio,
+      profile_image: a.profile_image,
+      cover_image: a.cover_image,
+      booking_status: a.booking_status,
+      availability_status: a.availability_status,
+      technical_rider: a.technical_rider || '',
+      hospitality_rider: a.hospitality_rider || '',
+      is_featured: a.is_featured || false
+    });
+    setShowcaseTracks(
+      a.showcase_tracks && a.showcase_tracks.length > 0
+        ? [...a.showcase_tracks]
+        : [
+            {
+              id: 'def-1',
+              title: `${a.stage_name} — Live Headline Performance Reel`,
+              subtitle: 'Official YouTube Showcase',
+              youtube_url: 'https://www.youtube.com/watch?v=5E4ZBSInqUU',
+              duration: '4:05'
+            }
+          ]
+    );
+    setSocialsEdit(
+      a.socials && Object.keys(a.socials).length > 0
+        ? { ...a.socials }
+        : {
+            Instagram: { url: '', followers: 0 },
+            Spotify: { url: '', followers: 0 },
+            YouTube: { url: '', followers: 0 },
+          }
+    );
     try {
-      if (editItem) await db.updateArtistProfile(editItem.id, form);
-      else await db.createArtist(form);
+      const dates = await db.getArtistAvailability(a.id);
+      setBlockedDates(dates);
+    } catch {
+      setBlockedDates(a.blocked_dates || []);
+    }
+    setCalMonthOffset(0);
+    setShowModal(true);
+  };
+
+  const handleAddTrack = () => {
+    if (!newTrackUrl.trim()) {
+      showToast('Please paste a YouTube link first.', 'error');
+      return;
+    }
+    const vid = extractYouTubeId(newTrackUrl);
+    if (!vid) {
+      showToast('Invalid YouTube URL. Paste a youtube.com/watch?v=... or youtu.be/... link.', 'error');
+      return;
+    }
+    const trk: ArtistTrack = {
+      id: 'trk-' + Math.random().toString(36).slice(2, 8),
+      title: newTrackTitle.trim() || `${form.stage_name || 'Artist'} — Official Showcase`,
+      subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
+      youtube_url: newTrackUrl.trim(),
+      duration: newTrackDuration.trim() || '3:40',
+    };
+    setShowcaseTracks(prev => [...prev, trk]);
+    setNewTrackTitle('');
+    setNewTrackSubtitle('');
+    setNewTrackUrl('');
+    setNewTrackDuration('');
+    showToast('YouTube track added to showcase list!', 'success');
+  };
+
+  const handleAddSocial = () => {
+    const plat = newSocialPlatform.trim();
+    if (!plat) return;
+    setSocialsEdit(prev => ({
+      ...prev,
+      [plat]: {
+        url: newSocialUrl.trim(),
+        followers: Number(newSocialFollowers.replace(/,/g, '')) || 0,
+      }
+    }));
+    setNewSocialUrl('');
+    setNewSocialFollowers('');
+  };
+
+  const handleToggleDateInModal = (dateStr: string) => {
+    setBlockedDates(prev =>
+      prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr].sort()
+    );
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.stage_name.trim()) {
+      showToast('Stage Name is required.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const cleanedSocials: Record<string, { url: string; followers: number }> = {};
+      Object.entries(socialsEdit).forEach(([plat, val]) => {
+        if (val && (val.followers > 0 || (val.url && val.url.trim().length > 0))) {
+          cleanedSocials[plat] = {
+            url: val.url?.trim() || '',
+            followers: Number(val.followers) || 0,
+          };
+        }
+      });
+
+      const payload: Omit<Artist, 'id'> = {
+        ...form,
+        showcase_tracks: showcaseTracks,
+        featured_youtube_url: showcaseTracks[0]?.youtube_url || '',
+        socials: cleanedSocials,
+        blocked_dates: blockedDates,
+      };
+
+      if (editItem) {
+        await db.updateArtistProfile(editItem.id, payload);
+        await db.setArtistAvailability(editItem.id, blockedDates);
+      } else {
+        const created = await db.createArtist(payload);
+        if (blockedDates.length > 0) {
+          await db.setArtistAvailability(created.id, blockedDates);
+        }
+      }
       setSavedArtist(true);
-      showToast(editItem ? 'Artist updated.' : 'Artist added.', 'success');
+      showToast(editItem ? 'Talent profile, YouTube showcase, socials & calendar updated!' : 'New artist added to roster!', 'success');
       setTimeout(() => {
         setSavedArtist(false);
         setShowModal(false);
@@ -1774,11 +1941,25 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     } catch { showToast('Failed to save artist.', 'error'); }
     finally { setSaving(false); }
   };
+
   const handleDelete = async (id: string) => {
     try { await db.deleteArtist(id); onRefresh(); showToast('Artist removed.', 'success'); }
     catch { showToast('Failed to delete.', 'error'); }
     finally { setConfirm(null); }
   };
+
+  // Calendar math for modal Tab 4
+  const calDate = new Date();
+  calDate.setDate(1);
+  calDate.setMonth(calDate.getMonth() + calMonthOffset);
+  const calYear = calDate.getFullYear();
+  const calMonth = calDate.getMonth();
+  const calMonthLabel = calDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDayOfCalWeek = new Date(calYear, calMonth, 1).getDay();
+  const calCells: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfCalWeek; i++) calCells.push(null);
+  for (let d = 1; d <= daysInCalMonth; d++) calCells.push(d);
 
   const filtered = artists.filter(a => {
     const matchesSearch = a.stage_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -1884,40 +2065,32 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 )}
               </TD>
               <TD>
-                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <a
+                    href={`/artist?id=${a.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View Live Talent Profile Page (/artist)"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <ABtn variant="ghost" size="sm"><Eye size={12} /></ABtn>
+                  </a>
                   <a
                     href={`/portal/artist?artistId=${a.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open Artist Hub Portal (Riders & Contracts)"
+                    title="Open Artist Hub Portal (Riders, Contracts & Calendar)"
                     style={{ textDecoration: 'none' }}
                   >
                     <ABtn variant="ghost" size="sm"><ExternalLink size={12} /></ABtn>
                   </a>
-                  <a
-                    href={`/book?artistId=${a.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Book Talent"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <button
-                      type="button"
-                      style={{
-                        background: 'rgba(212,175,55,0.12)',
-                        border: '1px solid rgba(212,175,55,0.3)',
-                        color: 'var(--accent)',
-                        padding: '3px 8px',
-                        borderRadius: 6,
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Book
-                    </button>
-                  </a>
-                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a)} title="Edit Profile"><Edit2 size={12} /></ABtn>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'showcase')} title="Manage YouTube Music Showcase">
+                    <Music size={12} color="var(--accent)" />
+                  </ABtn>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'calendar')} title="Manage Availability Calendar">
+                    <Calendar size={12} color="var(--accent)" />
+                  </ABtn>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title="Edit Full Talent Profile"><Edit2 size={12} /></ABtn>
                   <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title="Delete Artist"><Trash2 size={12} /></ABtn>
                 </div>
               </TD>
@@ -1925,47 +2098,367 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           ))}
         </tbody>
       </Tbl>
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? 'Edit Artist' : 'Add Artist'} width={600}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? `Edit Talent EPK — ${editItem.stage_name}` : 'Add Roster Artist'} width={720}>
+        {/* 5-Tab Navigation Bar */}
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1.15rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {([
+            { id: 'overview', label: '1. Overview & Bio' },
+            { id: 'showcase', label: '2. YouTube & Audio Showcase' },
+            { id: 'socials', label: '3. Social Footprint' },
+            { id: 'calendar', label: '4. Availability Calendar' },
+            { id: 'riders', label: '5. Riders' },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setModalTab(t.id)}
+              style={{
+                background: modalTab === t.id ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${modalTab === t.id ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.09)'}`,
+                color: modalTab === t.id ? 'var(--accent)' : 'var(--text-secondary)',
+                padding: '6px 11px',
+                borderRadius: 7,
+                fontSize: '0.74rem',
+                fontWeight: modalTab === t.id ? 700 : 500,
+                cursor: 'pointer',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSave}>
-          <FGrid>
-            <Field label="Stage Name"><FInput value={form.stage_name} onChange={v => setForm(f => ({ ...f, stage_name: v }))} /></Field>
-            <Field label="Legal Name"><FInput value={form.legal_name} onChange={v => setForm(f => ({ ...f, legal_name: v }))} /></Field>
-            <Field label="Category">
-              <FSelect value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={['Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'].map(c => ({ value: c, label: c }))} />
-            </Field>
-            <Field label="Genre"><FInput value={form.genre} onChange={v => setForm(f => ({ ...f, genre: v }))} /></Field>
-            <Field label="Booking Status">
-              <FSelect value={form.booking_status} onChange={v => setForm(f => ({ ...f, booking_status: v as Artist['booking_status'] }))} options={['Available', 'Booked', 'On Tour', 'On Hold'].map(s => ({ value: s, label: s }))} />
-            </Field>
-            <Field label="Availability">
-              <FSelect value={form.availability_status} onChange={v => setForm(f => ({ ...f, availability_status: v as Artist['availability_status'] }))} options={[{ value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }]} />
-            </Field>
-            <Field label="Featured Headliner">
-              <FSelect value={form.is_featured ? 'Yes' : 'No'} onChange={v => setForm(f => ({ ...f, is_featured: v === 'Yes' }))} options={[{ value: 'Yes', label: 'Yes (Spotlight on Homepage)' }, { value: 'No', label: 'No' }]} />
-            </Field>
-          </FGrid>
-          <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-            <Field label="Bio"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
+          {/* TAB 1: OVERVIEW & BIO */}
+          {modalTab === 'overview' && (
+            <>
+              <FGrid>
+                <Field label="Stage Name *"><FInput value={form.stage_name} onChange={v => setForm(f => ({ ...f, stage_name: v }))} /></Field>
+                <Field label="Legal Name"><FInput value={form.legal_name} onChange={v => setForm(f => ({ ...f, legal_name: v }))} /></Field>
+                <Field label="Category">
+                  <FSelect value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={['Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'].map(c => ({ value: c, label: c }))} />
+                </Field>
+                <Field label="Genre"><FInput value={form.genre} onChange={v => setForm(f => ({ ...f, genre: v }))} /></Field>
+                <Field label="Home Territory / Base"><FInput value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} placeholder="e.g. Kingston, Jamaica" /></Field>
+                <Field label="Booking Status">
+                  <FSelect value={form.booking_status} onChange={v => setForm(f => ({ ...f, booking_status: v as Artist['booking_status'] }))} options={['Available', 'Booked', 'On Tour', 'On Hold'].map(s => ({ value: s, label: s }))} />
+                </Field>
+                <Field label="Roster Visibility">
+                  <FSelect value={form.availability_status} onChange={v => setForm(f => ({ ...f, availability_status: v as Artist['availability_status'] }))} options={[{ value: 'Active', label: 'Active (Visible)' }, { value: 'Inactive', label: 'Inactive (Hidden)' }]} />
+                </Field>
+                <Field label="Featured Headliner">
+                  <FSelect value={form.is_featured ? 'Yes' : 'No'} onChange={v => setForm(f => ({ ...f, is_featured: v === 'Yes' }))} options={[{ value: 'Yes', label: 'Yes (Spotlight on Homepage)' }, { value: 'No', label: 'No' }]} />
+                </Field>
+              </FGrid>
+              <div style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                <Field label="Biography"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
 
-            {/* Image fields with device upload + preview support */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
-              <FImageUpload 
-                label="Profile Image" 
-                value={form.profile_image} 
-                onChange={v => setForm(f => ({ ...f, profile_image: v }))} 
-                aspect="square" 
-              />
-              <FImageUpload 
-                label="Cover Image" 
-                value={form.cover_image} 
-                onChange={v => setForm(f => ({ ...f, cover_image: v }))} 
-                aspect="wide" 
-              />
+                {/* Image fields with device upload + preview support */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+                  <FImageUpload 
+                    label="Profile Image" 
+                    value={form.profile_image} 
+                    onChange={v => setForm(f => ({ ...f, profile_image: v }))} 
+                    aspect="square" 
+                  />
+                  <FImageUpload 
+                    label="Cover Image" 
+                    value={form.cover_image} 
+                    onChange={v => setForm(f => ({ ...f, cover_image: v }))} 
+                    aspect="wide" 
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 2: YOUTUBE & AUDIO SHOWCASE */}
+          {modalTab === 'showcase' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div style={{ padding: '0.75rem 0.95rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--accent)' }}>Featured Audio &amp; YouTube Showcase:</strong> Paste any YouTube link (<code>youtube.com/watch?v=...</code>, <code>youtu.be/...</code>, or <code>music.youtube.com/...</code>) to embed interactive music &amp; live performance videos on the artist&apos;s public profile.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {showcaseTracks.length === 0 ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8 }}>
+                    No custom YouTube tracks added yet. Add a YouTube link below.
+                  </div>
+                ) : showcaseTracks.map((trk, idx) => {
+                  const vid = extractYouTubeId(trk.youtube_url);
+                  return (
+                    <div
+                      key={trk.id || idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '60px 1fr auto',
+                        gap: '0.65rem',
+                        alignItems: 'center',
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: 8,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)'
+                      }}
+                    >
+                      {vid ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`} alt={trk.title} style={{ width: 60, height: 38, objectFit: 'cover', borderRadius: 4 }} />
+                      ) : (
+                        <div style={{ width: 60, height: 38, borderRadius: 4, background: 'rgba(212,175,55,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Music size={14} color="var(--accent)" />
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                        <input
+                          value={trk.title}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, title: v } : item));
+                          }}
+                          placeholder="Track / Performance Title"
+                          style={{ ...iStyle, fontSize: '0.78rem', height: 32 }}
+                        />
+                        <input
+                          value={trk.youtube_url}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, youtube_url: v } : item));
+                          }}
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          style={{ ...iStyle, fontSize: '0.78rem', height: 32, color: 'var(--accent)' }}
+                        />
+                      </div>
+                      <ABtn variant="danger" size="sm" onClick={() => setShowcaseTracks(prev => prev.filter(item => item.id !== trk.id))} title="Remove Track">
+                        <Trash2 size={12} />
+                      </ABtn>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ padding: '0.85rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(212,175,55,0.35)' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
+                  + Add YouTube Music / Performance Link
+                </div>
+                <FGrid>
+                  <Field label="Track / Video Title">
+                    <FInput value={newTrackTitle} onChange={setNewTrackTitle} placeholder="e.g. Live at Reggae Sumfest 2026" />
+                  </Field>
+                  <Field label="YouTube URL (watch / youtu.be / shorts) *">
+                    <FInput value={newTrackUrl} onChange={setNewTrackUrl} placeholder="https://www.youtube.com/watch?v=..." />
+                  </Field>
+                  <Field label="Subtitle / Description">
+                    <FInput value={newTrackSubtitle} onChange={setNewTrackSubtitle} placeholder="e.g. Official Live Performance Reel" />
+                  </Field>
+                  <Field label="Duration">
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <FInput value={newTrackDuration} onChange={setNewTrackDuration} placeholder="e.g. 3:45" />
+                      <ABtn variant="primary" size="sm" onClick={handleAddTrack}><Plus size={12} />Add</ABtn>
+                    </div>
+                  </Field>
+                </FGrid>
+              </div>
             </div>
+          )}
 
-            <Field label="Technical Rider"><FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={2} /></Field>
-            <Field label="Hospitality Rider"><FTextarea value={form.hospitality_rider} onChange={v => setForm(f => ({ ...f, hospitality_rider: v }))} rows={2} /></Field>
-          </div>
+          {/* TAB 3: SOCIAL FOOTPRINT */}
+          {modalTab === 'socials' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div style={{ padding: '0.75rem 0.95rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--accent)' }}>Social Footprint &amp; Streaming Reach:</strong> Update verified profile URLs and follower / monthly listener counts. Total combined reach is automatically calculated on the public profile.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {Object.entries(socialsEdit).map(([plat, data]) => (
+                  <div
+                    key={plat}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '110px 1fr 140px auto',
+                      gap: '0.55rem',
+                      alignItems: 'center',
+                      padding: '0.55rem 0.75rem',
+                      borderRadius: 8,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--accent)' }}>{plat}</span>
+                    <input
+                      value={data?.url || ''}
+                      onChange={e => {
+                        const url = e.target.value;
+                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], url } }));
+                      }}
+                      placeholder={`https://${plat.toLowerCase().replace(/\s+/g, '')}.com/...`}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 32 }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={data?.followers ?? 0}
+                      onChange={e => {
+                        const followers = Number(e.target.value) || 0;
+                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], followers } }));
+                      }}
+                      placeholder="Followers"
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, color: 'var(--accent)', fontWeight: 600 }}
+                    />
+                    <ABtn
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setSocialsEdit(prev => {
+                          const next = { ...prev };
+                          delete next[plat];
+                          return next;
+                        });
+                      }}
+                      title={`Remove ${plat}`}
+                    >
+                      <Trash2 size={12} />
+                    </ABtn>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ padding: '0.85rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(212,175,55,0.35)' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
+                  + Add / Update Social Platform
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px auto', gap: '0.5rem', alignItems: 'end' }}>
+                  <Field label="Platform">
+                    <FSelect
+                      value={newSocialPlatform}
+                      onChange={setNewSocialPlatform}
+                      options={['Instagram', 'Spotify', 'YouTube', 'TikTok', 'Apple Music', 'SoundCloud', 'X / Twitter', 'Facebook'].map(p => ({ value: p, label: p }))}
+                    />
+                  </Field>
+                  <Field label="Profile URL">
+                    <FInput value={newSocialUrl} onChange={setNewSocialUrl} placeholder="https://..." />
+                  </Field>
+                  <Field label="Followers / Listeners">
+                    <FInput value={newSocialFollowers} onChange={setNewSocialFollowers} type="number" placeholder="e.g. 450000" />
+                  </Field>
+                  <ABtn variant="primary" size="sm" onClick={handleAddSocial}><Plus size={12} />Set</ABtn>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: AVAILABILITY CALENDAR */}
+          {modalTab === 'calendar' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div style={{ padding: '0.75rem 0.95rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--accent)' }}>Availability &amp; Routing Calendar:</strong> Click any date cell below to toggle between <strong style={{ color: '#30d158' }}>Available</strong> and <strong style={{ color: '#ff453a' }}>Booked / Locked Hold</strong>, then click Save.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'start' }}>
+                {/* Interactive Calendar Grid */}
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <ABtn variant="ghost" size="sm" onClick={() => setCalMonthOffset(p => p - 1)}><ChevronLeft size={13} /></ABtn>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {calMonthLabel}
+                    </span>
+                    <ABtn variant="ghost" size="sm" onClick={() => setCalMonthOffset(p => p + 1)}><ChevronRight size={13} /></ABtn>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>
+                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                    {calCells.map((day, i) => {
+                      if (day === null) return <span key={`e-${i}`} />;
+                      const dStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const isLocked = blockedDates.includes(dStr);
+                      return (
+                        <button
+                          key={dStr}
+                          type="button"
+                          onClick={() => handleToggleDateInModal(dStr)}
+                          style={{
+                            aspectRatio: '1',
+                            borderRadius: 5,
+                            fontSize: '0.73rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: isLocked ? '1px solid rgba(239,68,68,0.45)' : '1px solid rgba(48,209,88,0.25)',
+                            background: isLocked ? 'rgba(239,68,68,0.22)' : 'rgba(48,209,88,0.12)',
+                            color: isLocked ? '#fca5a5' : '#86efac',
+                            textDecoration: isLocked ? 'line-through' : 'none',
+                          }}
+                          title={isLocked ? `${dStr}: Locked — Click to make Available` : `${dStr}: Available — Click to Lock`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Quick Date Picker & Locked Dates List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <Field label="Block / Unblock Specific Date">
+                    <div style={{ display: 'flex', gap: '0.45rem' }}>
+                      <FInput value={customDateInput} onChange={setCustomDateInput} type="date" />
+                      <ABtn
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          if (customDateInput) {
+                            handleToggleDateInModal(customDateInput);
+                            setCustomDateInput('');
+                          }
+                        }}
+                      >
+                        Toggle
+                      </ABtn>
+                    </div>
+                  </Field>
+
+                  <div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                      Locked / Blackout Dates ({blockedDates.length})
+                    </div>
+                    {blockedDates.length === 0 ? (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>All dates currently open for inquiries.</div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', maxHeight: 150, overflowY: 'auto' }}>
+                        {blockedDates.map(d => (
+                          <span
+                            key={d}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 12, background: 'rgba(239,68,68,0.16)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontSize: '0.72rem', fontWeight: 600 }}
+                          >
+                            {d}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDateInModal(d)}
+                              style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: TECHNICAL & HOSPITALITY RIDERS */}
+          {modalTab === 'riders' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <Field label="Technical Rider (Audio, Console, Wireless Mics, IEMs & Stage Specs)">
+                <FTextarea value={form.technical_rider} onChange={v => setForm(f => ({ ...f, technical_rider: v }))} rows={5} />
+              </Field>
+              <Field label="Hospitality Rider (Greenroom, Catering, Hotel & Ground Transport)">
+                <FTextarea value={form.hospitality_rider} onChange={v => setForm(f => ({ ...f, hospitality_rider: v }))} rows={5} />
+              </Field>
+            </div>
+          )}
+
           <FActions onCancel={() => setShowModal(false)} saving={saving} saved={savedArtist} />
         </form>
       </Modal>

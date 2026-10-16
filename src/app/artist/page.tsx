@@ -2,16 +2,38 @@
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { db, Artist } from '@/utils/db';
+import { db, Artist, ArtistTrack, Booking, extractYouTubeId } from '@/utils/db';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { 
-  Music, Award, Calendar, MapPin, CheckCircle, FileText, Play, Pause, ChevronLeft, Volume2, Camera, Video, Edit2, Trash2, X, Upload
+  Music, Award, Calendar, MapPin, FileText, Play, Pause, ChevronLeft, ChevronRight,
+  Volume2, Camera, Video, Edit2, Trash2, X, Upload, Plus, ExternalLink, Globe, Sparkles, Check
 } from 'lucide-react';
 
-// The site is deployed as a static export on Cloudflare Pages, so dynamic
-// segments like /talent/[id] are never generated. The profile lives at a
-// static route and reads the artist id from the query string: /artist?id=...
+// Default curated YouTube showcase tracks when an artist hasn't customized their tracklist yet
+const DEFAULT_SHOWCASE_BY_CATEGORY: Record<string, ArtistTrack[]> = {
+  'Reggae Artists': [
+    { id: 'def-1', title: 'Live Headline Festival Performance Reel', subtitle: 'Official Reggae Showcase • Full Band Set', youtube_url: 'https://www.youtube.com/watch?v=5E4ZBSInqUU', duration: '4:12' },
+    { id: 'def-2', title: 'Acoustic & Lovers Rock Sessions (Live)', subtitle: 'Intimate Stage Arrangement', youtube_url: 'https://www.youtube.com/watch?v=69RdQFDuYPI', duration: '3:48' },
+  ],
+  'Dancehall Artists': [
+    { id: 'def-1', title: 'Mainstage Arena & Festival Headline Set', subtitle: 'High-Energy Live Performance Reel', youtube_url: 'https://www.youtube.com/watch?v=bM7SZ5SBzyY', duration: '3:35' },
+    { id: 'def-2', title: 'Official Club & Sound System Showcase', subtitle: 'International Tour Highlights', youtube_url: 'https://www.youtube.com/watch?v=3AtDnEC4zak', duration: '3:50' },
+  ],
+  default: [
+    { id: 'def-1', title: 'Official Live Performance & Tour Reel', subtitle: 'Showtime Global Agency Showcase', youtube_url: 'https://www.youtube.com/watch?v=5E4ZBSInqUU', duration: '4:05' },
+  ]
+};
+
+const SOCIAL_PLATFORMS = ['Instagram', 'Spotify', 'YouTube', 'TikTok', 'Apple Music', 'SoundCloud'] as const;
+
+function formatCompactCount(n: number): string {
+  if (!n || isNaN(n)) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return n.toLocaleString();
+}
+
 export default function ArtistProfilePage() {
   return (
     <Suspense fallback={null}>
@@ -24,31 +46,39 @@ function ArtistProfile() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const id = searchParams.get('id') || '';
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin, isStaff } = useAuth();
 
   const [artist, setArtist] = useState<Artist | null>(null);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [artistBookings, setArtistBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Media player state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [mediaProgress, setMediaProgress] = useState(35);
+  // Media & YouTube Showcase player state
+  const [activeTrackIndex, setActiveTrackIndex] = useState<number>(0);
+  const [showEmbedPlayer, setShowEmbedPlayer] = useState<boolean>(false);
 
-  // Calendar dates generation helper (Current month)
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth(); // 0-indexed
-  const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  // Interactive Calendar month offset (0 = current month, +1 = next month, etc.)
+  const [calMonthOffset, setCalMonthOffset] = useState<number>(0);
+  const displayDate = new Date();
+  displayDate.setDate(1);
+  displayDate.setMonth(displayDate.getMonth() + calMonthOffset);
+  const currentYear = displayDate.getFullYear();
+  const currentMonth = displayDate.getMonth(); // 0-indexed
+  const monthName = displayDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   // Dialog Refs
   const editDialogRef = useRef<HTMLDialogElement | null>(null);
   const deleteDialogRef = useRef<HTMLDialogElement | null>(null);
+
+  // Active tab inside Edit Profile Modal
+  const [editModalTab, setEditModalTab] = useState<'overview' | 'showcase' | 'socials' | 'calendar' | 'riders'>('overview');
 
   // Edit form state
   const [stageName, setStageName] = useState('');
   const [legalName, setLegalName] = useState('');
   const [category, setCategory] = useState('');
   const [genre, setGenre] = useState('');
+  const [location, setLocation] = useState('Jamaica');
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [coverImage, setCoverImage] = useState('');
@@ -56,33 +86,74 @@ function ArtistProfile() {
   const [availabilityStatus, setAvailabilityStatus] = useState<'Active' | 'Inactive'>('Active');
   const [techRider, setTechRider] = useState('');
   const [hospRider, setHospRider] = useState('');
-  const [formError, setFormError] = useState('');
 
-  const canManage = hasPermission('manage_artists') || hasPermission('update_profile');
+  // Editable Showcase Tracks (YouTube links)
+  const [showcaseTracks, setShowcaseTracks] = useState<ArtistTrack[]>([]);
+  const [newTrackTitle, setNewTrackTitle] = useState('');
+  const [newTrackSubtitle, setNewTrackSubtitle] = useState('');
+  const [newTrackUrl, setNewTrackUrl] = useState('');
+  const [newTrackDuration, setNewTrackDuration] = useState('');
+
+  // Editable Social Footprint
+  const [socialsEdit, setSocialsEdit] = useState<Record<string, { url: string; followers: number }>>({});
+  const [newSocialPlatform, setNewSocialPlatform] = useState('TikTok');
+  const [newSocialUrl, setNewSocialUrl] = useState('');
+  const [newSocialFollowers, setNewSocialFollowers] = useState('');
+
+  // Quick date input for calendar blocking
+  const [customBlockDate, setCustomBlockDate] = useState('');
+  const [formError, setFormError] = useState('');
+  const [saveSuccessToast, setSaveSuccessToast] = useState('');
+
+  const canManage = isAdmin || isStaff || hasPermission('manage_artists') || hasPermission('update_profile') || hasPermission('manage_artist_profiles');
+
+  const populateFormFromArtist = (data: Artist) => {
+    setStageName(data.stage_name);
+    setLegalName(data.legal_name || data.stage_name);
+    setCategory(data.category);
+    setGenre(data.genre);
+    setLocation(data.location || 'Jamaica');
+    setBio(data.bio);
+    setProfileImage(data.profile_image);
+    setCoverImage(data.cover_image);
+    setBookingStatus(data.booking_status);
+    setAvailabilityStatus(data.availability_status);
+    setTechRider(data.technical_rider || '');
+    setHospRider(data.hospitality_rider || '');
+
+    const defaultTracks = DEFAULT_SHOWCASE_BY_CATEGORY[data.category] || DEFAULT_SHOWCASE_BY_CATEGORY.default;
+    setShowcaseTracks(
+      data.showcase_tracks && data.showcase_tracks.length > 0
+        ? data.showcase_tracks
+        : defaultTracks
+    );
+    setSocialsEdit(data.socials ? { ...data.socials } : {
+      Instagram: { url: '', followers: 0 },
+      Spotify: { url: '', followers: 0 },
+      YouTube: { url: '', followers: 0 },
+    });
+  };
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
     
     const loadArtistData = async () => {
       try {
-        const data = await db.getArtistById(id);
+        const [data, allBookings] = await Promise.all([
+          db.getArtistById(id),
+          db.getBookings()
+        ]);
         if (data) {
           setArtist(data);
           const dates = await db.getArtistAvailability(data.id);
           setBlockedDates(dates);
-
-          // Populate edit state
-          setStageName(data.stage_name);
-          setLegalName(data.legal_name || data.stage_name);
-          setCategory(data.category);
-          setGenre(data.genre);
-          setBio(data.bio);
-          setProfileImage(data.profile_image);
-          setCoverImage(data.cover_image);
-          setBookingStatus(data.booking_status);
-          setAvailabilityStatus(data.availability_status);
-          setTechRider(data.technical_rider || '');
-          setHospRider(data.hospitality_rider || '');
+          setArtistBookings(
+            allBookings.filter(b =>
+              b.artist_id === data.id ||
+              (b.artists && b.artists.some(item => item.artist_id === data.id))
+            )
+          );
+          populateFormFromArtist(data);
         }
       } catch (err) {
         console.error('Failed to load artist:', err);
@@ -127,6 +198,13 @@ function ArtistProfile() {
     };
   }, [artist]);
 
+  const openEditModalOnTab = (tab: 'overview' | 'showcase' | 'socials' | 'calendar' | 'riders') => {
+    if (artist) populateFormFromArtist(artist);
+    setEditModalTab(tab);
+    setFormError('');
+    editDialogRef.current?.showModal();
+  };
+
   // File Upload Handlers
   const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,6 +228,76 @@ function ArtistProfile() {
     }
   };
 
+  // Add a YouTube Track inside modal
+  const handleAddShowcaseTrack = () => {
+    if (!newTrackUrl.trim()) {
+      setFormError('Please paste a valid YouTube URL (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...).');
+      return;
+    }
+    const ytId = extractYouTubeId(newTrackUrl);
+    if (!ytId) {
+      setFormError('Could not recognize a valid YouTube video ID from that link. Please check the URL.');
+      return;
+    }
+    setFormError('');
+    const track: ArtistTrack = {
+      id: 'trk-' + Math.random().toString(36).slice(2, 8),
+      title: newTrackTitle.trim() || `${stageName || 'Artist'} — Official Performance Showcase`,
+      subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
+      youtube_url: newTrackUrl.trim(),
+      duration: newTrackDuration.trim() || '3:30',
+    };
+    setShowcaseTracks(prev => [...prev, track]);
+    setNewTrackTitle('');
+    setNewTrackSubtitle('');
+    setNewTrackUrl('');
+    setNewTrackDuration('');
+  };
+
+  const handleRemoveShowcaseTrack = (trackId: string) => {
+    setShowcaseTracks(prev => prev.filter(t => t.id !== trackId));
+  };
+
+  // Add a Social Platform inside modal
+  const handleAddSocialPlatform = () => {
+    const plat = newSocialPlatform.trim();
+    if (!plat) return;
+    setSocialsEdit(prev => ({
+      ...prev,
+      [plat]: {
+        url: newSocialUrl.trim(),
+        followers: Number(newSocialFollowers.replace(/,/g, '')) || 0,
+      }
+    }));
+    setNewSocialUrl('');
+    setNewSocialFollowers('');
+  };
+
+  const handleRemoveSocialPlatform = (plat: string) => {
+    setSocialsEdit(prev => {
+      const copy = { ...prev };
+      delete copy[plat];
+      return copy;
+    });
+  };
+
+  // Toggle Calendar Date (Available <-> Blocked/Locked)
+  const handleToggleCalendarDate = async (dateStr: string) => {
+    if (!artist || !canManage) return;
+    try {
+      const updatedDates = await db.toggleArtistDate(artist.id, dateStr);
+      setBlockedDates([...updatedDates]);
+      setSaveSuccessToast(
+        updatedDates.includes(dateStr)
+          ? `Locked ${dateStr} on ${artist.stage_name}'s calendar`
+          : `Marked ${dateStr} as Available`
+      );
+      setTimeout(() => setSaveSuccessToast(''), 2600);
+    } catch (err) {
+      console.error('Failed to toggle date:', err);
+    }
+  };
+
   const handleEditProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -159,23 +307,41 @@ function ArtistProfile() {
       return;
     }
 
+    // Filter out empty 0-follower social entries if no URL and 0 followers
+    const cleanedSocials: Record<string, { url: string; followers: number }> = {};
+    Object.entries(socialsEdit).forEach(([plat, val]) => {
+      if (val && (val.followers > 0 || (val.url && val.url.trim().length > 0))) {
+        cleanedSocials[plat] = {
+          url: val.url?.trim() || '',
+          followers: Number(val.followers) || 0,
+        };
+      }
+    });
+
     try {
       const updated = await db.updateArtistProfile(id, {
         stage_name: stageName,
         legal_name: legalName,
         category,
         genre: genre,
+        location: location.trim() || 'Jamaica',
         bio: bio,
         profile_image: profileImage,
         cover_image: coverImage,
         booking_status: bookingStatus,
         availability_status: availabilityStatus,
         technical_rider: techRider,
-        hospitality_rider: hospRider
+        hospitality_rider: hospRider,
+        showcase_tracks: showcaseTracks,
+        featured_youtube_url: showcaseTracks[0]?.youtube_url || '',
+        socials: cleanedSocials,
+        blocked_dates: blockedDates,
       });
 
       setArtist(updated);
       editDialogRef.current?.close();
+      setSaveSuccessToast('Talent profile updated and published live!');
+      setTimeout(() => setSaveSuccessToast(''), 3200);
     } catch (err) {
       console.error(err);
       setFormError('Failed to save profile changes.');
@@ -230,27 +396,68 @@ function ArtistProfile() {
     );
   }
 
+  // Active showcase tracks for this artist
+  const activeTracks: ArtistTrack[] =
+    artist.showcase_tracks && artist.showcase_tracks.length > 0
+      ? artist.showcase_tracks
+      : (DEFAULT_SHOWCASE_BY_CATEGORY[artist.category] || DEFAULT_SHOWCASE_BY_CATEGORY.default);
+  const currentTrack = activeTracks[activeTrackIndex] || activeTracks[0];
+  const currentVideoId = extractYouTubeId(currentTrack?.youtube_url);
+
+  // Total Social Reach calculation
+  const socialEntries = artist.socials ? Object.entries(artist.socials).filter(([, d]) => d && (d.followers > 0 || d.url)) : [];
+  const totalSocialReach = socialEntries.reduce((sum, [, d]) => sum + (Number(d.followers) || 0), 0);
+
   // Calendar rendering math
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const startingDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
   
-  const calendarCells = [];
-  // Empty slots for padding
+  const calendarCells: (number | null)[] = [];
   for (let i = 0; i < startingDayOfWeek; i++) {
     calendarCells.push(null);
   }
-  // Days of the month
   for (let d = 1; d <= daysInMonth; d++) {
     calendarCells.push(d);
   }
 
-  const isDateBlocked = (day: number) => {
-    const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    return blockedDates.includes(formattedDate);
+  const formatDayStr = (day: number) =>
+    `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+  const isDateBlocked = (day: number) => blockedDates.includes(formatDayStr(day));
+
+  const getConfirmedBookingForDay = (day: number) => {
+    const dStr = formatDayStr(day);
+    return artistBookings.find(b => b.event_date === dStr && b.status !== 'Cancelled');
   };
 
   return (
     <div className="artist-profile-viewport luxury-bg">
+      {saveSuccessToast && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.96)',
+            border: '1px solid rgba(212, 175, 55, 0.5)',
+            color: '#fff',
+            padding: '0.75rem 1.15rem',
+            borderRadius: 10,
+            boxShadow: '0 14px 36px rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          <Check className="w-4 h-4 text-amber-400" />
+          <span>{saveSuccessToast}</span>
+        </div>
+      )}
+
       {/* 1. HERO COVER BANNER */}
       <section className="profile-hero-banner" style={{ backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url(${artist.cover_image})` }}>
         <div className="container hero-inner-alignment">
@@ -262,7 +469,7 @@ function ArtistProfile() {
             <span className="artist-category-tag">{artist.category}</span>
             <h1 className="artist-stage-name">{artist.stage_name}</h1>
             <div className="artist-meta-row">
-              <span className="meta-item"><MapPin className="meta-icon" /> Jamaica</span>
+              <span className="meta-item"><MapPin className="meta-icon" /> {artist.location || 'Jamaica'}</span>
               <span className="meta-item"><Music className="meta-icon" /> {artist.genre}</span>
               <span className="meta-item status-badge">
                 <span className="dot"></span> {artist.booking_status}
@@ -280,56 +487,241 @@ function ArtistProfile() {
           <div className="profile-main-col">
             {/* Biography */}
             <div className="luxury-card card-padding">
-              <h2>Biography</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(212, 175, 55, 0.1)', paddingBottom: 10 }}>
+                <h2 style={{ margin: 0, border: 'none', padding: 0 }}>Biography</h2>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModalOnTab('overview')}
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--gold-primary)', borderRadius: 6, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit Bio
+                  </button>
+                )}
+              </div>
               <p className="profile-bio-text">{artist.bio}</p>
             </div>
 
-            {/* Media Player Showcase */}
+            {/* Featured Audio & Video Showcase (YouTube Music / Video EPK) */}
             <div className="luxury-card card-padding media-showcase-card">
-              <h2>Featured Audio Showcase</h2>
-              <div className="audio-player-container glassmorphism">
-                <button 
-                  className="audio-play-btn" 
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  aria-label={isPlaying ? "Pause Audio" : "Play Audio"}
-                >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
-                </button>
-                <div className="player-track-info">
-                  <span className="track-title">Live Performance Reels &bull; 2026 Live Mix</span>
-                  <span className="track-artist">{artist.stage_name}</span>
-                  <div className="player-progress-bar">
-                    <div className="progress-track-bg">
-                      <div className="progress-fill" style={{ width: `${mediaProgress}%` }}></div>
-                    </div>
-                    <span className="time-duration">0:45 / 2:30</span>
-                  </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid rgba(212, 175, 55, 0.1)', paddingBottom: 10 }}>
+                <div>
+                  <h2 style={{ margin: 0, border: 'none', padding: 0 }}>Featured Audio &amp; Video Showcase</h2>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Official performance reels, live festival sets &amp; YouTube music streams
+                  </p>
                 </div>
-                <div className="player-volume">
-                  <Volume2 className="w-4 h-4 text-amber-500" />
-                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModalOnTab('showcase')}
+                    style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--gold-primary)', borderRadius: 6, padding: '5px 11px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <Video className="w-3.5 h-3.5" /> Manage YouTube Links
+                  </button>
+                )}
               </div>
-              
-              <div className="media-gallery-grid">
-                {artist.media && artist.media.map((med, idx) => (
-                  <div key={idx} className="media-gallery-item">
-                    {med.type === 'Image' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={med.url} alt={`${artist.stage_name} gallery`} className="gallery-img" />
-                    ) : (
-                      <div className="video-thumbnail-placeholder">
-                        <Play className="w-8 h-8 text-amber-500" />
-                        <span>Watch Video clip</span>
+
+              {/* Active YouTube Embed or Interactive Showcase Bar */}
+              {currentTrack && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  {showEmbedPlayer && currentVideoId ? (
+                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(212,175,55,0.3)', background: '#000', boxShadow: '0 12px 32px rgba(0,0,0,0.45)' }}>
+                      <div style={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
+                        <iframe
+                          src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&rel=0&modestbranding=1`}
+                          title={currentTrack.title}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                        />
                       </div>
-                    )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(15,23,42,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fff' }}>{currentTrack.title}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{currentTrack.subtitle || artist.stage_name}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <a
+                            href={`https://www.youtube.com/watch?v=${currentVideoId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}
+                          >
+                            Watch on YouTube <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setShowEmbedPlayer(false)}
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '3px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
+                          >
+                            Minimize
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="audio-player-container glassmorphism" style={{ cursor: 'pointer' }} onClick={() => setShowEmbedPlayer(true)}>
+                      <button 
+                        type="button"
+                        className="audio-play-btn" 
+                        onClick={(e) => { e.stopPropagation(); setShowEmbedPlayer(true); }}
+                        aria-label="Play YouTube Showcase"
+                      >
+                        <Play className="w-5 h-5 ml-0.5" />
+                      </button>
+                      <div className="player-track-info">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span className="track-title">{currentTrack.title}</span>
+                          <span style={{ fontSize: '0.65rem', padding: '1px 7px', borderRadius: 12, background: 'rgba(239,68,68,0.16)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontWeight: 600 }}>
+                            ▶ YouTube Stream
+                          </span>
+                        </div>
+                        <span className="track-artist">{currentTrack.subtitle || `${artist.stage_name} • Official Showcase`}</span>
+                        <div className="player-progress-bar">
+                          <div className="progress-track-bg">
+                            <div className="progress-fill" style={{ width: '38%' }}></div>
+                          </div>
+                          <span className="time-duration">{currentTrack.duration || 'LIVE'}</span>
+                        </div>
+                      </div>
+                      <div className="player-volume" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {currentVideoId && (
+                          <a
+                            href={`https://www.youtube.com/watch?v=${currentVideoId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Open directly on YouTube"
+                            style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                        <Volume2 className="w-4 h-4 text-amber-500" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tracklist / YouTube Showcase Selector */}
+              {activeTracks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: artist.media && artist.media.length > 0 ? '1.25rem' : 0 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 2 }}>
+                    Featured Tracks &amp; Live Reels ({activeTracks.length})
                   </div>
-                ))}
-              </div>
+                  {activeTracks.map((trk, idx) => {
+                    const vid = extractYouTubeId(trk.youtube_url);
+                    const isSelected = idx === activeTrackIndex;
+                    return (
+                      <div
+                        key={trk.id || idx}
+                        onClick={() => {
+                          setActiveTrackIndex(idx);
+                          setShowEmbedPlayer(true);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.85rem',
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: 10,
+                          background: isSelected ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.025)',
+                          border: `1px solid ${isSelected ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                          {vid ? (
+                            <div style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)' }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`}
+                                alt={trk.title}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Play className="w-3.5 h-3.5 text-amber-400" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Music className="w-4 h-4 text-amber-400" />
+                            </div>
+                          )}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? 'var(--gold-primary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {trk.title}
+                            </div>
+                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {trk.subtitle || artist.stage_name}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexShrink: 0 }}>
+                          {trk.duration && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                              {trk.duration}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isSelected && showEmbedPlayer ? '#30d158' : 'var(--gold-primary)', padding: '3px 8px', borderRadius: 6, background: isSelected && showEmbedPlayer ? 'rgba(48,209,88,0.12)' : 'rgba(212,175,55,0.12)' }}>
+                            {isSelected && showEmbedPlayer ? 'Playing' : 'Play'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {artist.media && artist.media.length > 0 && (
+                <div className="media-gallery-grid">
+                  {artist.media.map((med, idx) => {
+                    const mediaYtId = med.type !== 'Image' ? extractYouTubeId(med.url) : null;
+                    return (
+                      <div key={idx} className="media-gallery-item">
+                        {med.type === 'Image' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={med.url} alt={`${artist.stage_name} gallery`} className="gallery-img" />
+                        ) : mediaYtId ? (
+                          <iframe
+                            src={`https://www.youtube-nocookie.com/embed/${mediaYtId}?rel=0`}
+                            title={med.title || `${artist.stage_name} video`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            style={{ width: '100%', height: '100%', border: 'none' }}
+                          />
+                        ) : (
+                          <a href={med.url} target="_blank" rel="noopener noreferrer" className="video-thumbnail-placeholder" style={{ textDecoration: 'none' }}>
+                            <Play className="w-8 h-8 text-amber-500" />
+                            <span>Watch Video Clip</span>
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Performance Riders */}
             <div className="luxury-card card-padding">
-              <h2>Performance Requirements & Riders</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(212, 175, 55, 0.1)', paddingBottom: 10 }}>
+                <h2 style={{ margin: 0, border: 'none', padding: 0 }}>Performance Requirements &amp; Riders</h2>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModalOnTab('riders')}
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--gold-primary)', borderRadius: 6, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit Riders
+                  </button>
+                )}
+              </div>
               <div className="riders-grid-split">
                 <div className="rider-col">
                   <div className="rider-header-row">
@@ -356,14 +748,32 @@ function ArtistProfile() {
             {canManage && (
               <div className="luxury-card admin-controls-card animate-fade">
                 <h3>Management Controls</h3>
-                <p>Modify riders, bio profile details, or remove this talent from active roster.</p>
+                <p>Edit bio, YouTube music showcase, social footprint, availability calendar, or riders.</p>
                 <div className="admin-btn-group">
                   <button 
                     className="btn btn-secondary btn-admin"
-                    onClick={() => editDialogRef.current?.showModal()}
+                    onClick={() => openEditModalOnTab('overview')}
                   >
-                    <Edit2 className="w-4 h-4 mr-2 text-amber-500" /> Edit Profile
+                    <Edit2 className="w-4 h-4 mr-2 text-amber-500" /> Edit Full Profile
                   </button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.75rem', padding: '0.45rem 0.5rem', justifyContent: 'center' }}
+                      onClick={() => openEditModalOnTab('showcase')}
+                    >
+                      <Video className="w-3.5 h-3.5 mr-1 text-amber-500" /> YouTube Music
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '0.75rem', padding: '0.45rem 0.5rem', justifyContent: 'center' }}
+                      onClick={() => openEditModalOnTab('socials')}
+                    >
+                      <Globe className="w-3.5 h-3.5 mr-1 text-amber-500" /> Socials
+                    </button>
+                  </div>
                   <button 
                     className="btn btn-danger btn-admin"
                     onClick={() => deleteDialogRef.current?.showModal()}
@@ -383,23 +793,65 @@ function ArtistProfile() {
               </Link>
             </div>
 
-            {/* Social Metrics */}
+            {/* Social Footprint */}
             <div className="luxury-card stats-sidebar-card">
-              <h3>Social Footprint</h3>
-              {artist.socials ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h3 style={{ margin: 0 }}>Social Footprint</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {totalSocialReach > 0 && (
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 12, background: 'rgba(212,175,55,0.14)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--gold-primary)', fontWeight: 700 }}>
+                      {formatCompactCount(totalSocialReach)}+ Reach
+                    </span>
+                  )}
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => openEditModalOnTab('socials')}
+                      title="Edit Social Footprint"
+                      style={{ background: 'transparent', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--gold-primary)', borderRadius: 5, padding: '3px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {socialEntries.length > 0 ? (
                 <div className="socials-list">
-                  {Object.entries(artist.socials).map(([plat, data]) => (
-                    <div key={plat} className="social-stat-row">
-                      <div className="social-platform-label">
-                        {plat === 'Instagram' && <Camera className="w-4 h-4 text-amber-500" />}
-                        {plat === 'Spotify' && <Music className="w-4 h-4 text-amber-500" />}
-                        {plat === 'TikTok' && <Award className="w-4 h-4 text-amber-500" />}
-                        {plat === 'YouTube' && <Video className="w-4 h-4 text-amber-500" />}
-                        <span>{plat}</span>
+                  {socialEntries.map(([plat, data]) => {
+                    const hasUrl = Boolean(data.url && data.url.trim());
+                    const formattedUrl = hasUrl
+                      ? (/^https?:\/\//i.test(data.url.trim()) ? data.url.trim() : `https://${data.url.trim()}`)
+                      : '';
+                    return (
+                      <div key={plat} className="social-stat-row" style={{ alignItems: 'center' }}>
+                        <div className="social-platform-label">
+                          {plat === 'Instagram' && <Camera className="w-4 h-4 text-amber-500" />}
+                          {plat === 'Spotify' && <Music className="w-4 h-4 text-amber-500" />}
+                          {plat === 'TikTok' && <Award className="w-4 h-4 text-amber-500" />}
+                          {plat === 'YouTube' && <Video className="w-4 h-4 text-amber-500" />}
+                          {!['Instagram', 'Spotify', 'TikTok', 'YouTube'].includes(plat) && <Globe className="w-4 h-4 text-amber-500" />}
+                          {hasUrl ? (
+                            <a
+                              href={formattedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--text-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}
+                            >
+                              <span>{plat}</span>
+                              <ExternalLink className="w-3 h-3 text-amber-500" style={{ opacity: 0.8 }} />
+                            </a>
+                          ) : (
+                            <span>{plat}</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="followers-count" title={`${(data.followers || 0).toLocaleString()} followers / listeners`}>
+                            {data.followers ? data.followers.toLocaleString() : 'Verified'}
+                          </span>
+                        </div>
                       </div>
-                      <span className="followers-count">{data.followers.toLocaleString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-muted text-sm">Social media footprint verified. Details available on request.</p>
@@ -408,12 +860,54 @@ function ArtistProfile() {
 
             {/* Live Availability Calendar */}
             <div className="luxury-card calendar-sidebar-card">
-              <h3>Availability Calendar</h3>
-              <p className="calendar-desc">Shaded dates represent confirmed bookings or locked tour days.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <h3 style={{ margin: 0 }}>Availability Calendar</h3>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModalOnTab('calendar')}
+                    style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--gold-primary)', borderRadius: 5, padding: '3px 8px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Calendar className="w-3 h-3" /> Manage Dates
+                  </button>
+                )}
+              </div>
+              <p className="calendar-desc">
+                {canManage
+                  ? 'Admin Mode: Click any date below to toggle Available / Locked status immediately.'
+                  : 'Shaded dates represent confirmed bookings or locked tour routing days.'}
+              </p>
               
               <div className="calendar-container">
-                <div className="calendar-header-month">
-                  <span>{monthName}</span>
+                <div className="calendar-header-month" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setCalMonthOffset(prev => prev - 1)}
+                    aria-label="Previous Month"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-primary)', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>{monthName}</span>
+                    {calMonthOffset !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCalMonthOffset(0)}
+                        style={{ background: 'rgba(212,175,55,0.15)', border: 'none', color: 'var(--gold-primary)', borderRadius: 4, padding: '1px 5px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Today
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCalMonthOffset(prev => prev + 1)}
+                    aria-label="Next Month"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-primary)', borderRadius: 6, width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <div className="calendar-weekdays">
                   <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
@@ -423,12 +917,24 @@ function ArtistProfile() {
                     if (day === null) {
                       return <span key={`empty-${idx}`} className="empty-day-cell"></span>;
                     }
-                    const isBlocked = isDateBlocked(day);
+                    const dStr = formatDayStr(day);
+                    const confirmedBk = getConfirmedBookingForDay(day);
+                    const isBlocked = isDateBlocked(day) || Boolean(confirmedBk);
                     return (
                       <span 
                         key={`day-${day}`} 
+                        onClick={() => {
+                          if (canManage) handleToggleCalendarDate(dStr);
+                        }}
                         className={`day-cell ${isBlocked ? 'blocked' : 'available'}`}
-                        title={isBlocked ? 'Confirmed Booking' : 'Available for Booking'}
+                        style={{ cursor: canManage ? 'pointer' : 'default' }}
+                        title={
+                          confirmedBk
+                            ? `Confirmed Gig: ${confirmedBk.event_title} (${confirmedBk.event_country})`
+                            : isBlocked
+                            ? (canManage ? 'Blocked / Hold — Click to make Available' : 'Booked / Tour Hold')
+                            : (canManage ? 'Available — Click to Lock / Block Date' : 'Available for Booking')
+                        }
                       >
                         {day}
                       </span>
@@ -964,10 +1470,10 @@ function ArtistProfile() {
           background: rgba(12, 10, 23, 0.96);
           backdrop-filter: blur(25px);
           border-radius: var(--radius-lg);
-          padding: 2.25rem;
+          padding: 2rem;
           color: var(--text-primary);
-          max-width: 600px;
-          width: 90%;
+          max-width: 720px;
+          width: 94%;
           margin: auto;
           box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.05);
           overflow-y: auto;
@@ -983,7 +1489,7 @@ function ArtistProfile() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 1.5rem;
+          margin-bottom: 1rem;
           border-bottom: 1px solid rgba(212, 175, 55, 0.1);
           padding-bottom: 0.75rem;
         }
@@ -1009,7 +1515,7 @@ function ArtistProfile() {
         .form-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 1.25rem;
+          gap: 1.15rem;
         }
 
         @media (min-width: 480px) {
@@ -1024,11 +1530,11 @@ function ArtistProfile() {
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 0.5rem;
+          gap: 0.45rem;
         }
 
         .form-group label {
-          font-size: 0.8rem;
+          font-size: 0.78rem;
           font-weight: 600;
           color: var(--text-secondary);
           text-transform: uppercase;
@@ -1036,12 +1542,12 @@ function ArtistProfile() {
         }
 
         .form-group input, .form-group select, .form-group textarea {
-          padding: 0.75rem;
+          padding: 0.7rem;
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: var(--radius-sm);
           color: #ffffff;
-          font-size: 0.9rem;
+          font-size: 0.88rem;
           width: 100%;
         }
 
@@ -1098,7 +1604,9 @@ function ArtistProfile() {
           display: flex;
           justify-content: flex-end;
           gap: 1rem;
-          margin-top: 2rem;
+          margin-top: 1.5rem;
+          padding-top: 1rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .delete-modal-body {
@@ -1108,7 +1616,7 @@ function ArtistProfile() {
         }
       `}</style>
 
-      {/* Edit Profile Modal Dialog */}
+      {/* Edit Profile Modal Dialog — 5-Tab 2026 Agency EPK Editor */}
       <dialog 
         ref={editDialogRef} 
         id="edit-talent-dialog" 
@@ -1117,7 +1625,12 @@ function ArtistProfile() {
         aria-labelledby="editDialogTitle"
       >
         <div className="modal-header">
-          <h3 id="editDialogTitle">Edit Talent Profile</h3>
+          <div>
+            <h3 id="editDialogTitle" style={{ margin: 0 }}>Edit Talent EPK &amp; Profile — {artist.stage_name}</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              2026 Agency Press Kit: Manage bio, YouTube showcase links, social footprint, availability &amp; riders
+            </p>
+          </div>
           <button 
             type="button" 
             className="btn-close-modal" 
@@ -1128,151 +1641,494 @@ function ArtistProfile() {
           </button>
         </div>
 
-        <form onSubmit={handleEditProfileSubmit} className="form-grid">
-          {formError && <p className="form-row-full error-text">{formError}</p>}
-          
-          <div className="form-group">
-            <label htmlFor="editStageNameInput">Stage Name *</label>
-            <input 
-              id="editStageNameInput" 
-              type="text" 
-              value={stageName} 
-              onChange={(e) => setStageName(e.target.value)} 
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="editLegalNameInput">Legal Name</label>
-            <input 
-              id="editLegalNameInput" 
-              type="text" 
-              value={legalName} 
-              onChange={(e) => setLegalName(e.target.value)} 
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="editCategorySelect">Category</label>
-            <select 
-              id="editCategorySelect" 
-              value={category} 
-              onChange={(e) => setCategory(e.target.value)}
+        {/* 5-Tab Navigation Bar */}
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {([
+            { id: 'overview', label: '1. Overview & Bio' },
+            { id: 'showcase', label: '2. YouTube & Audio Showcase' },
+            { id: 'socials', label: '3. Social Footprint' },
+            { id: 'calendar', label: '4. Availability Calendar' },
+            { id: 'riders', label: '5. Riders' },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setEditModalTab(t.id)}
+              style={{
+                background: editModalTab === t.id ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${editModalTab === t.id ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.09)'}`,
+                color: editModalTab === t.id ? 'var(--gold-primary)' : 'var(--text-secondary)',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: '0.76rem',
+                fontWeight: editModalTab === t.id ? 700 : 500,
+                cursor: 'pointer',
+              }}
             >
-              <option value="Reggae Artists">Reggae Artists</option>
-              <option value="Dancehall Artists">Dancehall Artists</option>
-              <option value="DJs">DJs & Sound Systems</option>
-              <option value="Bands">Bands</option>
-              <option value="Dancers">Dancers</option>
-              <option value="Hosts">Hosts</option>
-            </select>
-          </div>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="form-group">
-            <label htmlFor="editGenreInput">Genre / Style</label>
-            <input 
-              id="editGenreInput" 
-              type="text" 
-              value={genre} 
-              onChange={(e) => setGenre(e.target.value)} 
-            />
-          </div>
+        <form onSubmit={handleEditProfileSubmit}>
+          {formError && <p className="error-text" style={{ marginBottom: '0.85rem' }}>{formError}</p>}
 
-          <div className="form-group">
-            <label htmlFor="editBookingStatus">Booking Status</label>
-            <select 
-              id="editBookingStatus" 
-              value={bookingStatus} 
-              onChange={(e) => setBookingStatus(e.target.value as any)}
-            >
-              <option value="Available">Available</option>
-              <option value="Booked">Booked</option>
-              <option value="On Tour">On Tour</option>
-              <option value="On Hold">On Hold</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="editAvailabilityStatus">Roster Status</label>
-            <select 
-              id="editAvailabilityStatus" 
-              value={availabilityStatus} 
-              onChange={(e) => setAvailabilityStatus(e.target.value as any)}
-            >
-              <option value="Active">Active / Visible</option>
-              <option value="Inactive">Inactive / Hidden</option>
-            </select>
-          </div>
-
-          <div className="form-group form-row-full">
-            <label htmlFor="editBioInput">Biography Description</label>
-            <textarea 
-              id="editBioInput" 
-              value={bio} 
-              onChange={(e) => setBio(e.target.value)} 
-              rows={4}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="editProfileImageFileInput">Profile Image Upload</label>
-            <div className="file-upload-wrapper">
-              <Upload className="w-5 h-5 text-amber-500" />
-              <input 
-                id="editProfileImageFileInput" 
-                type="file" 
-                accept="image/*" 
-                onChange={handleProfileImageChange}
-              />
-            </div>
-            {profileImage && (
-              <div className="preview-img-container">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={profileImage} alt="Profile Preview" className="preview-img" />
+          {/* TAB 1: OVERVIEW & BIO */}
+          {editModalTab === 'overview' && (
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor="editStageNameInput">Stage Name *</label>
+                <input 
+                  id="editStageNameInput" 
+                  type="text" 
+                  value={stageName} 
+                  onChange={(e) => setStageName(e.target.value)} 
+                  required
+                />
               </div>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="editCoverImageFileInput">Cover Image Upload</label>
-            <div className="file-upload-wrapper">
-              <Upload className="w-5 h-5 text-amber-500" />
-              <input 
-                id="editCoverImageFileInput" 
-                type="file" 
-                accept="image/*" 
-                onChange={handleCoverImageChange}
-              />
-            </div>
-            {coverImage && (
-              <div className="preview-img-container">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={coverImage} alt="Cover Preview" className="preview-img" />
+              <div className="form-group">
+                <label htmlFor="editLegalNameInput">Legal Name</label>
+                <input 
+                  id="editLegalNameInput" 
+                  type="text" 
+                  value={legalName} 
+                  onChange={(e) => setLegalName(e.target.value)} 
+                />
               </div>
-            )}
-          </div>
 
-          <div className="form-group form-row-full">
-            <label htmlFor="editTechRiderInput">Technical Rider Summary</label>
-            <textarea 
-              id="editTechRiderInput" 
-              value={techRider} 
-              onChange={(e) => setTechRider(e.target.value)} 
-              rows={2}
-            />
-          </div>
+              <div className="form-group">
+                <label htmlFor="editCategorySelect">Category</label>
+                <select 
+                  id="editCategorySelect" 
+                  value={category} 
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  <option value="Reggae Artists">Reggae Artists</option>
+                  <option value="Dancehall Artists">Dancehall Artists</option>
+                  <option value="DJs">DJs &amp; Sound Systems</option>
+                  <option value="Soca Artists">Soca Artists</option>
+                  <option value="Afrobeats Artists">Afrobeats Artists</option>
+                  <option value="R&B Artists">R&amp;B Artists</option>
+                  <option value="Bands">Bands</option>
+                  <option value="Hosts">Hosts</option>
+                </select>
+              </div>
 
-          <div className="form-group form-row-full">
-            <label htmlFor="editHospRiderInput">Hospitality Rider Summary</label>
-            <textarea 
-              id="editHospRiderInput" 
-              value={hospRider} 
-              onChange={(e) => setHospRider(e.target.value)} 
-              rows={2}
-            />
-          </div>
+              <div className="form-group">
+                <label htmlFor="editGenreInput">Genre / Style</label>
+                <input 
+                  id="editGenreInput" 
+                  type="text" 
+                  value={genre} 
+                  onChange={(e) => setGenre(e.target.value)} 
+                />
+              </div>
 
-          <div className="modal-actions form-row-full">
+              <div className="form-group">
+                <label htmlFor="editLocationInput">Home Territory / Base</label>
+                <input 
+                  id="editLocationInput" 
+                  type="text" 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)} 
+                  placeholder="e.g. Kingston, Jamaica"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="editBookingStatus">Booking Status</label>
+                <select 
+                  id="editBookingStatus" 
+                  value={bookingStatus} 
+                  onChange={(e) => setBookingStatus(e.target.value as any)}
+                >
+                  <option value="Available">Available</option>
+                  <option value="Booked">Booked</option>
+                  <option value="On Tour">On Tour</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
+
+              <div className="form-group form-row-full">
+                <label htmlFor="editBioInput">Biography Description</label>
+                <textarea 
+                  id="editBioInput" 
+                  value={bio} 
+                  onChange={(e) => setBio(e.target.value)} 
+                  rows={4}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="editProfileImageFileInput">Profile Image Upload / URL</label>
+                <input
+                  type="text"
+                  value={profileImage}
+                  onChange={(e) => setProfileImage(e.target.value)}
+                  placeholder="Image URL or upload below"
+                  style={{ marginBottom: 6 }}
+                />
+                <div className="file-upload-wrapper">
+                  <Upload className="w-5 h-5 text-amber-500" />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Upload from device</span>
+                  <input 
+                    id="editProfileImageFileInput" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleProfileImageChange}
+                  />
+                </div>
+                {profileImage && (
+                  <div className="preview-img-container">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={profileImage} alt="Profile Preview" className="preview-img" />
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="editCoverImageFileInput">Cover Banner Image Upload / URL</label>
+                <input
+                  type="text"
+                  value={coverImage}
+                  onChange={(e) => setCoverImage(e.target.value)}
+                  placeholder="Cover URL or upload below"
+                  style={{ marginBottom: 6 }}
+                />
+                <div className="file-upload-wrapper">
+                  <Upload className="w-5 h-5 text-amber-500" />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Upload from device</span>
+                  <input 
+                    id="editCoverImageFileInput" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleCoverImageChange}
+                  />
+                </div>
+                {coverImage && (
+                  <div className="preview-img-container">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={coverImage} alt="Cover Preview" className="preview-img" />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: YOUTUBE & AUDIO SHOWCASE */}
+          {editModalTab === 'showcase' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ padding: '0.85rem 1rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--gold-primary)' }}>YouTube Music &amp; Live Video Showcase:</strong> Paste any YouTube link (e.g. <code>https://www.youtube.com/watch?v=...</code>, <code>https://youtu.be/...</code>, or <code>https://music.youtube.com/watch?v=...</code>). The profile automatically generates thumbnail previews and embeds an interactive player.
+              </div>
+
+              {/* Existing Tracks List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                {showcaseTracks.map((trk, idx) => {
+                  const vid = extractYouTubeId(trk.youtube_url);
+                  return (
+                    <div
+                      key={trk.id || idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '64px 1fr auto',
+                        gap: '0.75rem',
+                        alignItems: 'center',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 8,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)'
+                      }}
+                    >
+                      {vid ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`}
+                          alt={trk.title}
+                          style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 5 }}
+                        />
+                      ) : (
+                        <div style={{ width: 64, height: 40, borderRadius: 5, background: 'rgba(212,175,55,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Video className="w-4 h-4 text-amber-400" />
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <input
+                          type="text"
+                          value={trk.title}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, title: val } : item));
+                          }}
+                          placeholder="Track / Performance Title"
+                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={trk.youtube_url}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, youtube_url: val } : item));
+                          }}
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveShowcaseTrack(trk.id)}
+                        title="Remove Track"
+                        style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add New YouTube Track Box */}
+              <div style={{ padding: '1rem', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(212,175,55,0.35)' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
+                  + Add New YouTube Music / Performance Link
+                </div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Track / Set Title</label>
+                    <input
+                      type="text"
+                      value={newTrackTitle}
+                      onChange={(e) => setNewTrackTitle(e.target.value)}
+                      placeholder="e.g. Rockaway (Live at Reggae Sumfest)"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>YouTube Link (Watch / Share / Shorts URL) *</label>
+                    <input
+                      type="url"
+                      value={newTrackUrl}
+                      onChange={(e) => setNewTrackUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Subtitle / Event Context</label>
+                    <input
+                      type="text"
+                      value={newTrackSubtitle}
+                      onChange={(e) => setNewTrackSubtitle(e.target.value)}
+                      placeholder="e.g. Official Music Video • 2026"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Duration</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={newTrackDuration}
+                        onChange={(e) => setNewTrackDuration(e.target.value)}
+                        placeholder="e.g. 3:45"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddShowcaseTrack}
+                        className="btn btn-primary"
+                        style={{ whiteSpace: 'nowrap', padding: '0 1rem', fontSize: '0.8rem' }}
+                      >
+                        + Add Track
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SOCIAL FOOTPRINT */}
+          {editModalTab === 'socials' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ padding: '0.85rem 1rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--gold-primary)' }}>Verified Social &amp; Streaming Footprint:</strong> Enter the artist&apos;s official profile URL and follower / monthly listener count for each platform. Buyers can click each platform on the public profile to verify reach.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {Object.entries(socialsEdit).map(([plat, data]) => (
+                  <div
+                    key={plat}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '120px 1fr 150px auto',
+                      gap: '0.65rem',
+                      alignItems: 'center',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: 8,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--gold-primary)' }}>{plat}</div>
+                    <input
+                      type="text"
+                      value={data?.url || ''}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], url } }));
+                      }}
+                      placeholder={`https://${plat.toLowerCase().replace(/\s+/g, '')}.com/...`}
+                      style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.82rem' }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={data?.followers ?? 0}
+                      onChange={(e) => {
+                        const followers = Number(e.target.value) || 0;
+                        setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], followers } }));
+                      }}
+                      placeholder="Followers"
+                      style={{ padding: '0.5rem 0.65rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: 'var(--gold-primary)', fontSize: '0.82rem', fontWeight: 600 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSocialPlatform(plat)}
+                      title={`Remove ${plat}`}
+                      style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Additional Platform */}
+              <div style={{ padding: '0.9rem', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px dashed rgba(212,175,55,0.35)', display: 'grid', gridTemplateColumns: '140px 1fr 140px auto', gap: '0.6rem', alignItems: 'end' }}>
+                <div className="form-group">
+                  <label>Platform</label>
+                  <select value={newSocialPlatform} onChange={(e) => setNewSocialPlatform(e.target.value)}>
+                    {SOCIAL_PLATFORMS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                    <option value="X / Twitter">X / Twitter</option>
+                    <option value="Facebook">Facebook</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Profile Link URL</label>
+                  <input
+                    type="text"
+                    value={newSocialUrl}
+                    onChange={(e) => setNewSocialUrl(e.target.value)}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Followers / Listeners</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={newSocialFollowers}
+                    onChange={(e) => setNewSocialFollowers(e.target.value)}
+                    placeholder="e.g. 500000"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddSocialPlatform}
+                  className="btn btn-primary"
+                  style={{ height: 40, padding: '0 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                >
+                  + Add / Update
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: AVAILABILITY CALENDAR */}
+          {editModalTab === 'calendar' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ padding: '0.85rem 1rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <strong style={{ color: 'var(--gold-primary)' }}>Interactive Routing &amp; Blackout Calendar:</strong> Click any date on the calendar below (or pick a date) to lock/block it as unavailable or click again to re-open it. Changes sync immediately with the Artist Hub and public profile.
+              </div>
+
+              {/* Quick Date Picker Add */}
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="date"
+                  value={customBlockDate}
+                  onChange={(e) => setCustomBlockDate(e.target.value)}
+                  style={{ padding: '0.55rem 0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: '0.85rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customBlockDate) {
+                      handleToggleCalendarDate(customBlockDate);
+                      setCustomBlockDate('');
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '0.55rem 1rem', fontSize: '0.8rem' }}
+                >
+                  Toggle Selected Date
+                </button>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Total Blocked / Hold Dates: <strong style={{ color: 'var(--gold-primary)' }}>{blockedDates.length}</strong>
+                </span>
+              </div>
+
+              {/* Blocked Dates Pills */}
+              {blockedDates.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', padding: '0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  {blockedDates.map(d => (
+                    <span
+                      key={d}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 16, background: 'rgba(239,68,68,0.16)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontSize: '0.76rem', fontWeight: 600 }}
+                    >
+                      {d}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCalendarDate(d)}
+                        title="Unblock date"
+                        style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: TECHNICAL & HOSPITALITY RIDERS */}
+          {editModalTab === 'riders' && (
+            <div className="form-grid">
+              <div className="form-group form-row-full">
+                <label htmlFor="editTechRiderInput">Technical Rider Summary (FOH, Monitors, Backline &amp; Stage Specs)</label>
+                <textarea 
+                  id="editTechRiderInput" 
+                  value={techRider} 
+                  onChange={(e) => setTechRider(e.target.value)} 
+                  rows={5}
+                  placeholder="Specify console preferences, wireless microphones, IEM channels, and backline requirements..."
+                />
+              </div>
+
+              <div className="form-group form-row-full">
+                <label htmlFor="editHospRiderInput">Hospitality Rider Summary (Dressing Room, Catering, Travel &amp; Security)</label>
+                <textarea 
+                  id="editHospRiderInput" 
+                  value={hospRider} 
+                  onChange={(e) => setHospRider(e.target.value)} 
+                  rows={5}
+                  placeholder="Specify greenroom catering, hotel star rating, ground transport, and guest credentials..."
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="modal-actions">
             <button 
               type="button" 
               className="btn btn-secondary" 
@@ -1281,7 +2137,7 @@ function ArtistProfile() {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              Save Changes
+              Save &amp; Publish Profile
             </button>
           </div>
         </form>
