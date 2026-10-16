@@ -1107,9 +1107,14 @@ function ArtistProfile() {
                           border: `1px solid ${isSelected ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.07)'}`,
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
+                          width: '100%',
+                          maxWidth: '100%',
+                          boxSizing: 'border-box',
+                          minWidth: 0,
+                          overflow: 'hidden',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                           {vid ? (
                             <div className="track-thumb-box" style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)', background: '#0f172a' }}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1137,7 +1142,7 @@ function ArtistProfile() {
                               <Music className="w-4 h-4 text-amber-400" />
                             </div>
                           )}
-                          <div style={{ minWidth: 0 }}>
+                          <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? 'var(--gold-primary)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {trk.title}
                             </div>
@@ -1746,29 +1751,50 @@ function ArtistProfile() {
         .profile-grid-section {
           padding-top: var(--spacing-xl);
           padding-bottom: var(--spacing-xxl);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
         }
 
         .profile-layout-split {
           display: grid;
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
           gap: var(--spacing-lg);
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
         }
 
         @media (min-width: 1024px) {
           .profile-layout-split {
-            grid-template-columns: 1.8fr 1fr;
+            grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
             gap: 2rem;
           }
         }
 
-        .profile-main-col {
+        .profile-main-col,
+        .profile-sidebar-col {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-lg);
+          min-width: 0;
+          max-width: 100%;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .luxury-card {
+          min-width: 0;
+          max-width: 100%;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .card-padding {
           padding: var(--spacing-xl);
+          box-sizing: border-box;
         }
 
         .profile-main-col h2 {
@@ -1794,6 +1820,10 @@ function ArtistProfile() {
           border-radius: var(--radius-md);
           margin-bottom: var(--spacing-lg);
           border: 1px solid rgba(212, 175, 55, 0.15);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
         }
 
         .audio-play-btn {
@@ -1817,29 +1847,40 @@ function ArtistProfile() {
         }
 
         .player-track-info {
-          flex-grow: 1;
+          flex: 1 1 0%;
           display: flex;
           flex-direction: column;
           gap: 4px;
           min-width: 0;
+          overflow: hidden;
         }
 
         .track-title {
           font-size: 0.85rem;
           font-weight: 600;
           color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .track-artist {
           font-size: 0.75rem;
           color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .player-progress-bar {
           display: flex;
           align-items: center;
-          gap: 1rem;
+          gap: 0.75rem;
           margin-top: 4px;
+          min-width: 0;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .progress-track-bg {

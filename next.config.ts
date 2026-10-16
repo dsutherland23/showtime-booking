@@ -39,11 +39,11 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://apis.google.com https://www.youtube.com https://s.ytimg.com https://*.firebaseapp.com https://*.paypal.com https://*.paypalobjects.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://www.googletagmanager.com https://apis.google.com https://www.youtube.com https://s.ytimg.com https://*.firebaseapp.com https://*.paypal.com https://*.paypalobjects.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: blob: https: http:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://prod.spline.design https://*.spline.design https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.paypal.com https://www.paypal.com https://www.youtube.com https://*.youtube.com https://i.ytimg.com",
+              "connect-src 'self' https://cloudflareinsights.com https://*.cloudflareinsights.com https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://prod.spline.design https://*.spline.design https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.paypal.com https://www.paypal.com https://www.youtube.com https://*.youtube.com https://i.ytimg.com",
               "media-src 'self' https: data: blob:",
               "worker-src 'self' blob:",
               "frame-src 'self' https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com https://music.youtube.com https://*.youtube.com https://*.firebaseapp.com https://accounts.google.com https://*.paypal.com https://www.paypal.com",
