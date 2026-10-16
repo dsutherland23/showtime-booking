@@ -6,14 +6,14 @@ import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { profile, loading, isStaff } = useAuth();
+  const { profile, loading, isStaff, isAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !isStaff) {
+    if (!loading && !isStaff && !isAdmin) {
       router.replace('/unauthorized');
     }
-  }, [loading, isStaff, router]);
+  }, [loading, isStaff, isAdmin, router]);
 
   if (loading) {
     return (
@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!isStaff) return null;
+  if (!isStaff && !isAdmin) return null;
 
   return <>{children}</>;
 }

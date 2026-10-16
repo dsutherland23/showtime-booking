@@ -10733,11 +10733,15 @@ export default function AdminPortal() {
   const [dataLoading, setDataLoading]         = useState(true);
   const [liveSignal, setLiveSignal]           = useState<{ id: string; message: string; timestamp: string } | null>(null);
   const prevLeadCountRef                      = useRef<number | null>(null);
+  const initialLoadedRef                      = useRef<boolean>(false);
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => setToast({ message, type }), []);
 
-  const loadData = useCallback(async () => {
-    setDataLoading(true);
+  const loadData = useCallback(async (isSilent = false) => {
+    // Only display blocking loading spinner on the very first mount, never on background polls or updates
+    if (!initialLoadedRef.current && !isSilent) {
+      setDataLoading(true);
+    }
     try {
       const [
         aLeads, aBookings, aTasks, aInvoices, aArtists,
@@ -10770,9 +10774,19 @@ export default function AdminPortal() {
         const n = await db.getNotifications(user.id);
         setNotifs(n);
       }
-    } catch { showToast('Failed to load data. Please refresh.', 'error'); }
-    finally { setDataLoading(false); }
+      initialLoadedRef.current = true;
+    } catch {
+      if (!initialLoadedRef.current) {
+        showToast('Failed to load data. Please refresh.', 'error');
+      }
+    } finally {
+      setDataLoading(false);
+    }
   }, [user, showToast]);
+
+  const handleRefresh = useCallback(() => {
+    loadData(true);
+  }, [loadData]);
 
   useEffect(() => {
     if (!loading) {
@@ -10806,26 +10820,37 @@ export default function AdminPortal() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
         showToast(`⚡ Live Booking Signal: ${clientName} submitted request!`, 'success');
-        loadData();
+        loadData(true);
       }
     };
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'st_leads' || e.key === 'st_bookings' || e.key === 'st_notifs' || e.key === 'st_events') {
-        loadData();
+        loadData(true);
       }
     };
 
     window.addEventListener('st_new_booking_event', handleEvent);
     window.addEventListener('storage', handleStorage);
 
+    // Silent background refresh every 30s when tab is active (preserves UI state and form inputs)
     const interval = setInterval(() => {
-      loadData();
-    }, 6000);
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadData(true);
+      }
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('st_new_booking_event', handleEvent);
       window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
   }, [loadData, showToast]);
@@ -10876,24 +10901,24 @@ export default function AdminPortal() {
       </div>
     );
     switch (activeTab) {
-      case 'dashboard':    return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} onRefresh={loadData} showToast={showToast} />;
-      case 'bookings':     return <BookingsSection bookings={bookings} leads={leads} artists={artists} onRefresh={loadData} showToast={showToast} />;
-      case 'artists':      return !hasPermission('view_artists') && !isAdmin    ? <AccessDenied /> : <ArtistsSection artists={artists} onRefresh={loadData} showToast={showToast} />;
-      case 'events':       return !hasPermission('view_events') && !isAdmin     ? <AccessDenied /> : <EventsSection events={events} artists={artists} venues={venues} onRefresh={loadData} showToast={showToast} />;
-      case 'venues':       return !hasPermission('manage_venues') && !isAdmin   ? <AccessDenied /> : <VenuesSection venues={venues} onRefresh={loadData} showToast={showToast} />;
-      case 'customers':    return !hasPermission('view_customers') && !isAdmin  ? <AccessDenied /> : <CustomersSection customers={customers} onRefresh={loadData} showToast={showToast} />;
-      case 'finance':      return !hasPermission('view_finance') && !isAdmin    ? <AccessDenied /> : <FinanceSection billingDocs={billingDocs} invoices={invoices} bookings={bookings} customers={customers} artists={artists} onRefresh={loadData} showToast={showToast} />;
-      case 'orders':       return !hasPermission('view_orders') && !isAdmin     ? <AccessDenied /> : <OrdersSection invoices={invoices} bookings={bookings} onRefresh={loadData} showToast={showToast} />;
-      case 'tickets':      return !hasPermission('view_tickets') && !isAdmin    ? <AccessDenied /> : <TicketsSection tiers={ticketTiers} promoCodes={promoCodes} onRefresh={loadData} showToast={showToast} />;
-      case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={loadData} showToast={showToast} />;
-      case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={loadData} showToast={showToast} />;
-      case 'content':            return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} />;
-      case 'page_services':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="services" />;
-      case 'page_about':         return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="about" />;
-      case 'page_privacy':       return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="privacy" />;
-      case 'page_accessibility': return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={loadData} showToast={showToast} initialSubTab="accessibility" />;
-      case 'staff':        return !isAdmin ? <AccessDenied /> : <StaffSection users={users} onRefresh={loadData} showToast={showToast} />;
-      case 'integrations': return !isAdmin ? <AccessDenied /> : <IntegrationsSection integrations={integrations} onRefresh={loadData} showToast={showToast} />;
+      case 'dashboard':    return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'bookings':     return <BookingsSection bookings={bookings} leads={leads} artists={artists} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'artists':      return !hasPermission('view_artists') && !isAdmin    ? <AccessDenied /> : <ArtistsSection artists={artists} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'events':       return !hasPermission('view_events') && !isAdmin     ? <AccessDenied /> : <EventsSection events={events} artists={artists} venues={venues} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'venues':       return !hasPermission('manage_venues') && !isAdmin   ? <AccessDenied /> : <VenuesSection venues={venues} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'customers':    return !hasPermission('view_customers') && !isAdmin  ? <AccessDenied /> : <CustomersSection customers={customers} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'finance':      return !hasPermission('view_finance') && !isAdmin    ? <AccessDenied /> : <FinanceSection billingDocs={billingDocs} invoices={invoices} bookings={bookings} customers={customers} artists={artists} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'orders':       return !hasPermission('view_orders') && !isAdmin     ? <AccessDenied /> : <OrdersSection invoices={invoices} bookings={bookings} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'tickets':      return !hasPermission('view_tickets') && !isAdmin    ? <AccessDenied /> : <TicketsSection tiers={ticketTiers} promoCodes={promoCodes} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'content':            return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'page_services':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="services" />;
+      case 'page_about':         return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="about" />;
+      case 'page_privacy':       return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="privacy" />;
+      case 'page_accessibility': return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="accessibility" />;
+      case 'staff':        return !isAdmin ? <AccessDenied /> : <StaffSection users={users} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'integrations': return !isAdmin ? <AccessDenied /> : <IntegrationsSection integrations={integrations} onRefresh={handleRefresh} showToast={showToast} />;
       case 'maintenance':  return !isAdmin ? <AccessDenied /> : <MaintenanceSection showToast={showToast} />;
       case 'settings':     return !isAdmin ? <AccessDenied /> : <SettingsSection showToast={showToast} />;
       case 'help':         return <HelpSection onNavigate={setActiveTab} isAdmin={isAdmin} />;
@@ -11118,7 +11143,7 @@ export default function AdminPortal() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
-                onClick={loadData}
+                onClick={() => handleRefresh()}
                 title="Refresh"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6, borderRadius: 8, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}

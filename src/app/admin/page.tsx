@@ -1,29 +1,23 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
 export default function AdminRedirect() {
   const { user, isStaff, isAdmin, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
 
     if (user && (isAdmin || isStaff)) {
-      window.location.replace('/dashboard');
+      router.replace('/dashboard');
     } else {
-      window.location.replace('/auth/login?redirect=/dashboard&admin=1');
+      router.replace('/auth/login?redirect=/dashboard&admin=1');
     }
-  }, [user, isStaff, isAdmin, loading]);
-
-  // Fallback timeout ensures prompt navigation even if auth state resolution is delayed
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.location.replace('/auth/login?redirect=/dashboard&admin=1');
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
+  }, [user, isStaff, isAdmin, loading, router]);
 
   return (
     <div
