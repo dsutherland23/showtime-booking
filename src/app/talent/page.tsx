@@ -2,60 +2,15 @@
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { db, Artist } from '@/utils/db';
+import { db, Artist, getArtistEstimatedPricing, computePriceTierFromFee } from '@/utils/db';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, Music, MapPin, DollarSign, Filter, X, Upload } from 'lucide-react';
-
-// Pricing tiers for artists
-const ARTIST_PRICING: Record<string, { fee: number; tier: string }> = {
-  'art-beres-hammond': { fee: 90000, tier: '$$$' },
-  'art-chronixx': { fee: 120000, tier: '$$$$' },
-  'art-koffee': { fee: 75000, tier: '$$$' },
-  'art-shenseea': { fee: 85000, tier: '$$$' },
-  'art-rodigan': { fee: 20000, tier: '$' }
-};
-
-// Deterministic fallback pricing for seed / dynamically added artists
-const getArtistPricing = (id: string, category: string): { fee: number; tier: string } => {
-  if (ARTIST_PRICING[id]) return ARTIST_PRICING[id];
-  
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const factor = Math.abs(hash % 10);
-  
-  let fee = 15000;
-  let tier = '$$';
-  
-  if (category === 'Reggae Artists' || category === 'Dancehall Artists') {
-    fee = 35000 + factor * 10000;
-    tier = fee > 80000 ? '$$$$' : fee > 50000 ? '$$$' : '$$';
-  } else if (category === 'DJs') {
-    fee = 10000 + factor * 3000;
-    tier = fee > 30000 ? '$$$' : fee > 18000 ? '$$' : '$';
-  } else if (category === 'Bands') {
-    fee = 20000 + factor * 5000;
-    tier = fee > 50000 ? '$$$' : '$$';
-  } else if (category === 'Dancers') {
-    fee = 3000 + factor * 1000;
-    tier = fee > 8000 ? '$$' : '$';
-  } else if (category === 'Hosts') {
-    fee = 5000 + factor * 1500;
-    tier = fee > 12000 ? '$$' : '$';
-  } else {
-    fee = 10000 + factor * 2000;
-    tier = '$$';
-  }
-  
-  return { fee, tier };
-};
+import { Search, SlidersHorizontal, Music, MapPin, DollarSign, Filter, X, Upload, Edit2, Check } from 'lucide-react';
 
 const TalentDirectoryContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin, isStaff } = useAuth();
   
   const [artists, setArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
@@ -63,19 +18,25 @@ const TalentDirectoryContent = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [budgetTier, setBudgetTier] = useState('All');
 
+  // Inline Estimate Editor State on Talent Card
+  const [editingFeeArtistId, setEditingFeeArtistId] = useState<string | null>(null);
+  const [editingFeeValue, setEditingFeeValue] = useState<string>('');
+  const [toastMsg, setToastMsg] = useState<string>('');
+
   // Form state for creating new artist
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [stageName, setStageName] = useState('');
   const [legalName, setLegalName] = useState('');
   const [category, setCategory] = useState('Dancehall Artists');
   const [genre, setGenre] = useState('');
+  const [estimatedFeeInput, setEstimatedFeeInput] = useState('50000');
   const [bio, setBio] = useState('');
   const [profileImageBase64, setProfileImageBase64] = useState('');
   const [techRider, setTechRider] = useState('');
   const [hospRider, setHospRider] = useState('');
   const [formError, setFormError] = useState('');
 
-  const canManage = hasPermission('manage_artists');
+  const canManage = isAdmin || isStaff || hasPermission('manage_artists');
 
   // Sync category filter from URL params (e.g. from Home page)
   useEffect(() => {
@@ -125,7 +86,7 @@ const TalentDirectoryContent = () => {
     // Budget Filter
     if (budgetTier !== 'All') {
       result = result.filter(a => {
-        const pricing = getArtistPricing(a.id, a.category);
+        const pricing = getArtistEstimatedPricing(a);
         const fee = pricing.fee;
         if (budgetTier === 'tier-1') return fee < 30000;
         if (budgetTier === 'tier-2') return fee >= 30000 && fee <= 80000;
@@ -163,6 +124,24 @@ const TalentDirectoryContent = () => {
       dialog.removeEventListener('click', handleBackdropClick);
     };
   }, []);
+
+  // Save inline estimated fee directly on a Talent Card
+  const handleSaveInlineFee = async (artist: Artist) => {
+    const numericFee = Math.max(0, Number(editingFeeValue.replace(/[^0-9.]/g, '')) || 0);
+    const tier = computePriceTierFromFee(numericFee);
+    try {
+      await db.updateArtistProfile(artist.id, {
+        estimated_fee: numericFee,
+        price_tier: tier,
+      });
+      setEditingFeeArtistId(null);
+      await loadArtists();
+      setToastMsg(`Updated ${artist.stage_name}'s estimate to $${numericFee.toLocaleString()} USD`);
+      setTimeout(() => setToastMsg(''), 3000);
+    } catch (err) {
+      console.error('Failed to update estimated fee:', err);
+    }
+  };
 
   // Handle local image file read
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,12 +187,16 @@ const TalentDirectoryContent = () => {
       }
     }
 
+    const parsedFee = Math.max(0, Number(estimatedFeeInput.replace(/[^0-9.]/g, '')) || 50000);
+
     try {
       await db.createArtist({
         stage_name: stageName,
         legal_name: legalName || stageName,
         category,
         genre: genre || category.replace(' Artists', ''),
+        estimated_fee: parsedFee,
+        price_tier: computePriceTierFromFee(parsedFee),
         bio: bio || `${stageName} is an elite professional performer available for global booking.`,
         profile_image: finalProfileImage,
         cover_image: finalCoverImage,
@@ -227,6 +210,7 @@ const TalentDirectoryContent = () => {
       setStageName('');
       setLegalName('');
       setGenre('');
+      setEstimatedFeeInput('50000');
       setBio('');
       setProfileImageBase64('');
       setTechRider('');
@@ -245,6 +229,32 @@ const TalentDirectoryContent = () => {
 
   return (
     <div className="talent-directory-container container">
+      {toastMsg && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.96)',
+            border: '1px solid rgba(212, 175, 55, 0.5)',
+            color: '#fff',
+            padding: '0.75rem 1.15rem',
+            borderRadius: 10,
+            boxShadow: '0 14px 36px rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          <Check className="w-4 h-4 text-amber-400" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="directory-header">
         <span className="gold-badge">Showtime Roster</span>
@@ -314,7 +324,8 @@ const TalentDirectoryContent = () => {
       {filteredArtists.length > 0 ? (
         <div className="grid-3 directory-grid">
           {filteredArtists.map((artist) => {
-            const pricing = getArtistPricing(artist.id, artist.category);
+            const pricing = getArtistEstimatedPricing(artist);
+            const isEditingThisFee = editingFeeArtistId === artist.id;
             return (
               <div key={artist.id} className="luxury-card artist-card animate-fade">
                 <Link 
@@ -343,12 +354,110 @@ const TalentDirectoryContent = () => {
                   
                   <div className="artist-meta">
                     <span className="meta-item">
-                      <MapPin className="icon-tiny" /> Jamaica
+                      <MapPin className="icon-tiny" /> {artist.location || 'Jamaica'}
                     </span>
                     {pricing && (
-                      <span className="meta-item fee-text">
-                        Est: ${pricing.fee.toLocaleString()} USD
-                      </span>
+                      isEditingThisFee ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', fontWeight: 700 }}>$</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={500}
+                            value={editingFeeValue}
+                            onChange={(e) => setEditingFeeValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveInlineFee(artist);
+                              } else if (e.key === 'Escape') {
+                                setEditingFeeArtistId(null);
+                              }
+                            }}
+                            autoFocus
+                            style={{
+                              width: 92,
+                              padding: '3px 6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              background: 'rgba(15,23,42,0.95)',
+                              border: '1px solid var(--gold-primary)',
+                              borderRadius: 5,
+                              color: '#fff',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveInlineFee(artist)}
+                            title="Save Estimate"
+                            style={{
+                              background: 'var(--gold-gradient)',
+                              border: 'none',
+                              color: '#0f172a',
+                              borderRadius: 5,
+                              padding: '3px 7px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingFeeArtistId(null)}
+                            title="Cancel"
+                            style={{
+                              background: 'rgba(255,255,255,0.08)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#cbd5e1',
+                              borderRadius: 5,
+                              padding: '3px 6px',
+                              fontSize: '0.7rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className="meta-item fee-text"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: canManage ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (canManage) {
+                              setEditingFeeArtistId(artist.id);
+                              setEditingFeeValue(String(pricing.fee));
+                            }
+                          }}
+                          title={canManage ? 'Click to edit estimated booking fee (USD)' : undefined}
+                        >
+                          <span>Est: ${pricing.fee.toLocaleString()} USD</span>
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingFeeArtistId(artist.id);
+                                setEditingFeeValue(String(pricing.fee));
+                              }}
+                              title="Edit Estimated Fee"
+                              style={{
+                                background: 'rgba(212,175,55,0.14)',
+                                border: '1px solid rgba(212,175,55,0.35)',
+                                color: 'var(--gold-primary)',
+                                borderRadius: 4,
+                                padding: '2px 5px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <Edit2 style={{ width: 11, height: 11 }} />
+                            </button>
+                          )}
+                        </span>
+                      )
                     )}
                   </div>
 
@@ -456,6 +565,19 @@ const TalentDirectoryContent = () => {
               value={genre} 
               onChange={(e) => setGenre(e.target.value)} 
               placeholder="e.g. Roots Reggae, Trap Dancehall"
+            />
+          </div>
+
+          <div className="form-group form-row-full">
+            <label htmlFor="estimatedFeeInput">Estimated Booking Fee (USD) — Shown on Talent Card as &ldquo;Est: $XX,XXX USD&rdquo;</label>
+            <input
+              id="estimatedFeeInput"
+              type="number"
+              min={0}
+              step={500}
+              value={estimatedFeeInput}
+              onChange={(e) => setEstimatedFeeInput(e.target.value)}
+              placeholder="e.g. 90000"
             />
           </div>
 

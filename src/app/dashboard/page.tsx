@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   db,
-  Lead, Booking, Task, Notification, Invoice, Artist, ArtistTrack, extractYouTubeId, Venue, Customer,
+  Lead, Booking, Task, Notification, Invoice, Artist, ArtistTrack, extractYouTubeId, getArtistEstimatedPricing, computePriceTierFromFee, Venue, Customer,
   User, TicketTier, PromoCode, MarketingCampaign, AdPlacement,
   WebsiteSection, Integration, ShowEvent,
   BillingDoc, BillingDocType, BillingDocStatus, BillingLineItem, BillingPayment,
@@ -1775,6 +1775,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     category: 'Reggae Artists',
     genre: '',
     location: 'Jamaica',
+    estimated_fee: 50000,
     bio: '',
     profile_image: '',
     cover_image: '',
@@ -1814,6 +1815,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       category: a.category,
       genre: a.genre,
       location: a.location || 'Jamaica',
+      estimated_fee: getArtistEstimatedPricing(a).fee,
       bio: a.bio,
       profile_image: a.profile_image,
       cover_image: a.cover_image,
@@ -1949,8 +1951,12 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         }
       });
 
+      const numericFee = Math.max(0, Number(form.estimated_fee) || 0);
+
       const payload: Omit<Artist, 'id'> = {
         ...form,
+        estimated_fee: numericFee,
+        price_tier: computePriceTierFromFee(numericFee),
         showcase_tracks: finalTracks,
         featured_youtube_url: finalTracks[0]?.youtube_url || '',
         media: finalMedia,
@@ -1968,7 +1974,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         }
       }
       setSavedArtist(true);
-      showToast(editItem ? 'Talent profile, YouTube showcase, socials & calendar updated!' : 'New artist added to roster!', 'success');
+      showToast(editItem ? 'Talent profile, estimate, YouTube showcase, socials & calendar updated!' : 'New artist added to roster!', 'success');
       setTimeout(() => {
         setSavedArtist(false);
         setShowModal(false);
@@ -2067,11 +2073,13 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       </div>
 
       <Tbl>
-        <TH cols={['Artist', 'Category', 'Genre', 'Booking Status', 'Availability', 'Featured', 'Actions']} />
+        <TH cols={['Artist', 'Category', 'Genre', 'Est. Fee (USD)', 'Booking Status', 'Availability', 'Featured', 'Actions']} />
         <tbody>
           {filtered.length === 0 ? (
-            <tr><td colSpan={7}><Empty icon={Music} msg="No artists found matching your criteria" /></td></tr>
-          ) : filtered.map(a => (
+            <tr><td colSpan={8}><Empty icon={Music} msg="No artists found matching your criteria" /></td></tr>
+          ) : filtered.map(a => {
+            const est = getArtistEstimatedPricing(a);
+            return (
             <TR key={a.id}>
               <TD>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
@@ -2089,6 +2097,16 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
               </TD>
               <TD muted>{a.category}</TD>
               <TD muted>{a.genre}</TD>
+              <TD>
+                <span
+                  onClick={() => openEdit(a, 'overview')}
+                  title="Click to edit Estimated Booking Fee"
+                  style={{ fontWeight: 700, color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                  Est: ${est.fee.toLocaleString()} USD
+                  <Edit2 size={11} style={{ opacity: 0.7 }} />
+                </span>
+              </TD>
               <TD><StatusBadge status={a.booking_status} /></TD>
               <TD><StatusBadge status={a.availability_status} /></TD>
               <TD>
@@ -2131,7 +2149,8 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 </div>
               </TD>
             </TR>
-          ))}
+            );
+          })}
         </tbody>
       </Tbl>
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? `Edit Talent EPK — ${editItem.stage_name}` : 'Add Roster Artist'} width={720}>
@@ -2176,6 +2195,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 </Field>
                 <Field label="Genre"><FInput value={form.genre} onChange={v => setForm(f => ({ ...f, genre: v }))} /></Field>
                 <Field label="Home Territory / Base"><FInput value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} placeholder="e.g. Kingston, Jamaica" /></Field>
+                <Field label="Estimated Booking Fee (USD)">
+                  <FInput value={String(form.estimated_fee ?? 50000)} onChange={v => setForm(f => ({ ...f, estimated_fee: Number(v.replace(/[^0-9.]/g, '')) || 0 }))} type="number" placeholder="e.g. 90000" />
+                </Field>
                 <Field label="Booking Status">
                   <FSelect value={form.booking_status} onChange={v => setForm(f => ({ ...f, booking_status: v as Artist['booking_status'] }))} options={['Available', 'Booked', 'On Tour', 'On Hold'].map(s => ({ value: s, label: s }))} />
                 </Field>

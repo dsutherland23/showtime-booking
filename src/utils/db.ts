@@ -50,6 +50,8 @@ export interface Artist {
   genre: string;
   bio: string;
   location?: string;
+  estimated_fee?: number;  // e.g. 90000 for "Est: $90,000 USD"
+  price_tier?: string;     // e.g. '$', '$$', '$$$', '$$$$'
   profile_image: string;
   cover_image: string;
   cover_position?: string; // e.g. '50% 35%' for background-position alignment
@@ -65,6 +67,61 @@ export interface Artist {
   technical_rider?: string;
   hospitality_rider?: string;
   is_featured?: boolean;
+}
+
+const DEFAULT_ARTIST_PRICING: Record<string, { fee: number; tier: string }> = {
+  'art-beres-hammond': { fee: 90000, tier: '$$$' },
+  'art-chronixx': { fee: 120000, tier: '$$$$' },
+  'art-koffee': { fee: 75000, tier: '$$$' },
+  'art-shenseea': { fee: 85000, tier: '$$$' },
+  'art-rodigan': { fee: 20000, tier: '$' },
+};
+
+export function computePriceTierFromFee(fee: number): string {
+  if (fee >= 100000) return '$$$$';
+  if (fee >= 50000) return '$$$';
+  if (fee >= 20000) return '$$';
+  return '$';
+}
+
+export function getArtistEstimatedPricing(
+  artist: Pick<Artist, 'id' | 'category' | 'estimated_fee' | 'price_tier'>
+): { fee: number; tier: string } {
+  if (typeof artist.estimated_fee === 'number' && !isNaN(artist.estimated_fee) && artist.estimated_fee >= 0) {
+    return {
+      fee: artist.estimated_fee,
+      tier: artist.price_tier || computePriceTierFromFee(artist.estimated_fee),
+    };
+  }
+  if (DEFAULT_ARTIST_PRICING[artist.id]) {
+    return {
+      fee: DEFAULT_ARTIST_PRICING[artist.id].fee,
+      tier: artist.price_tier || DEFAULT_ARTIST_PRICING[artist.id].tier,
+    };
+  }
+  let hash = 0;
+  for (let i = 0; i < artist.id.length; i++) {
+    hash = artist.id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const factor = Math.abs(hash % 10);
+  let fee = 15000;
+  if (artist.category === 'Reggae Artists' || artist.category === 'Dancehall Artists') {
+    fee = 35000 + factor * 10000;
+  } else if (artist.category === 'DJs') {
+    fee = 10000 + factor * 3000;
+  } else if (artist.category === 'Bands') {
+    fee = 20000 + factor * 5000;
+  } else if (artist.category === 'Dancers') {
+    fee = 3000 + factor * 1000;
+  } else if (artist.category === 'Hosts') {
+    fee = 5000 + factor * 1500;
+  } else {
+    fee = 10000 + factor * 2000;
+  }
+  return {
+    fee,
+    tier: artist.price_tier || computePriceTierFromFee(fee),
+  };
 }
 
 export interface BookingArtistItem {

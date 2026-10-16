@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { db, Artist, ArtistTrack, Booking, extractYouTubeId } from '@/utils/db';
+import { db, Artist, ArtistTrack, Booking, extractYouTubeId, getArtistEstimatedPricing, computePriceTierFromFee } from '@/utils/db';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { 
   Music, Award, Calendar, MapPin, FileText, Play, Pause, ChevronLeft, ChevronRight,
-  Volume2, Camera, Video, Edit2, Trash2, X, Upload, Plus, ExternalLink, Globe, Sparkles, Check
+  Volume2, Camera, Video, Edit2, Trash2, X, Upload, Plus, ExternalLink, Globe, Sparkles, Check, DollarSign
 } from 'lucide-react';
 
 // Default curated YouTube showcase tracks when an artist hasn't customized their tracklist yet
@@ -103,6 +103,7 @@ function ArtistProfile() {
   const [category, setCategory] = useState('');
   const [genre, setGenre] = useState('');
   const [location, setLocation] = useState('Jamaica');
+  const [estimatedFee, setEstimatedFee] = useState<string>('90000');
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [coverImage, setCoverImage] = useState('');
@@ -141,6 +142,7 @@ function ArtistProfile() {
     setCategory(data.category);
     setGenre(data.genre);
     setLocation(data.location || 'Jamaica');
+    setEstimatedFee(String(getArtistEstimatedPricing(data).fee));
     setBio(data.bio);
     setProfileImage(data.profile_image);
     setCoverImage(data.cover_image);
@@ -526,6 +528,8 @@ function ArtistProfile() {
       }
     });
 
+    const parsedFee = Math.max(0, Number(String(estimatedFee).replace(/[^0-9.]/g, '')) || 0);
+
     try {
       const updated = await db.updateArtistProfile(id, {
         stage_name: stageName,
@@ -533,6 +537,8 @@ function ArtistProfile() {
         category,
         genre: genre,
         location: location.trim() || 'Jamaica',
+        estimated_fee: parsedFee,
+        price_tier: computePriceTierFromFee(parsedFee),
         bio: bio,
         profile_image: profileImage,
         cover_image: coverImage,
@@ -977,6 +983,16 @@ function ArtistProfile() {
             <div className="artist-meta-row">
               <span className="meta-item"><MapPin className="meta-icon" /> {artist.location || 'Jamaica'}</span>
               <span className="meta-item"><Music className="meta-icon" /> {artist.genre}</span>
+              <span
+                className="meta-item"
+                style={{ color: 'var(--gold-primary)', fontWeight: 700, cursor: canManage ? 'pointer' : 'default' }}
+                onClick={() => { if (canManage) openEditModalOnTab('overview'); }}
+                title={canManage ? 'Click to edit Estimated Booking Fee' : undefined}
+              >
+                <DollarSign className="meta-icon" />
+                Est: ${getArtistEstimatedPricing(artist).fee.toLocaleString()} USD
+                {canManage && <Edit2 className="w-3.5 h-3.5 ml-1" />}
+              </span>
               <span className="meta-item status-badge">
                 <span className="dot"></span> {artist.booking_status}
               </span>
@@ -2384,6 +2400,19 @@ function ArtistProfile() {
                   <option value="On Tour">On Tour</option>
                   <option value="On Hold">On Hold</option>
                 </select>
+              </div>
+
+              <div className="form-group form-row-full">
+                <label htmlFor="editEstimatedFeeInput">Estimated Booking Fee (USD) — Displayed on Talent Card as &ldquo;Est: $XX,XXX USD&rdquo;</label>
+                <input
+                  id="editEstimatedFeeInput"
+                  type="number"
+                  min={0}
+                  step={500}
+                  value={estimatedFee}
+                  onChange={(e) => setEstimatedFee(e.target.value)}
+                  placeholder="e.g. 90000"
+                />
               </div>
 
               <div className="form-group form-row-full">
