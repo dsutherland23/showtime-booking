@@ -22,17 +22,24 @@ export interface ArtistTrack {
 }
 
 /**
- * Extracts an 11-character YouTube Video ID from any YouTube URL format
- * (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, music.youtube.com/watch?v=, youtube.com/embed/)
+ * Extracts an 11-character YouTube Video ID from any YouTube URL or iframe snippet
+ * (youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, music.youtube.com/watch?v=, youtube.com/embed/, youtube-nocookie.com/embed/)
  */
 export function extractYouTubeId(input?: string): string | null {
   if (!input) return null;
   const trimmed = input.trim();
   if (!trimmed) return null;
   if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
-  const regex = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
-  const match = trimmed.match(regex);
-  return match ? match[1] : null;
+
+  // Check for v= query parameter anywhere in URL
+  const vParamMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (vParamMatch) return vParamMatch[1];
+
+  // Check for youtu.be/, /embed/, /shorts/, /live/, /v/
+  const pathMatch = trimmed.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|shorts\/|live\/))([a-zA-Z0-9_-]{11})/i);
+  if (pathMatch) return pathMatch[1];
+
+  return null;
 }
 
 export interface Artist {
@@ -45,6 +52,8 @@ export interface Artist {
   location?: string;
   profile_image: string;
   cover_image: string;
+  cover_position?: string; // e.g. '50% 35%' for background-position alignment
+  cover_zoom?: number;     // e.g. 100 to 160 for background-size zoom percentage
   booking_status: 'Available' | 'Booked' | 'On Tour' | 'On Hold';
   availability_status: 'Active' | 'Inactive';
   manager_id?: string;

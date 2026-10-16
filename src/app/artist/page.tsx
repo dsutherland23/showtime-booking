@@ -17,7 +17,7 @@ const DEFAULT_SHOWCASE_BY_CATEGORY: Record<string, ArtistTrack[]> = {
     { id: 'def-2', title: 'Acoustic & Lovers Rock Sessions (Live)', subtitle: 'Intimate Stage Arrangement', youtube_url: 'https://www.youtube.com/watch?v=69RdQFDuYPI', duration: '3:48' },
   ],
   'Dancehall Artists': [
-    { id: 'def-1', title: 'Mainstage Arena & Festival Headline Set', subtitle: 'High-Energy Live Performance Reel', youtube_url: 'https://www.youtube.com/watch?v=bM7SZ5SBzyY', duration: '3:35' },
+    { id: 'def-1', title: 'Mainstage Arena & Festival Headline Set', subtitle: 'High-Energy Live Performance Reel', youtube_url: 'https://www.youtube.com/watch?v=69RdQFDuYPI', duration: '3:35' },
     { id: 'def-2', title: 'Official Club & Sound System Showcase', subtitle: 'International Tour Highlights', youtube_url: 'https://www.youtube.com/watch?v=3AtDnEC4zak', duration: '3:50' },
   ],
   default: [
@@ -32,6 +32,19 @@ function formatCompactCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
   return n.toLocaleString();
+}
+
+function parseCoverPosition(pos?: string): { x: number; y: number } {
+  if (!pos) return { x: 50, y: 35 };
+  const matches = pos.match(/(\d+(?:\.\d+)?)%/g);
+  if (matches && matches.length >= 2) {
+    const x = Math.min(100, Math.max(0, parseFloat(matches[0])));
+    const y = Math.min(100, Math.max(0, parseFloat(matches[1])));
+    return { x, y };
+  }
+  if (pos.includes('top')) return { x: 50, y: 15 };
+  if (pos.includes('bottom')) return { x: 50, y: 85 };
+  return { x: 50, y: 35 };
 }
 
 export default function ArtistProfilePage() {
@@ -56,6 +69,17 @@ function ArtistProfile() {
   // Media & YouTube Showcase player state
   const [activeTrackIndex, setActiveTrackIndex] = useState<number>(0);
   const [showEmbedPlayer, setShowEmbedPlayer] = useState<boolean>(false);
+
+  // Interactive Header Banner Drag-and-Drop & Alignment state
+  const [bannerEditMode, setBannerEditMode] = useState<boolean>(false);
+  const [bannerPosX, setBannerPosX] = useState<number>(50);
+  const [bannerPosY, setBannerPosY] = useState<number>(35);
+  const [bannerZoom, setBannerZoom] = useState<number>(100);
+  const [bannerDraftImage, setBannerDraftImage] = useState<string>('');
+  const [isDraggingFileOverBanner, setIsDraggingFileOverBanner] = useState<boolean>(false);
+  const [isDraggingBannerPan, setIsDraggingBannerPan] = useState<boolean>(false);
+  const bannerDragStartRef = useRef<{ clientX: number; clientY: number; startX: number; startY: number } | null>(null);
+  const heroBannerInputRef = useRef<HTMLInputElement | null>(null);
 
   // Interactive Calendar month offset (0 = current month, +1 = next month, etc.)
   const [calMonthOffset, setCalMonthOffset] = useState<number>(0);
@@ -94,6 +118,10 @@ function ArtistProfile() {
   const [newTrackUrl, setNewTrackUrl] = useState('');
   const [newTrackDuration, setNewTrackDuration] = useState('');
 
+  // Editable Showcase Gallery Photos (the image(s) below the YouTube tracks)
+  const [mediaGallery, setMediaGallery] = useState<{ type: 'Audio' | 'Video' | 'Image'; url: string; title?: string }[]>([]);
+  const [newGalleryImageUrl, setNewGalleryImageUrl] = useState('');
+
   // Editable Social Footprint
   const [socialsEdit, setSocialsEdit] = useState<Record<string, { url: string; followers: number }>>({});
   const [newSocialPlatform, setNewSocialPlatform] = useState('TikTok');
@@ -116,6 +144,11 @@ function ArtistProfile() {
     setBio(data.bio);
     setProfileImage(data.profile_image);
     setCoverImage(data.cover_image);
+    setBannerDraftImage(data.cover_image);
+    const parsedPos = parseCoverPosition(data.cover_position);
+    setBannerPosX(parsedPos.x);
+    setBannerPosY(parsedPos.y);
+    setBannerZoom(data.cover_zoom || 100);
     setBookingStatus(data.booking_status);
     setAvailabilityStatus(data.availability_status);
     setTechRider(data.technical_rider || '');
@@ -126,6 +159,11 @@ function ArtistProfile() {
       data.showcase_tracks && data.showcase_tracks.length > 0
         ? data.showcase_tracks
         : defaultTracks
+    );
+    setMediaGallery(
+      data.media && data.media.length > 0
+        ? data.media.map(m => ({ ...m }))
+        : []
     );
     setSocialsEdit(data.socials ? { ...data.socials } : {
       Instagram: { url: '', followers: 0 },
@@ -222,10 +260,150 @@ function ArtistProfile() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCoverImage(reader.result as string);
+        const dataUrl = reader.result as string;
+        setCoverImage(dataUrl);
+        setBannerDraftImage(dataUrl);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Direct Hero Banner File Drop / Upload & Interactive Alignment Handlers
+  const handleBannerFileSelected = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      setBannerDraftImage(dataUrl);
+      setCoverImage(dataUrl);
+      setBannerEditMode(true);
+      setSaveSuccessToast('Banner loaded! Drag the image or use the sliders to align, then click Save Banner.');
+      setTimeout(() => setSaveSuccessToast(''), 4000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerDragOver = (e: React.DragEvent<HTMLElement>) => {
+    if (!canManage) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingFileOverBanner(true);
+    }
+  };
+
+  const handleBannerDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    if (!canManage) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFileOverBanner(false);
+  };
+
+  const handleBannerDrop = (e: React.DragEvent<HTMLElement>) => {
+    if (!canManage) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFileOverBanner(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleBannerFileSelected(file);
+    }
+  };
+
+  const handleBannerPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    if (!canManage || !bannerEditMode) return;
+    // Ignore clicks on buttons, inputs, links inside the hero banner
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, a, label, .banner-editor-dock')) return;
+    e.preventDefault();
+    setIsDraggingBannerPan(true);
+    bannerDragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      startX: bannerPosX,
+      startY: bannerPosY,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const handleBannerPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (!isDraggingBannerPan || !bannerDragStartRef.current) return;
+    const dx = e.clientX - bannerDragStartRef.current.clientX;
+    const dy = e.clientY - bannerDragStartRef.current.clientY;
+    // Dragging mouse down pulls image down (decreases Y%), dragging up pushes image up (increases Y%)
+    const nextX = Math.round(Math.min(100, Math.max(0, bannerDragStartRef.current.startX - dx * 0.15)));
+    const nextY = Math.round(Math.min(100, Math.max(0, bannerDragStartRef.current.startY - dy * 0.22)));
+    setBannerPosX(nextX);
+    setBannerPosY(nextY);
+  };
+
+  const handleBannerPointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    if (!isDraggingBannerPan) return;
+    setIsDraggingBannerPan(false);
+    bannerDragStartRef.current = null;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+  };
+
+  const handleSaveBannerDirectly = async () => {
+    if (!artist || !canManage) return;
+    try {
+      const newPos = `${bannerPosX}% ${bannerPosY}%`;
+      const finalCover = bannerDraftImage || artist.cover_image;
+      const updated = await db.updateArtistProfile(artist.id, {
+        cover_image: finalCover,
+        cover_position: newPos,
+        cover_zoom: bannerZoom,
+      });
+      setArtist(updated);
+      setCoverImage(finalCover);
+      setBannerEditMode(false);
+      setSaveSuccessToast('Header banner image & alignment saved!');
+      setTimeout(() => setSaveSuccessToast(''), 3200);
+    } catch (err) {
+      console.error('Failed to save banner:', err);
+    }
+  };
+
+  // Direct Inline Showcase Gallery Photo Replacement / Upload / Delete Handlers
+  const handleReplaceGalleryPhotoInline = async (index: number, file: File) => {
+    if (!artist || !canManage || !file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
+      const nextMedia = [...(artist.media || [])];
+      nextMedia[index] = { type: 'Image', url: dataUrl, title: `${artist.stage_name} Showcase Photo` };
+      const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
+      setArtist(updated);
+      setMediaGallery(nextMedia);
+      setSaveSuccessToast('Showcase gallery image updated!');
+      setTimeout(() => setSaveSuccessToast(''), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddGalleryPhotoInline = async (file: File) => {
+    if (!artist || !canManage || !file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
+      const nextMedia = [...(artist.media || []), { type: 'Image' as const, url: dataUrl, title: `${artist.stage_name} Showcase Photo` }];
+      const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
+      setArtist(updated);
+      setMediaGallery(nextMedia);
+      setSaveSuccessToast('New photo added to showcase gallery!');
+      setTimeout(() => setSaveSuccessToast(''), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteGalleryPhotoInline = async (index: number) => {
+    if (!artist || !canManage) return;
+    const nextMedia = (artist.media || []).filter((_, i) => i !== index);
+    const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
+    setArtist(updated);
+    setMediaGallery(nextMedia);
+    setSaveSuccessToast('Gallery photo removed.');
+    setTimeout(() => setSaveSuccessToast(''), 3000);
   };
 
   // Add a YouTube Track inside modal
@@ -244,7 +422,7 @@ function ArtistProfile() {
       id: 'trk-' + Math.random().toString(36).slice(2, 8),
       title: newTrackTitle.trim() || `${stageName || 'Artist'} — Official Performance Showcase`,
       subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
-      youtube_url: newTrackUrl.trim(),
+      youtube_url: `https://www.youtube.com/watch?v=${ytId}`,
       duration: newTrackDuration.trim() || '3:30',
     };
     setShowcaseTracks(prev => [...prev, track]);
@@ -307,6 +485,36 @@ function ArtistProfile() {
       return;
     }
 
+    // Auto-append any unsaved YouTube URL typed into the "Add New YouTube Link" input box
+    let finalShowcaseTracks = [...showcaseTracks];
+    if (newTrackUrl.trim()) {
+      const pendingYtId = extractYouTubeId(newTrackUrl.trim());
+      if (pendingYtId) {
+        finalShowcaseTracks.push({
+          id: 'trk-' + Math.random().toString(36).slice(2, 8),
+          title: newTrackTitle.trim() || `${stageName || 'Artist'} — Official Performance Showcase`,
+          subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
+          youtube_url: `https://www.youtube.com/watch?v=${pendingYtId}`,
+          duration: newTrackDuration.trim() || '3:30',
+        });
+        setNewTrackTitle('');
+        setNewTrackSubtitle('');
+        setNewTrackUrl('');
+        setNewTrackDuration('');
+      }
+    }
+
+    // Auto-append any unsaved gallery photo URL typed in Tab 2
+    let finalMediaGallery = [...mediaGallery];
+    if (newGalleryImageUrl.trim()) {
+      finalMediaGallery.push({
+        type: 'Image',
+        url: newGalleryImageUrl.trim(),
+        title: `${stageName} Showcase Photo`,
+      });
+      setNewGalleryImageUrl('');
+    }
+
     // Filter out empty 0-follower social entries if no URL and 0 followers
     const cleanedSocials: Record<string, { url: string; followers: number }> = {};
     Object.entries(socialsEdit).forEach(([plat, val]) => {
@@ -328,17 +536,22 @@ function ArtistProfile() {
         bio: bio,
         profile_image: profileImage,
         cover_image: coverImage,
+        cover_position: `${bannerPosX}% ${bannerPosY}%`,
+        cover_zoom: bannerZoom,
         booking_status: bookingStatus,
         availability_status: availabilityStatus,
         technical_rider: techRider,
         hospitality_rider: hospRider,
-        showcase_tracks: showcaseTracks,
-        featured_youtube_url: showcaseTracks[0]?.youtube_url || '',
+        showcase_tracks: finalShowcaseTracks,
+        featured_youtube_url: finalShowcaseTracks[0]?.youtube_url || '',
+        media: finalMediaGallery,
         socials: cleanedSocials,
         blocked_dates: blockedDates,
       });
 
       setArtist(updated);
+      setShowcaseTracks(finalShowcaseTracks);
+      setMediaGallery(finalMediaGallery);
       editDialogRef.current?.close();
       setSaveSuccessToast('Talent profile updated and published live!');
       setTimeout(() => setSaveSuccessToast(''), 3200);
@@ -430,6 +643,10 @@ function ArtistProfile() {
     return artistBookings.find(b => b.event_date === dStr && b.status !== 'Cancelled');
   };
 
+  const activeBannerUrl = bannerEditMode ? (bannerDraftImage || artist.cover_image) : artist.cover_image;
+  const activeBannerPos = bannerEditMode ? `${bannerPosX}% ${bannerPosY}%` : (artist.cover_position || '50% 35%');
+  const activeBannerZoom = bannerEditMode ? bannerZoom : (artist.cover_zoom || 100);
+
   return (
     <div className="artist-profile-viewport luxury-bg">
       {saveSuccessToast && (
@@ -458,8 +675,297 @@ function ArtistProfile() {
         </div>
       )}
 
-      {/* 1. HERO COVER BANNER */}
-      <section className="profile-hero-banner" style={{ backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.75) 100%), url(${artist.cover_image})` }}>
+      {/* 1. HERO COVER BANNER (with Admin Drag-and-Drop & Interactive Alignment) */}
+      <section
+        className="profile-hero-banner"
+        onDragOver={handleBannerDragOver}
+        onDragLeave={handleBannerDragLeave}
+        onDrop={handleBannerDrop}
+        onPointerDown={handleBannerPointerDown}
+        onPointerMove={handleBannerPointerMove}
+        onPointerUp={handleBannerPointerUp}
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.18) 0%, rgba(15,23,42,0.78) 100%), url("${activeBannerUrl}")`,
+          backgroundPosition: activeBannerPos,
+          backgroundSize: activeBannerZoom > 100 ? `${activeBannerZoom}%` : 'cover',
+          backgroundRepeat: 'no-repeat',
+          cursor: bannerEditMode ? (isDraggingBannerPan ? 'grabbing' : 'grab') : 'default',
+          userSelect: bannerEditMode ? 'none' : 'auto',
+          outline: isDraggingFileOverBanner ? '3px dashed var(--gold-primary)' : 'none',
+          outlineOffset: '-6px',
+        }}
+      >
+        {/* Hidden File Input for Direct Hero Banner Upload */}
+        {canManage && (
+          <input
+            ref={heroBannerInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleBannerFileSelected(file);
+            }}
+          />
+        )}
+
+        {/* Drag-and-drop file overlay cue */}
+        {canManage && isDraggingFileOverBanner && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.78)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 30,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.6rem',
+              color: 'var(--gold-primary)',
+              fontWeight: 700,
+              fontSize: '1.1rem',
+              pointerEvents: 'none',
+            }}
+          >
+            <Upload className="w-8 h-8 text-amber-400" />
+            <span>Drop Image Here to Set &amp; Align Talent Header Banner</span>
+          </div>
+        )}
+
+        {/* Top-Right Admin Banner Controls */}
+        {canManage && (
+          <div
+            className="banner-editor-dock"
+            style={{
+              position: 'absolute',
+              top: 20,
+              right: 24,
+              zIndex: 25,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '0.65rem',
+              maxWidth: '92vw',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => heroBannerInputRef.current?.click()}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.82)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(212, 175, 55, 0.45)',
+                  color: '#fff',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: 8,
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                }}
+              >
+                <Upload className="w-3.5 h-3.5 text-amber-400" />
+                Upload / Drop Banner
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!bannerEditMode) {
+                    setBannerDraftImage(artist.cover_image);
+                    const parsed = parseCoverPosition(artist.cover_position);
+                    setBannerPosX(parsed.x);
+                    setBannerPosY(parsed.y);
+                    setBannerZoom(artist.cover_zoom || 100);
+                  }
+                  setBannerEditMode(!bannerEditMode);
+                }}
+                style={{
+                  background: bannerEditMode ? 'var(--gold-gradient)' : 'rgba(15, 23, 42, 0.82)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(212, 175, 55, 0.55)',
+                  color: bannerEditMode ? '#0f172a' : 'var(--gold-primary)',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: 8,
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {bannerEditMode ? 'Editing Banner Alignment' : 'Align / Reposition Banner'}
+              </button>
+            </div>
+
+            {/* Interactive Alignment & Framing Panel */}
+            {bannerEditMode && (
+              <div
+                style={{
+                  background: 'rgba(12, 16, 31, 0.94)',
+                  backdropFilter: 'blur(18px)',
+                  border: '1px solid rgba(212, 175, 55, 0.45)',
+                  borderRadius: 12,
+                  padding: '0.9rem 1.05rem',
+                  width: 340,
+                  maxWidth: '90vw',
+                  boxShadow: '0 18px 42px rgba(0,0,0,0.65)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                  color: '#fff',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Drag Banner or Adjust Sliders
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                    {bannerPosX}% X • {bannerPosY}% Y • {bannerZoom}%
+                  </span>
+                </div>
+
+                {/* Quick Vertical Presets */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[
+                    { label: 'Top (Face High)', y: 15 },
+                    { label: 'Upper-Mid', y: 35 },
+                    { label: 'Center', y: 50 },
+                    { label: 'Bottom', y: 80 },
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setBannerPosY(preset.y)}
+                      style={{
+                        flex: 1,
+                        padding: '3px 4px',
+                        fontSize: '0.66rem',
+                        fontWeight: 600,
+                        borderRadius: 5,
+                        cursor: 'pointer',
+                        background: Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.25)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${Math.abs(bannerPosY - preset.y) <= 5 ? 'rgba(212,175,55,0.6)' : 'rgba(255,255,255,0.12)'}`,
+                        color: Math.abs(bannerPosY - preset.y) <= 5 ? 'var(--gold-primary)' : '#cbd5e1',
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Vertical Alignment Slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                  <span style={{ width: 70, color: '#cbd5e1' }}>Vertical:</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={bannerPosY}
+                    onChange={(e) => setBannerPosY(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Horizontal Alignment Slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                  <span style={{ width: 70, color: '#cbd5e1' }}>Horizontal:</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={bannerPosX}
+                    onChange={(e) => setBannerPosX(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Zoom Slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.73rem' }}>
+                  <span style={{ width: 70, color: '#cbd5e1' }}>Zoom:</span>
+                  <input
+                    type="range"
+                    min={100}
+                    max={160}
+                    value={bannerZoom}
+                    onChange={(e) => setBannerZoom(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#d4af37', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Optional Direct Image URL input */}
+                <input
+                  type="text"
+                  value={bannerDraftImage}
+                  onChange={(e) => setBannerDraftImage(e.target.value)}
+                  placeholder="Or paste banner image URL..."
+                  style={{
+                    padding: '0.4rem 0.6rem',
+                    fontSize: '0.74rem',
+                    background: 'rgba(0,0,0,0.4)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 6,
+                    color: '#fff',
+                  }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBannerEditMode(false);
+                      setBannerDraftImage(artist.cover_image);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: 6,
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.16)',
+                      color: '#e2e8f0',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBannerDirectly}
+                    style={{
+                      flex: 1.5,
+                      padding: '0.45rem 0.75rem',
+                      borderRadius: 6,
+                      background: 'var(--gold-gradient)',
+                      border: 'none',
+                      color: '#0f172a',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <Check className="w-3.5 h-3.5" /> Save Banner
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="container hero-inner-alignment">
           <Link href="/talent" className="back-link">
             <ChevronLeft className="w-4 h-4" /> Back to Directory
@@ -517,7 +1023,7 @@ function ArtistProfile() {
                     onClick={() => openEditModalOnTab('showcase')}
                     style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.35)', color: 'var(--gold-primary)', borderRadius: 6, padding: '5px 11px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
                   >
-                    <Video className="w-3.5 h-3.5" /> Manage YouTube Links
+                    <Video className="w-3.5 h-3.5" /> Manage YouTube &amp; Photos
                   </button>
                 )}
               </div>
@@ -529,8 +1035,10 @@ function ArtistProfile() {
                     <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(212,175,55,0.3)', background: '#000', boxShadow: '0 12px 32px rgba(0,0,0,0.45)' }}>
                       <div style={{ position: 'relative', paddingTop: '56.25%', width: '100%' }}>
                         <iframe
-                          src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&rel=0&modestbranding=1`}
+                          key={currentVideoId}
+                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1&rel=0`}
                           title={currentTrack.title}
+                          referrerPolicy="strict-origin-when-cross-origin"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                           allowFullScreen
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
@@ -574,7 +1082,7 @@ function ArtistProfile() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span className="track-title">{currentTrack.title}</span>
                           <span style={{ fontSize: '0.65rem', padding: '1px 7px', borderRadius: 12, background: 'rgba(239,68,68,0.16)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontWeight: 600 }}>
-                            ▶ YouTube Stream
+                            ▶ Click to Play Video
                           </span>
                         </div>
                         <span className="track-artist">{currentTrack.subtitle || `${artist.stage_name} • Official Showcase`}</span>
@@ -607,7 +1115,7 @@ function ArtistProfile() {
 
               {/* Tracklist / YouTube Showcase Selector */}
               {activeTracks.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: artist.media && artist.media.length > 0 ? '1.25rem' : 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: (artist.media && artist.media.length > 0) || canManage ? '1.25rem' : 0 }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 2 }}>
                     Featured Tracks &amp; Live Reels ({activeTracks.length})
                   </div>
@@ -636,11 +1144,21 @@ function ArtistProfile() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
                           {vid ? (
-                            <div style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)' }}>
+                            <div style={{ position: 'relative', width: 64, height: 40, borderRadius: 6, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.12)', background: '#0f172a' }}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`}
+                                src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
                                 alt={trk.title}
+                                loading="lazy"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  if (!img.dataset.fallback) {
+                                    img.dataset.fallback = '1';
+                                    img.src = `https://img.youtube.com/vi/${vid}/0.jpg`;
+                                  } else {
+                                    img.src = artist.profile_image || '/images/artist_reggae.jpg';
+                                  }
+                                }}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
                               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -678,32 +1196,150 @@ function ArtistProfile() {
                 </div>
               )}
               
-              {artist.media && artist.media.length > 0 && (
-                <div className="media-gallery-grid">
-                  {artist.media.map((med, idx) => {
-                    const mediaYtId = med.type !== 'Image' ? extractYouTubeId(med.url) : null;
-                    return (
-                      <div key={idx} className="media-gallery-item">
-                        {med.type === 'Image' ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={med.url} alt={`${artist.stage_name} gallery`} className="gallery-img" />
-                        ) : mediaYtId ? (
-                          <iframe
-                            src={`https://www.youtube-nocookie.com/embed/${mediaYtId}?rel=0`}
-                            title={med.title || `${artist.stage_name} video`}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            style={{ width: '100%', height: '100%', border: 'none' }}
-                          />
-                        ) : (
-                          <a href={med.url} target="_blank" rel="noopener noreferrer" className="video-thumbnail-placeholder" style={{ textDecoration: 'none' }}>
-                            <Play className="w-8 h-8 text-amber-500" />
-                            <span>Watch Video Clip</span>
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })}
+              {/* Showcase Photo & Media Gallery (with Direct Inline Admin Replace / Upload / Delete) */}
+              {((artist.media && artist.media.length > 0) || canManage) && (
+                <div>
+                  {canManage && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: 6 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                        Showcase Press Photos &amp; Media ({artist.media?.length || 0})
+                      </span>
+                      <label
+                        style={{
+                          background: 'rgba(212,175,55,0.12)',
+                          border: '1px solid rgba(212,175,55,0.35)',
+                          color: 'var(--gold-primary)',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          fontSize: '0.73rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <Upload className="w-3.5 h-3.5" /> + Add Showcase Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleAddGalleryPhotoInline(f);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <div className="media-gallery-grid">
+                    {(artist.media || []).map((med, idx) => {
+                      const mediaYtId = med.type !== 'Image' ? extractYouTubeId(med.url) : null;
+                      return (
+                        <div
+                          key={idx}
+                          className="media-gallery-item"
+                          style={{ position: 'relative' }}
+                          onDragOver={(e) => {
+                            if (!canManage) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onDrop={(e) => {
+                            if (!canManage) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const f = e.dataTransfer.files?.[0];
+                            if (f && f.type.startsWith('image/')) {
+                              handleReplaceGalleryPhotoInline(idx, f);
+                            }
+                          }}
+                        >
+                          {med.type === 'Image' ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={med.url} alt={`${artist.stage_name} gallery`} className="gallery-img" />
+                          ) : mediaYtId ? (
+                            <iframe
+                              src={`https://www.youtube.com/embed/${mediaYtId}?rel=0`}
+                              title={med.title || `${artist.stage_name} video`}
+                              referrerPolicy="strict-origin-when-cross-origin"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              style={{ width: '100%', height: '100%', border: 'none' }}
+                            />
+                          ) : (
+                            <a href={med.url} target="_blank" rel="noopener noreferrer" className="video-thumbnail-placeholder" style={{ textDecoration: 'none' }}>
+                              <Play className="w-8 h-8 text-amber-500" />
+                              <span>Watch Video Clip</span>
+                            </a>
+                          )}
+
+                          {/* Admin Overlay Controls Directly on the Showcase Image */}
+                          {canManage && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: 10,
+                                right: 10,
+                                display: 'flex',
+                                gap: 6,
+                                zIndex: 10,
+                              }}
+                            >
+                              <label
+                                title="Replace or drag-and-drop a new image here"
+                                style={{
+                                  background: 'rgba(15, 23, 42, 0.88)',
+                                  backdropFilter: 'blur(8px)',
+                                  border: '1px solid rgba(212, 175, 55, 0.5)',
+                                  color: 'var(--gold-primary)',
+                                  padding: '5px 10px',
+                                  borderRadius: 6,
+                                  fontSize: '0.73rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                                }}
+                              >
+                                <Camera className="w-3.5 h-3.5" /> Change Photo
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleReplaceGalleryPhotoInline(idx, f);
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteGalleryPhotoInline(idx)}
+                                title="Remove this showcase photo"
+                                style={{
+                                  background: 'rgba(15, 23, 42, 0.88)',
+                                  backdropFilter: 'blur(8px)',
+                                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                                  color: '#ff453a',
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -1792,7 +2428,10 @@ function ArtistProfile() {
                 <input
                   type="text"
                   value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
+                  onChange={(e) => {
+                    setCoverImage(e.target.value);
+                    setBannerDraftImage(e.target.value);
+                  }}
                   placeholder="Cover URL or upload below"
                   style={{ marginBottom: 6 }}
                 />
@@ -1807,18 +2446,38 @@ function ArtistProfile() {
                   />
                 </div>
                 {coverImage && (
-                  <div className="preview-img-container">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={coverImage} alt="Cover Preview" className="preview-img" />
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div
+                      style={{
+                        height: 80,
+                        borderRadius: 6,
+                        border: '1px solid rgba(212,175,55,0.35)',
+                        backgroundImage: `url("${coverImage}")`,
+                        backgroundPosition: `${bannerPosX}% ${bannerPosY}%`,
+                        backgroundSize: bannerZoom > 100 ? `${bannerZoom}%` : 'cover',
+                        backgroundRepeat: 'no-repeat',
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      <span>Vertical Align ({bannerPosY}%):</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={bannerPosY}
+                        onChange={(e) => setBannerPosY(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: '#d4af37', padding: 0 }}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* TAB 2: YOUTUBE & AUDIO SHOWCASE */}
+          {/* TAB 2: YOUTUBE & AUDIO SHOWCASE + SHOWCASE GALLERY PHOTOS */}
           {editModalTab === 'showcase' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
               <div style={{ padding: '0.85rem 1rem', borderRadius: 8, background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 <strong style={{ color: 'var(--gold-primary)' }}>YouTube Music &amp; Live Video Showcase:</strong> Paste any YouTube link (e.g. <code>https://www.youtube.com/watch?v=...</code>, <code>https://youtu.be/...</code>, or <code>https://music.youtube.com/watch?v=...</code>). The profile automatically generates thumbnail previews and embeds an interactive player.
               </div>
@@ -1844,8 +2503,17 @@ function ArtistProfile() {
                       {vid ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`}
+                          src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
                           alt={trk.title}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.fallback) {
+                              img.dataset.fallback = '1';
+                              img.src = `https://img.youtube.com/vi/${vid}/0.jpg`;
+                            } else {
+                              img.src = artist.profile_image || '/images/artist_reggae.jpg';
+                            }
+                          }}
                           style={{ width: 64, height: 40, objectFit: 'cover', borderRadius: 5 }}
                         />
                       ) : (
@@ -1940,6 +2608,158 @@ function ArtistProfile() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Showcase Gallery Photos Editor (Images Below YouTube Tracks) */}
+              <div style={{ padding: '1rem', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gold-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Showcase Gallery Photos (Displayed Below YouTube Tracks)
+                    </div>
+                    <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                      Replace, upload, or remove the press/performance photos shown at the bottom of the Showcase card.
+                    </div>
+                  </div>
+                  <label
+                    style={{
+                      background: 'rgba(212,175,55,0.16)',
+                      border: '1px solid rgba(212,175,55,0.4)',
+                      color: 'var(--gold-primary)',
+                      padding: '5px 11px',
+                      borderRadius: 6,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                    }}
+                  >
+                    <Upload className="w-3.5 h-3.5" /> + Upload Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setMediaGallery(prev => [...prev, { type: 'Image', url: reader.result as string, title: `${stageName} Showcase Photo` }]);
+                          };
+                          reader.readAsDataURL(f);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {mediaGallery.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: '0.75rem' }}>
+                    {mediaGallery.map((med, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '84px 1fr auto auto',
+                          gap: '0.65rem',
+                          alignItems: 'center',
+                          padding: '0.55rem 0.75rem',
+                          borderRadius: 8,
+                          background: 'rgba(0,0,0,0.3)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={med.url}
+                          alt={`Gallery ${idx + 1}`}
+                          style={{ width: 84, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)' }}
+                        />
+                        <input
+                          type="text"
+                          value={med.url}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setMediaGallery(prev => prev.map((item, i) => i === idx ? { ...item, url: val } : item));
+                          }}
+                          placeholder="Image URL or upload file..."
+                          style={{ padding: '0.45rem 0.6rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.78rem' }}
+                        />
+                        <label
+                          title="Replace photo from computer"
+                          style={{
+                            background: 'rgba(212,175,55,0.12)',
+                            border: '1px solid rgba(212,175,55,0.35)',
+                            color: 'var(--gold-primary)',
+                            padding: '6px 10px',
+                            borderRadius: 6,
+                            fontSize: '0.74rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <Camera className="w-3.5 h-3.5" /> Change
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const dataUrl = reader.result as string;
+                                  setMediaGallery(prev => prev.map((item, i) => i === idx ? { ...item, type: 'Image', url: dataUrl } : item));
+                                };
+                                reader.readAsDataURL(f);
+                              }
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setMediaGallery(prev => prev.filter((_, i) => i !== idx))}
+                          title="Remove photo"
+                          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ff453a', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
+                    No gallery photos currently attached. Upload a photo or paste an image URL below.
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={newGalleryImageUrl}
+                    onChange={(e) => setNewGalleryImageUrl(e.target.value)}
+                    placeholder="Or paste an image URL (https://...) to add to gallery"
+                    style={{ flex: 1, padding: '0.5rem 0.7rem', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#fff', fontSize: '0.8rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newGalleryImageUrl.trim()) return;
+                      setMediaGallery(prev => [...prev, { type: 'Image', url: newGalleryImageUrl.trim(), title: `${stageName} Showcase Photo` }]);
+                      setNewGalleryImageUrl('');
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '0 0.9rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                  >
+                    + Add Image URL
+                  </button>
                 </div>
               </div>
             </div>

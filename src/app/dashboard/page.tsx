@@ -1785,12 +1785,16 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     is_featured: false
   };
   const [form, setForm] = useState(blank);
+  const [mediaGallery, setMediaGallery] = useState<{ type: 'Audio' | 'Video' | 'Image'; url: string; title?: string }[]>([]);
+  const [newGalleryImageUrl, setNewGalleryImageUrl] = useState('');
 
   const openCreate = () => {
     setEditItem(null);
     setForm(blank);
     setModalTab('overview');
     setShowcaseTracks([]);
+    setMediaGallery([]);
+    setNewGalleryImageUrl('');
     setSocialsEdit({
       Instagram: { url: '', followers: 0 },
       Spotify: { url: '', followers: 0 },
@@ -1832,6 +1836,8 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
             }
           ]
     );
+    setMediaGallery(a.media && a.media.length > 0 ? a.media.map(m => ({ ...m })) : []);
+    setNewGalleryImageUrl('');
     setSocialsEdit(
       a.socials && Object.keys(a.socials).length > 0
         ? { ...a.socials }
@@ -1865,7 +1871,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       id: 'trk-' + Math.random().toString(36).slice(2, 8),
       title: newTrackTitle.trim() || `${form.stage_name || 'Artist'} — Official Showcase`,
       subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
-      youtube_url: newTrackUrl.trim(),
+      youtube_url: `https://www.youtube.com/watch?v=${vid}`,
       duration: newTrackDuration.trim() || '3:40',
     };
     setShowcaseTracks(prev => [...prev, trk]);
@@ -1904,6 +1910,35 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     }
     setSaving(true);
     try {
+      // Auto-append any typed YouTube URL that wasn't clicked "+ Add" yet
+      const finalTracks = [...showcaseTracks];
+      if (newTrackUrl.trim()) {
+        const pendingVid = extractYouTubeId(newTrackUrl.trim());
+        if (pendingVid) {
+          finalTracks.push({
+            id: 'trk-' + Math.random().toString(36).slice(2, 8),
+            title: newTrackTitle.trim() || `${form.stage_name} — Official Showcase`,
+            subtitle: newTrackSubtitle.trim() || 'Official YouTube Audio / Video Showcase',
+            youtube_url: `https://www.youtube.com/watch?v=${pendingVid}`,
+            duration: newTrackDuration.trim() || '3:40',
+          });
+          setNewTrackTitle('');
+          setNewTrackSubtitle('');
+          setNewTrackUrl('');
+          setNewTrackDuration('');
+        }
+      }
+
+      const finalMedia = [...mediaGallery];
+      if (newGalleryImageUrl.trim()) {
+        finalMedia.push({
+          type: 'Image',
+          url: newGalleryImageUrl.trim(),
+          title: `${form.stage_name} Showcase Photo`,
+        });
+        setNewGalleryImageUrl('');
+      }
+
       const cleanedSocials: Record<string, { url: string; followers: number }> = {};
       Object.entries(socialsEdit).forEach(([plat, val]) => {
         if (val && (val.followers > 0 || (val.url && val.url.trim().length > 0))) {
@@ -1916,8 +1951,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
 
       const payload: Omit<Artist, 'id'> = {
         ...form,
-        showcase_tracks: showcaseTracks,
-        featured_youtube_url: showcaseTracks[0]?.youtube_url || '',
+        showcase_tracks: finalTracks,
+        featured_youtube_url: finalTracks[0]?.youtube_url || '',
+        media: finalMedia,
         socials: cleanedSocials,
         blocked_dates: blockedDates,
       };
@@ -2202,7 +2238,20 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                     >
                       {vid ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={`https://i.ytimg.com/vi/${vid}/mqdefault.jpg`} alt={trk.title} style={{ width: 60, height: 38, objectFit: 'cover', borderRadius: 4 }} />
+                        <img
+                          src={`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`}
+                          alt={trk.title}
+                          onError={e => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.fallback) {
+                              img.dataset.fallback = '1';
+                              img.src = `https://img.youtube.com/vi/${vid}/0.jpg`;
+                            } else {
+                              img.src = form.profile_image || '/images/artist_reggae.jpg';
+                            }
+                          }}
+                          style={{ width: 60, height: 38, objectFit: 'cover', borderRadius: 4 }}
+                        />
                       ) : (
                         <div style={{ width: 60, height: 38, borderRadius: 4, background: 'rgba(212,175,55,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Music size={14} color="var(--accent)" />
@@ -2257,6 +2306,45 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                     </div>
                   </Field>
                 </FGrid>
+              </div>
+
+              {/* Showcase Gallery Photos Editor */}
+              <div style={{ padding: '0.85rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                  Showcase Gallery Photos (Displayed Below YouTube Tracks)
+                </div>
+                {mediaGallery.map((med, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: '0.5rem', alignItems: 'center', marginBottom: '0.45rem' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={med.url} alt="" style={{ width: 72, height: 44, objectFit: 'cover', borderRadius: 5 }} />
+                    <input
+                      value={med.url}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setMediaGallery(prev => prev.map((m, i) => i === idx ? { ...m, url: v } : m));
+                      }}
+                      placeholder="Photo URL..."
+                      style={{ ...iStyle, fontSize: '0.78rem', height: 32 }}
+                    />
+                    <ABtn variant="danger" size="sm" onClick={() => setMediaGallery(prev => prev.filter((_, i) => i !== idx))}>
+                      <Trash2 size={12} />
+                    </ABtn>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <FInput value={newGalleryImageUrl} onChange={setNewGalleryImageUrl} placeholder="Paste image URL to add to showcase gallery..." />
+                  <ABtn
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (!newGalleryImageUrl.trim()) return;
+                      setMediaGallery(prev => [...prev, { type: 'Image', url: newGalleryImageUrl.trim() }]);
+                      setNewGalleryImageUrl('');
+                    }}
+                  >
+                    <Plus size={12} />Add Photo
+                  </ABtn>
+                </div>
               </div>
             </div>
           )}
