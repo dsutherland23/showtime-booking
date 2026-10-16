@@ -89,6 +89,11 @@ function parseArtistRow(row) {
     }
   }
 
+  if (!Array.isArray(parsed.media)) parsed.media = [];
+  if (!Array.isArray(parsed.showcase_tracks)) parsed.showcase_tracks = [];
+  if (!Array.isArray(parsed.blocked_dates)) parsed.blocked_dates = [];
+  if (typeof parsed.socials !== 'object' || parsed.socials === null || Array.isArray(parsed.socials)) parsed.socials = {};
+
   if (parsed.is_featured !== undefined) {
     parsed.is_featured = Boolean(parsed.is_featured);
   }

@@ -2442,6 +2442,19 @@ export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey
 export const supabase = isSupabaseConfigured ? createClient() : null;
 
 // ---------------------------------------------------------
+function parseJsonSafe<T>(val: any, fallback: T): T {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return parsed !== null && parsed !== undefined ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return val as T;
+}
+
 function normalizeRemoteArtist(remote: any): Artist {
   const seed = SEED_ARTISTS.find(s => s.id === remote.id);
   const base = seed ? { ...seed } : ({} as any);
@@ -2451,18 +2464,25 @@ function normalizeRemoteArtist(remote: any): Artist {
     ...remote,
   };
 
-  // Keep rich seed values if remote is null / empty
-  if (!merged.showcase_tracks || (Array.isArray(merged.showcase_tracks) && merged.showcase_tracks.length === 0)) {
-    if (seed?.showcase_tracks) merged.showcase_tracks = seed.showcase_tracks;
+  // Safely parse JSON strings from SQLite / D1
+  merged.media = parseJsonSafe(merged.media, seed?.media || []);
+  if (!Array.isArray(merged.media)) {
+    merged.media = seed?.media || [];
   }
-  if (!merged.socials || Object.keys(merged.socials).length === 0) {
-    if (seed?.socials) merged.socials = seed.socials;
+
+  merged.socials = parseJsonSafe(merged.socials, seed?.socials || {});
+  if (typeof merged.socials !== 'object' || Array.isArray(merged.socials) || merged.socials === null) {
+    merged.socials = seed?.socials || {};
   }
-  if (!merged.media || (Array.isArray(merged.media) && merged.media.length === 0)) {
-    if (seed?.media) merged.media = seed.media;
+
+  merged.showcase_tracks = parseJsonSafe(merged.showcase_tracks, seed?.showcase_tracks || []);
+  if (!Array.isArray(merged.showcase_tracks) || merged.showcase_tracks.length === 0) {
+    merged.showcase_tracks = seed?.showcase_tracks || [];
   }
-  if ((!merged.blocked_dates || merged.blocked_dates.length === 0) && seed?.blocked_dates) {
-    merged.blocked_dates = seed.blocked_dates;
+
+  merged.blocked_dates = parseJsonSafe(merged.blocked_dates, seed?.blocked_dates || []);
+  if (!Array.isArray(merged.blocked_dates)) {
+    merged.blocked_dates = seed?.blocked_dates || [];
   }
 
   // Ensure booleans and numbers are cast properly

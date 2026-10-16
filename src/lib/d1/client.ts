@@ -51,15 +51,40 @@ export async function executeD1Query<T = any>(sql: string, params: any[] = []): 
   return data.result[0].results as T[];
 }
 
+function parseD1ArtistRow(row: any) {
+  if (!row) return null;
+  const parsed = { ...row };
+  const jsonFields = ['socials', 'media', 'showcase_tracks', 'blocked_dates', 'extra_json'];
+  for (const field of jsonFields) {
+    if (parsed[field] && typeof parsed[field] === 'string') {
+      try {
+        parsed[field] = JSON.parse(parsed[field]);
+      } catch {}
+    }
+  }
+  if (!Array.isArray(parsed.media)) parsed.media = [];
+  if (!Array.isArray(parsed.showcase_tracks)) parsed.showcase_tracks = [];
+  if (!Array.isArray(parsed.blocked_dates)) parsed.blocked_dates = [];
+  if (typeof parsed.socials !== 'object' || parsed.socials === null || Array.isArray(parsed.socials)) parsed.socials = {};
+  if (parsed.is_featured !== undefined) parsed.is_featured = Boolean(parsed.is_featured);
+  if (parsed.estimated_fee !== undefined && parsed.estimated_fee !== null) parsed.estimated_fee = Number(parsed.estimated_fee);
+  if (parsed.cover_zoom !== undefined && parsed.cover_zoom !== null) parsed.cover_zoom = Number(parsed.cover_zoom);
+  if (parsed.extra_json && typeof parsed.extra_json === 'object') {
+    Object.assign(parsed, parsed.extra_json);
+  }
+  return parsed;
+}
+
 export const d1 = {
   // --- ARTISTS ---
   async getArtists() {
-    return executeD1Query('SELECT * FROM artists ORDER BY is_featured DESC, stage_name ASC');
+    const rows = await executeD1Query('SELECT * FROM artists ORDER BY is_featured DESC, stage_name ASC');
+    return rows.map(parseD1ArtistRow);
   },
 
   async getArtistById(id: string) {
     const res = await executeD1Query('SELECT * FROM artists WHERE id = ? LIMIT 1', [id]);
-    return res[0] || null;
+    return res[0] ? parseD1ArtistRow(res[0]) : null;
   },
 
   async updateArtistProfile(id: string, updates: Record<string, any>) {

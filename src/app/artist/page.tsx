@@ -157,17 +157,15 @@ function ArtistProfile() {
     setHospRider(data.hospitality_rider || '');
 
     const defaultTracks = DEFAULT_SHOWCASE_BY_CATEGORY[data.category] || DEFAULT_SHOWCASE_BY_CATEGORY.default;
-    setShowcaseTracks(
-      data.showcase_tracks && data.showcase_tracks.length > 0
-        ? data.showcase_tracks
-        : defaultTracks
-    );
-    setMediaGallery(
-      data.media && data.media.length > 0
-        ? data.media.map(m => ({ ...m }))
-        : []
-    );
-    setSocialsEdit(data.socials ? { ...data.socials } : {
+    const safeTracks = Array.isArray(data.showcase_tracks) && data.showcase_tracks.length > 0
+      ? data.showcase_tracks
+      : defaultTracks;
+    setShowcaseTracks(safeTracks);
+
+    const safeMedia = Array.isArray(data.media) ? data.media : [];
+    setMediaGallery(safeMedia.map(m => ({ ...m })));
+
+    setSocialsEdit(data.socials && typeof data.socials === 'object' && !Array.isArray(data.socials) ? { ...data.socials } : {
       Instagram: { url: '', followers: 0 },
       Spotify: { url: '', followers: 0 },
       YouTube: { url: '', followers: 0 },
@@ -372,7 +370,8 @@ function ArtistProfile() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const dataUrl = reader.result as string;
-      const nextMedia = [...(artist.media || [])];
+      const safeCurrentMedia = Array.isArray(artist.media) ? artist.media : [];
+      const nextMedia = [...safeCurrentMedia];
       nextMedia[index] = { type: 'Image', url: dataUrl, title: `${artist.stage_name} Showcase Photo` };
       const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
       setArtist(updated);
@@ -388,7 +387,8 @@ function ArtistProfile() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const dataUrl = reader.result as string;
-      const nextMedia = [...(artist.media || []), { type: 'Image' as const, url: dataUrl, title: `${artist.stage_name} Showcase Photo` }];
+      const safeCurrentMedia = Array.isArray(artist.media) ? artist.media : [];
+      const nextMedia = [...safeCurrentMedia, { type: 'Image' as const, url: dataUrl, title: `${artist.stage_name} Showcase Photo` }];
       const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
       setArtist(updated);
       setMediaGallery(nextMedia);
@@ -400,7 +400,8 @@ function ArtistProfile() {
 
   const handleDeleteGalleryPhotoInline = async (index: number) => {
     if (!artist || !canManage) return;
-    const nextMedia = (artist.media || []).filter((_, i) => i !== index);
+    const safeCurrentMedia = Array.isArray(artist.media) ? artist.media : [];
+    const nextMedia = safeCurrentMedia.filter((_, i) => i !== index);
     const updated = await db.updateArtistProfile(artist.id, { media: nextMedia });
     setArtist(updated);
     setMediaGallery(nextMedia);
@@ -617,14 +618,16 @@ function ArtistProfile() {
 
   // Active showcase tracks for this artist
   const activeTracks: ArtistTrack[] =
-    artist.showcase_tracks && artist.showcase_tracks.length > 0
+    Array.isArray(artist.showcase_tracks) && artist.showcase_tracks.length > 0
       ? artist.showcase_tracks
       : (DEFAULT_SHOWCASE_BY_CATEGORY[artist.category] || DEFAULT_SHOWCASE_BY_CATEGORY.default);
   const currentTrack = activeTracks[activeTrackIndex] || activeTracks[0];
   const currentVideoId = extractYouTubeId(currentTrack?.youtube_url);
 
   // Total Social Reach calculation
-  const socialEntries = artist.socials ? Object.entries(artist.socials).filter(([, d]) => d && (d.followers > 0 || d.url)) : [];
+  const socialEntries = artist.socials && typeof artist.socials === 'object' && !Array.isArray(artist.socials)
+    ? Object.entries(artist.socials).filter(([, d]) => d && (d.followers > 0 || d.url))
+    : [];
   const totalSocialReach = socialEntries.reduce((sum, [, d]) => sum + (Number(d.followers) || 0), 0);
 
   // Calendar rendering math
@@ -1078,7 +1081,7 @@ function ArtistProfile() {
 
               {/* Tracklist / YouTube Showcase Selector */}
               {activeTracks.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: (artist.media && artist.media.length > 0) || canManage ? '1.25rem' : 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginBottom: (Array.isArray(artist.media) && artist.media.length > 0) || canManage ? '1.25rem' : 0 }}>
                   <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 2 }}>
                     Featured Tracks &amp; Live Reels ({activeTracks.length})
                   </div>
@@ -1161,12 +1164,12 @@ function ArtistProfile() {
               )}
               
               {/* Showcase Photo & Media Gallery (with Direct Inline Admin Replace / Upload / Delete) */}
-              {((artist.media && artist.media.length > 0) || canManage) && (
+              {((Array.isArray(artist.media) && artist.media.length > 0) || canManage) && (
                 <div>
                   {canManage && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: 6 }}>
                       <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-                        Showcase Press Photos &amp; Media ({artist.media?.length || 0})
+                        Showcase Press Photos &amp; Media ({Array.isArray(artist.media) ? artist.media.length : 0})
                       </span>
                       <label
                         style={{
@@ -1197,7 +1200,7 @@ function ArtistProfile() {
                     </div>
                   )}
                   <div className="media-gallery-grid">
-                    {(artist.media || []).map((med, idx) => {
+                    {(Array.isArray(artist.media) ? artist.media : []).map((med, idx) => {
                       const mediaYtId = med.type !== 'Image' ? extractYouTubeId(med.url) : null;
                       return (
                         <div
