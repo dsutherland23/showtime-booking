@@ -15,6 +15,18 @@ export async function POST(request: Request) {
         const artist = await d1.getArtistById(payload.id);
         return NextResponse.json({ success: true, data: artist });
       }
+      case 'updateArtistProfile': {
+        const artist = await d1.updateArtistProfile(payload.id, payload.updates);
+        return NextResponse.json({ success: true, data: artist });
+      }
+      case 'getStore': {
+        const val = await d1.getStore(payload.key);
+        return NextResponse.json({ success: true, data: val });
+      }
+      case 'setStore': {
+        const val = await d1.setStore(payload.key, payload.value);
+        return NextResponse.json({ success: true, data: val });
+      }
       case 'getLeads': {
         const leads = await d1.getLeads();
         return NextResponse.json({ success: true, data: leads });

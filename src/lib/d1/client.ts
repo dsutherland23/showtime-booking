@@ -62,6 +62,75 @@ export const d1 = {
     return res[0] || null;
   },
 
+  async updateArtistProfile(id: string, updates: Record<string, any>) {
+    const existing = await this.getArtistById(id);
+    if (!existing) throw new Error('Artist not found in D1');
+
+    const allowedColumns = [
+      'stage_name', 'legal_name', 'category', 'genre', 'bio', 'location',
+      'estimated_fee', 'price_tier', 'profile_image', 'cover_image',
+      'cover_position', 'cover_zoom', 'booking_status', 'availability_status',
+      'manager_id', 'socials', 'media', 'technical_rider', 'hospitality_rider',
+      'is_featured', 'showcase_tracks', 'featured_youtube_url', 'blocked_dates',
+      'extra_json'
+    ];
+
+    const setClauses: string[] = [];
+    const params: any[] = [];
+    const extraFields: Record<string, any> = {};
+
+    for (const [key, rawVal] of Object.entries(updates)) {
+      if (key === 'id') continue;
+      if (allowedColumns.includes(key)) {
+        let val = rawVal;
+        if (['socials', 'media', 'showcase_tracks', 'blocked_dates', 'extra_json'].includes(key)) {
+          val = typeof rawVal === 'string' ? rawVal : JSON.stringify(rawVal);
+        } else if (key === 'is_featured') {
+          val = rawVal ? 1 : 0;
+        }
+        setClauses.push(`${key} = ?`);
+        params.push(val);
+      } else {
+        extraFields[key] = rawVal;
+      }
+    }
+
+    if (Object.keys(extraFields).length > 0) {
+      const currentExtra = existing.extra_json ? (typeof existing.extra_json === 'string' ? JSON.parse(existing.extra_json) : existing.extra_json) : {};
+      const combinedExtra = { ...currentExtra, ...extraFields };
+      setClauses.push('extra_json = ?');
+      params.push(JSON.stringify(combinedExtra));
+    }
+
+    if (setClauses.length > 0) {
+      params.push(id);
+      const sql = `UPDATE artists SET ${setClauses.join(', ')} WHERE id = ?`;
+      await executeD1Query(sql, params);
+    }
+
+    return this.getArtistById(id);
+  },
+
+  // --- SITE STORE (CROSS-DEVICE SYNC) ---
+  async getStore(key: string) {
+    const rows = await executeD1Query('SELECT value FROM site_store WHERE key = ? LIMIT 1', [key]);
+    if (!rows[0] || !rows[0].value) return null;
+    try {
+      return JSON.parse(rows[0].value);
+    } catch {
+      return rows[0].value;
+    }
+  },
+
+  async setStore(key: string, value: any) {
+    const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+    await executeD1Query(
+      'INSERT INTO site_store (key, value, updated_at) VALUES (?, ?, datetime(\'now\')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+      [key, strVal]
+    );
+    return value;
+  },
+
   // --- LEADS ---
   async getLeads() {
     return executeD1Query('SELECT * FROM leads ORDER BY created_at DESC');

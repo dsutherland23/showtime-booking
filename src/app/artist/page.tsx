@@ -1561,6 +1561,13 @@ function ArtistProfile() {
       </section>
 
       <style jsx>{`
+        .artist-profile-viewport {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: clip;
+          position: relative;
+        }
+
         .profile-hero-banner {
           min-height: 380px;
           height: auto;
@@ -1572,6 +1579,8 @@ function ArtistProfile() {
           padding-top: 1.5rem;
           padding-bottom: 2rem;
           box-sizing: border-box;
+          max-width: 100%;
+          overflow-x: clip;
         }
 
         .hero-inner-alignment {
@@ -1655,8 +1664,8 @@ function ArtistProfile() {
           border: 1px solid rgba(212, 175, 55, 0.45);
           border-radius: 12px;
           padding: 0.9rem 1.05rem;
-          width: 340px;
-          max-width: 100%;
+          width: 100%;
+          max-width: 340px;
           box-sizing: border-box;
           box-shadow: 0 18px 42px rgba(0,0,0,0.65);
           display: flex;

@@ -110,6 +110,10 @@ html {
   /* Apple's signature font rendering */
   text-rendering: optimizeLegibility;
   -webkit-text-size-adjust: 100%;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip !important;
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -119,7 +123,11 @@ body {
   line-height: 1.47059;   /* Apple's exact body line-height ratio */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip !important;
+  overscroll-behavior-x: none;
+  position: relative;
   letter-spacing: -0.022em;   /* Apple's body letter-spacing */
 }
 
@@ -544,6 +552,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--bg-primary);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* Hide the old accent top bar */
@@ -664,6 +675,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   flex-grow: 1;
   position: relative;
   z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* ── Footer — Apple.com dark footer ──────────────────────── */
@@ -858,7 +872,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   position: fixed;
   top: 56px; /* Right below header */
   left: 0;
-  width: 100vw;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
   height: calc(100vh - 56px);
   background: rgba(7, 5, 14, 0.98);
   backdrop-filter: blur(28px) saturate(180%);
@@ -925,8 +941,8 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: 9999;
   opacity: 0.028;
@@ -1821,22 +1837,39 @@ a, button, [role="button"] {
   }
 }
 
-/* ── Small Mobile Screen Safety (320px–420px) ────────────────── */
+/* ── Small Mobile Screen Safety (320px–480px) ────────────────── */
+@media (max-width: 480px) {
+  html, body {
+    overflow-x: clip !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-layout,
+  .main-content-wrapper {
+    overflow-x: clip !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Prevent button, badge and heading overflow */
+  h1, h2, h3, h4, p, span, a {
+    overflow-wrap: break-word;
+  }
+
+  .container {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
 @media (max-width: 420px) {
   .container {
     padding-left: 0.85rem !important;
     padding-right: 0.85rem !important;
-  }
-
-  html, body {
-    overflow-x: hidden;
-    width: 100%;
-  }
-
-  /* Prevent button and heading overflow */
-  h1, h2, h3, h4 {
-    word-break: break-word;
-    overflow-wrap: break-word;
   }
 }
 

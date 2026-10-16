@@ -2442,8 +2442,41 @@ export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey
 export const supabase = isSupabaseConfigured ? createClient() : null;
 
 // ---------------------------------------------------------
-// DATABASE CRUD API LAYER
-// ---------------------------------------------------------
+function normalizeRemoteArtist(remote: any): Artist {
+  const seed = SEED_ARTISTS.find(s => s.id === remote.id);
+  const base = seed ? { ...seed } : ({} as any);
+
+  const merged: Artist = {
+    ...base,
+    ...remote,
+  };
+
+  // Keep rich seed values if remote is null / empty
+  if (!merged.showcase_tracks || (Array.isArray(merged.showcase_tracks) && merged.showcase_tracks.length === 0)) {
+    if (seed?.showcase_tracks) merged.showcase_tracks = seed.showcase_tracks;
+  }
+  if (!merged.socials || Object.keys(merged.socials).length === 0) {
+    if (seed?.socials) merged.socials = seed.socials;
+  }
+  if (!merged.media || (Array.isArray(merged.media) && merged.media.length === 0)) {
+    if (seed?.media) merged.media = seed.media;
+  }
+  if ((!merged.blocked_dates || merged.blocked_dates.length === 0) && seed?.blocked_dates) {
+    merged.blocked_dates = seed.blocked_dates;
+  }
+
+  // Ensure booleans and numbers are cast properly
+  if (merged.is_featured !== undefined) merged.is_featured = Boolean(merged.is_featured);
+  if (merged.estimated_fee !== undefined && merged.estimated_fee !== null) {
+    merged.estimated_fee = Number(merged.estimated_fee);
+  }
+  if (merged.cover_zoom !== undefined && merged.cover_zoom !== null) {
+    merged.cover_zoom = Number(merged.cover_zoom);
+  }
+
+  return merged;
+}
+
 export const db = {
   // --- USERS ---
   async getUsers(): Promise<User[]> {
@@ -2485,16 +2518,82 @@ export const db = {
   },
 
   // --- ARTISTS ---
-  async getArtists(): Promise<Artist[]> {
+  async getArtists(forceFresh = false): Promise<Artist[]> {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('artists').select('*');
       if (!error && data) return data as Artist[];
     }
-    return getStoreValue('st_artists_v2', SEED_ARTISTS);
+
+    if (typeof window === 'undefined') {
+      return SEED_ARTISTS;
+    }
+
+    const localArtists = getStoreValue('st_artists_v2', SEED_ARTISTS);
+
+    // Call Cloudflare D1 API to fetch globally persistent updates
+    try {
+      const res = await fetch('/api/d1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getArtists' }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const remoteNormalized = json.data.map(normalizeRemoteArtist);
+          
+          // Merge with any local artists not present in remote
+          const merged = [...remoteNormalized];
+          for (const loc of localArtists) {
+            if (!merged.some(r => r.id === loc.id)) {
+              merged.push(loc);
+            }
+          }
+
+          setStoreValue('st_artists_v2', merged);
+          return merged;
+        }
+      }
+    } catch {
+      // Offline fallback: use local storage cache
+    }
+
+    return localArtists;
   },
 
-  async getArtistById(id: string): Promise<Artist | null> {
-    const artists = await this.getArtists();
+  async getArtistById(id: string, forceFresh = false): Promise<Artist | null> {
+    if (typeof window === 'undefined') {
+      return SEED_ARTISTS.find(a => a.id === id) || null;
+    }
+
+    try {
+      const res = await fetch('/api/d1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getArtistById', payload: { id } }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          const normalized = normalizeRemoteArtist(json.data);
+          const current = getStoreValue('st_artists_v2', SEED_ARTISTS);
+          const idx = current.findIndex(a => a.id === id);
+          if (idx !== -1) {
+            current[idx] = { ...current[idx], ...normalized };
+          } else {
+            current.push(normalized);
+          }
+          setStoreValue('st_artists_v2', current);
+          return normalized;
+        }
+      }
+    } catch {
+      // Offline fallback
+    }
+
+    const artists = await this.getArtists(forceFresh);
     return artists.find(a => a.id === id) || null;
   },
 
@@ -2503,14 +2602,57 @@ export const db = {
       const { data, error } = await supabase.from('artists').update(updates).eq('id', id).select().single();
       if (!error && data) return data as Artist;
     }
+
+    // 1. Optimistically update local state immediately
     const artists = await this.getArtists();
     const idx = artists.findIndex(a => a.id === id);
+    let updatedArtist: Artist;
+
     if (idx !== -1) {
       artists[idx] = { ...artists[idx], ...updates };
+      updatedArtist = artists[idx];
       setStoreValue('st_artists_v2', artists);
-      return artists[idx];
+    } else {
+      const seed = SEED_ARTISTS.find(a => a.id === id);
+      if (!seed) throw new Error('Artist not found');
+      updatedArtist = { ...seed, ...updates };
+      artists.push(updatedArtist);
+      setStoreValue('st_artists_v2', artists);
     }
-    throw new Error('Artist not found');
+
+    // 2. Dispatch event for real-time reactivity in open tabs/windows
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_artist_updated', { detail: { id, updates: updatedArtist } }));
+      window.dispatchEvent(new Event('storage'));
+    }
+
+    // 3. Persist to Cloudflare D1 database (syncs to all devices globally)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/d1', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'updateArtistProfile', payload: { id, updates } }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const remoteNormalized = normalizeRemoteArtist(json.data);
+            const current = getStoreValue('st_artists_v2', SEED_ARTISTS);
+            const cIdx = current.findIndex(a => a.id === id);
+            if (cIdx !== -1) {
+              current[cIdx] = { ...current[cIdx], ...remoteNormalized };
+              setStoreValue('st_artists_v2', current);
+            }
+            return remoteNormalized;
+          }
+        }
+      } catch (err) {
+        console.warn('[db.updateArtistProfile] D1 sync warning:', err);
+      }
+    }
+
+    return updatedArtist;
   },
 
   // --- CRM LEADS ---
