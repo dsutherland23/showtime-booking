@@ -65,6 +65,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'tickets',      label: 'Tickets',       icon: Ticket,          section: 'Financial',       permission: 'view_tickets' },
   { id: 'marketing',    label: 'Marketing',     icon: Megaphone,       section: 'Growth',          permission: 'manage_marketing' },
   { id: 'advertising',  label: 'Advertising',   icon: Radio,           section: 'Growth',          permission: 'manage_advertising' },
+  { id: 'theme_studio',       label: 'Gold & Brand Color',    icon: Palette,     section: 'Website', adminOnly: true },
   { id: 'content',            label: 'Content CMS',           icon: FileText,    section: 'Website', permission: 'manage_content' },
   { id: 'page_services',      label: 'Services Page',         icon: Briefcase,   section: 'Website', permission: 'manage_content' },
   { id: 'page_about',         label: 'About Us Page',         icon: Compass,     section: 'Website', permission: 'manage_content' },
@@ -654,11 +655,13 @@ function Modal({ open, onClose, title, children, width = 540, className = '' }: 
   if (!open) return null;
   return (
     <div
+      data-lenis-prevent="true"
       onClick={onClose}
       className={`showtime-modal-backdrop ${className ? className + '-backdrop' : ''}`}
       style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(0.5rem, 2.5vw, 1rem)', backdropFilter: 'blur(6px)' }}
     >
       <div
+        data-lenis-prevent="true"
         onClick={e => e.stopPropagation()}
         className={`showtime-modal-card ${className}`}
         style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: 'min(92vh, 100dvh - 1rem)', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box', boxShadow: '0 24px 60px rgba(0,0,0,0.75)', animation: 'scaleIn 0.2s ease' }}
@@ -830,6 +833,54 @@ function DashboardOverview({
   const urgentLeads = leads.filter(l => l.status === 'Lead Received' || l.status === 'Qualified').slice(0, 4);
   const totalPipeline = bookings.reduce((s, b) => s + (b.total_amount || 0), 0) + leads.reduce((s, l) => s + (l.budget || 0), 0);
 
+  const [activeAccent, setActiveAccent] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('st_accent_color') || '#d4af37';
+    }
+    return '#d4af37';
+  });
+  const [syncingEdge, setSyncingEdge] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    db.getPlatformSettings().then(s => {
+      if (mounted && s?.accentColor) {
+        setActiveAccent(s.accentColor);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const handleQuickAccentChange = async (primaryHex: string, secondaryHex?: string, themeId = 'custom') => {
+    const sec = secondaryHex || adjustLightness(primaryHex, 40);
+    setActiveAccent(primaryHex);
+    applyAccentTheme(primaryHex, sec);
+    try {
+      await db.updatePlatformSettings({
+        accentColor: primaryHex,
+        accentSecondary: sec,
+        accentTheme: themeId,
+      });
+      showToast?.(`✓ Brand color updated to ${primaryHex.toUpperCase()} & synced globally!`, 'success');
+    } catch {
+      showToast?.('Applied locally; cloud sync will retry.', 'error');
+    }
+  };
+
+  const handleQuickEdgeSync = async () => {
+    setSyncingEdge(true);
+    try {
+      await db.pushAllStoresToCloud();
+      await db.syncAllStoresFromCloud();
+      onRefresh?.();
+      showToast?.('✓ Global Cloudflare D1 Edge synced across all countries!', 'success');
+    } catch {
+      showToast?.('Failed to sync with global edge.', 'error');
+    } finally {
+      setSyncingEdge(false);
+    }
+  };
+
   const handleToggleTask = async (taskId: string) => {
     try {
       await db.toggleTask(taskId);
@@ -841,7 +892,7 @@ function DashboardOverview({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* 2026 Core Operations Quick Bar */}
       <div style={{
         display: 'flex',
@@ -869,6 +920,152 @@ function DashboardOverview({
           <ABtn variant="secondary" size="sm" onClick={() => onNavigate('events')}><Star size={12} />Post Event</ABtn>
           <ABtn variant="secondary" size="sm" onClick={() => onNavigate('venues')}><MapPin size={12} />Add Venue</ABtn>
           <ABtn variant="secondary" size="sm" onClick={() => onNavigate('customers')}><Users size={12} />Add Buyer CRM</ABtn>
+          <ABtn variant="secondary" size="sm" onClick={() => onNavigate('help')}><HelpCircle size={12} />Help Center</ABtn>
+        </div>
+      </div>
+
+      {/* 2026 Brand Gold/Button Color Quick Studio & Global Multi-Country Sync Bar */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+        gap: '0.9rem',
+      }}>
+        {/* Quick Brand & Gold Color Studio Card */}
+        <div style={{
+          padding: '1rem 1.15rem',
+          borderRadius: 12,
+          background: 'rgba(255,255,255,0.025)',
+          border: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.7rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Palette size={16} style={{ color: 'var(--accent)' }} />
+              <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Brand Gold &amp; Button Color Studio
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('theme_studio')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--accent)',
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              Open Full Studio &rarr;
+            </button>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            Click any swatch or pick a custom color to instantly change all gold buttons, writing, and accents across the entire website worldwide:
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {PRESET_ACCENT_THEMES.map(t => {
+              const isSel = activeAccent.toLowerCase() === t.primary.toLowerCase();
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  title={`${t.name} (${t.primary})`}
+                  onClick={() => handleQuickAccentChange(t.primary, t.secondary, t.id)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.3rem 0.55rem',
+                    borderRadius: 999,
+                    border: isSel ? `1.5px solid ${t.primary}` : '1px solid rgba(255,255,255,0.12)',
+                    background: isSel ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
+                    color: isSel ? '#fff' : 'var(--text-secondary)',
+                    fontSize: '0.71rem',
+                    fontWeight: isSel ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${t.secondary} 0%, ${t.primary} 100%)`,
+                    display: 'inline-block',
+                    flexShrink: 0,
+                  }} />
+                  {t.name.replace('Royal Showtime ', '').replace(' Prestige', '').replace(' Sunset', '').replace(' Velvet', '')}
+                </button>
+              );
+            })}
+            <label
+              title="Pick any custom brand color"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.26rem 0.55rem',
+                borderRadius: 999,
+                border: '1px dashed rgba(255,255,255,0.25)',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'var(--text-primary)',
+                fontSize: '0.71rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="color"
+                value={activeAccent}
+                onChange={e => handleQuickAccentChange(e.target.value)}
+                style={{ width: 16, height: 16, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }}
+              />
+              Custom
+            </label>
+          </div>
+        </div>
+
+        {/* Global Multi-Country Cloud Sync Card */}
+        <div style={{
+          padding: '1rem 1.15rem',
+          borderRadius: 12,
+          background: 'rgba(255,255,255,0.025)',
+          border: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '0.7rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#30d158', boxShadow: '0 0 8px #30d158', display: 'inline-block' }} />
+              <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Global Multi-Country Cloud Sync (Cloudflare D1)
+              </span>
+            </div>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#30d158', background: 'rgba(48,209,88,0.12)', padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(48,209,88,0.3)' }}>
+              LIVE EDGE SYNC
+            </span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            All admin portal data, bookings, artists, CMS pages, and theme settings automatically synchronize across 300+ global edge cities so admins in any country see the exact same live portal state.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <ABtn variant="primary" size="sm" onClick={handleQuickEdgeSync} disabled={syncingEdge}>
+              {syncingEdge ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={12} />}
+              {syncingEdge ? 'Syncing Edge…' : 'Sync All Countries Now'}
+            </ABtn>
+            <ABtn variant="secondary" size="sm" onClick={() => onNavigate('settings')}>
+              <Settings size={12} /> Settings &amp; Audit Log
+            </ABtn>
+            <ABtn variant="secondary" size="sm" onClick={() => onNavigate('help')}>
+              <HelpCircle size={12} /> Help Center
+            </ABtn>
+          </div>
         </div>
       </div>
 
@@ -9717,9 +9914,19 @@ function IntegrationsSection({ integrations, onRefresh, showToast }: {
 
 // ─── Settings Section ─────────────────────────────────────────────────────────
 
-function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 'error') => void }) {
+function SettingsSection({
+  showToast,
+  initialSubTab = 'branding',
+}: {
+  showToast: (m: string, t: 'success' | 'error') => void;
+  initialSubTab?: 'branding' | 'theme' | 'policies' | 'security' | 'cloudSync' | 'backup';
+}) {
   const { user, profile } = useAuth();
-  const [subTab, setSubTab] = useState<'branding' | 'theme' | 'policies' | 'security' | 'cloudSync' | 'backup'>('branding');
+  const [subTab, setSubTab] = useState<'branding' | 'theme' | 'policies' | 'security' | 'cloudSync' | 'backup'>(initialSubTab);
+
+  useEffect(() => {
+    setSubTab(initialSubTab);
+  }, [initialSubTab]);
   const [agencyName, setAgencyName] = useState('Showtime Entertainment Services LLC');
   const [domain, setDomain] = useState('showtimeservices.com');
   const [contactEmail, setContactEmail] = useState('bookings@showtimeservices.com');
@@ -11404,6 +11611,7 @@ export default function AdminPortal() {
     dashboard: 'Dashboard', bookings: 'Bookings', artists: 'Artists', events: 'Events',
     venues: 'Venues', customers: 'Customers', finance: 'Finance', orders: 'Orders',
     tickets: 'Tickets & Promos', marketing: 'Marketing', advertising: 'Advertising',
+    theme_studio: 'Gold & Brand Color Studio',
     content: 'Content CMS', staff: 'Staff & Roles', integrations: 'Integrations',
     maintenance: 'System Maintenance & Retainer', settings: 'Settings', help: 'Help Center',
   };
@@ -11419,6 +11627,13 @@ export default function AdminPortal() {
   const grouped = NAV_SECTIONS
     .map(s => ({ ...s, items: visibleNavItems.filter(i => i.section === s.id) }))
     .filter(s => s.items.length > 0);
+
+  const handleSelectNavTab = (tabId: string) => {
+    setActiveTab(tabId);
+    if (typeof window !== 'undefined' && window.innerWidth <= 767) {
+      setSidebarOpen(false);
+    }
+  };
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
@@ -11444,7 +11659,7 @@ export default function AdminPortal() {
       </div>
     );
     switch (activeTab) {
-      case 'dashboard':    return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'dashboard':    return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={handleSelectNavTab} onRefresh={handleRefresh} showToast={showToast} />;
       case 'bookings':     return <BookingsSection bookings={bookings} leads={leads} artists={artists} onRefresh={handleRefresh} showToast={showToast} />;
       case 'artists':      return !hasPermission('view_artists') && !isAdmin    ? <AccessDenied /> : <ArtistsSection artists={artists} onRefresh={handleRefresh} showToast={showToast} />;
       case 'events':       return !hasPermission('view_events') && !isAdmin     ? <AccessDenied /> : <EventsSection events={events} artists={artists} venues={venues} onRefresh={handleRefresh} showToast={showToast} />;
@@ -11455,6 +11670,7 @@ export default function AdminPortal() {
       case 'tickets':      return !hasPermission('view_tickets') && !isAdmin    ? <AccessDenied /> : <TicketsSection tiers={ticketTiers} promoCodes={promoCodes} onRefresh={handleRefresh} showToast={showToast} />;
       case 'marketing':    return !hasPermission('manage_marketing') && !isAdmin    ? <AccessDenied /> : <MarketingSection campaigns={campaigns} onRefresh={handleRefresh} showToast={showToast} />;
       case 'advertising':  return !hasPermission('manage_advertising') && !isAdmin  ? <AccessDenied /> : <AdvertisingSection ads={adPlacements} onRefresh={handleRefresh} showToast={showToast} />;
+      case 'theme_studio':       return !isAdmin ? <AccessDenied /> : <SettingsSection showToast={showToast} initialSubTab="theme" />;
       case 'content':            return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} />;
       case 'page_services':      return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="services" />;
       case 'page_about':         return !hasPermission('manage_content') && !isAdmin  ? <AccessDenied /> : <ContentSection sections={websiteSections} onRefresh={handleRefresh} showToast={showToast} initialSubTab="about" />;
@@ -11464,8 +11680,8 @@ export default function AdminPortal() {
       case 'integrations': return !isAdmin ? <AccessDenied /> : <IntegrationsSection integrations={integrations} onRefresh={handleRefresh} showToast={showToast} />;
       case 'maintenance':  return !isAdmin ? <AccessDenied /> : <MaintenanceSection showToast={showToast} />;
       case 'settings':     return !isAdmin ? <AccessDenied /> : <SettingsSection showToast={showToast} />;
-      case 'help':         return <HelpSection onNavigate={setActiveTab} isAdmin={isAdmin} />;
-      default:             return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={setActiveTab} />;
+      case 'help':         return <HelpSection onNavigate={handleSelectNavTab} isAdmin={isAdmin} />;
+      default:             return <DashboardOverview bookings={bookings} leads={leads} invoices={invoices} artists={artists} tasks={tasks} onNavigate={handleSelectNavTab} />;
     }
   };
 
@@ -11478,44 +11694,63 @@ export default function AdminPortal() {
         @keyframes slideInLeft { from { transform: translateX(-100%) } to { transform: translateX(0) } }
 
         /* ── Dashboard responsive shell ── */
-        .dash-shell { display: flex; min-height: 100vh; background: var(--bg-primary); font-family: var(--font-body); }
+        .dash-shell { display: flex; min-height: calc(100dvh - 56px); background: var(--bg-primary); font-family: var(--font-body); }
         .dash-sidebar {
-          width: var(--sidebar-w, 220px);
-          height: 100vh;
-          max-height: 100dvh;
+          width: var(--sidebar-w, 224px);
+          height: calc(100dvh - 56px);
+          max-height: calc(100dvh - 56px);
           background: var(--bg-secondary);
           border-right: 1px solid var(--border-color);
           display: flex; flex-direction: column;
           transition: width 0.28s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94);
           overflow: hidden; flex-shrink: 0;
-          position: sticky; top: 0; z-index: 100;
+          position: sticky; top: 56px; z-index: 100;
         }
         .dash-sidebar nav {
           flex: 1 1 0% !important;
           min-height: 0 !important;
           overflow-y: auto !important;
+          overflow-x: hidden !important;
           -webkit-overflow-scrolling: touch !important;
           overscroll-behavior-y: contain !important;
-          scroll-padding-bottom: 2rem;
+          touch-action: pan-y !important;
+          padding: 0.4rem 0.5rem 2rem 0.5rem !important;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(212, 175, 55, 0.4) transparent;
+        }
+        .dash-sidebar nav::-webkit-scrollbar {
+          width: 5px;
+        }
+        .dash-sidebar nav::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .dash-sidebar nav::-webkit-scrollbar-thumb {
+          background: rgba(212, 175, 55, 0.35);
+          border-radius: 999px;
+        }
+        .dash-sidebar nav::-webkit-scrollbar-thumb:hover {
+          background: rgba(212, 175, 55, 0.65);
         }
         .dash-sidebar-backdrop { display: none; }
-        .dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
+        .dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: calc(100dvh - 56px); }
         .dash-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
         .dash-content-inner { max-width: 1200px; margin: 0 auto; animation: fadeInUp 0.25s ease; }
         .dash-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px,1fr)); gap: 1rem; }
         .dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .dash-notif-panel { position: absolute; right: 0; top: 110%; width: 300px; }
         .dash-header-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; margin: 0; }
+        .dash-header-quick-label { display: inline; }
 
         @media (max-width: 767px) {
           .dash-shell { flex-direction: column; overflow-x: hidden; }
+          .dash-header-quick-label { display: none; }
 
           /* Sidebar becomes a slide-in overlay drawer above NavHeader with full mobile scrollability */
           .dash-sidebar {
             position: fixed;
             left: 0; top: 0; bottom: 0;
-            height: 100dvh;
-            max-height: 100dvh;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
             z-index: 1200;
             transform: translateX(-100%);
             width: min(280px, 86vw) !important;
@@ -11567,17 +11802,18 @@ export default function AdminPortal() {
 
         {/* ── Sidebar ── */}
         <aside
+          data-lenis-prevent="true"
           className={`dash-sidebar${sidebarOpen ? ' sidebar-open' : ''}`}
           style={{
-            '--sidebar-w': sidebarOpen ? '220px' : '58px',
+            '--sidebar-w': sidebarOpen ? '224px' : '58px',
           } as React.CSSProperties}
         >
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: sidebarOpen ? '1rem 1rem 0.75rem' : '1rem 0.65rem 0.75rem', borderBottom: '1px solid var(--border-color)', gap: '0.5rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: sidebarOpen ? '0.75rem 0.9rem 0.65rem' : '0.75rem 0.65rem 0.65rem', borderBottom: '1px solid var(--border-color)', gap: '0.5rem', flexShrink: 0 }}>
             {sidebarOpen && (
               <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Showtime</div>
-                <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 2 }}>Admin Portal</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Showtime</div>
+                <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 2 }}>Admin Portal</div>
               </div>
             )}
             <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6, marginLeft: sidebarOpen ? 'auto' : 0 }}>
@@ -11586,11 +11822,14 @@ export default function AdminPortal() {
           </div>
 
           {/* Nav */}
-          <nav style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', padding: '0.5rem 0.5rem 3rem 0.5rem', scrollbarWidth: 'thin' }}>
+          <nav
+            data-lenis-prevent="true"
+            style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', padding: '0.4rem 0.5rem 2rem 0.5rem', scrollbarWidth: 'thin' }}
+          >
             {grouped.map((section, si) => (
-              <div key={section.id} style={{ marginBottom: si < grouped.length - 1 ? '0.25rem' : 0 }}>
+              <div key={section.id} style={{ marginBottom: si < grouped.length - 1 ? '0.2rem' : 0 }}>
                 {sidebarOpen && (
-                  <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.5rem 0.5rem 0.25rem' }}>
+                  <div style={{ fontSize: '0.58rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.35rem 0.5rem 0.18rem' }}>
                     {section.label}
                   </div>
                 )}
@@ -11600,17 +11839,18 @@ export default function AdminPortal() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => handleSelectNavTab(item.id)}
                       title={!sidebarOpen ? item.label : undefined}
                       style={{
                         width: '100%', display: 'flex', alignItems: 'center',
-                        gap: sidebarOpen ? '0.55rem' : 0,
+                        flexShrink: 0,
+                        gap: sidebarOpen ? '0.5rem' : 0,
                         justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                        padding: sidebarOpen ? '0.5rem 0.65rem' : '0.55rem',
+                        padding: sidebarOpen ? '0.42rem 0.6rem' : '0.48rem',
                         borderRadius: 8, border: 'none', cursor: 'pointer',
                         background: isActive ? 'rgba(212,175,55,0.12)' : 'transparent',
                         color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                        fontSize: '0.82rem', fontWeight: isActive ? 600 : 400,
+                        fontSize: '0.8rem', fontWeight: isActive ? 600 : 400,
                         transition: 'all 0.15s', whiteSpace: 'nowrap',
                         overflow: 'hidden', marginBottom: 1, position: 'relative'
                       }}
@@ -11648,31 +11888,31 @@ export default function AdminPortal() {
                   );
                 })}
                 {si < grouped.length - 1 && sidebarOpen && (
-                  <div style={{ height: 1, background: 'var(--border-color)', margin: '0.4rem 0.5rem' }} />
+                  <div style={{ height: 1, background: 'var(--border-color)', margin: '0.3rem 0.5rem' }} />
                 )}
               </div>
             ))}
           </nav>
 
           {/* User footer */}
-          <div style={{ borderTop: '1px solid var(--border-color)', padding: sidebarOpen ? '0.75rem' : '0.65rem 0.5rem', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: sidebarOpen ? '0.6rem' : 0, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+          <div style={{ borderTop: '1px solid var(--border-color)', padding: sidebarOpen ? '0.6rem 0.75rem' : '0.55rem 0.5rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: sidebarOpen ? '0.55rem' : 0, justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(212,175,55,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem', fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
                 {initials(profile.first_name, profile.last_name)}
               </div>
               {sidebarOpen && (
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {profile.first_name} {profile.last_name}
                   </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{profile.role}</div>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{profile.role}</div>
                 </div>
               )}
             </div>
             {sidebarOpen && (
               <button
                 onClick={handleSignOut}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.65rem', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', marginTop: '0.5rem', transition: 'all 0.15s' }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.6rem', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.75rem', marginTop: '0.35rem', transition: 'all 0.15s' }}
                 onMouseEnter={e => { (e.currentTarget.style.color = '#ff453a'); (e.currentTarget.style.background = 'rgba(255,69,58,0.08)'); }}
                 onMouseLeave={e => { (e.currentTarget.style.color = 'var(--text-muted)'); (e.currentTarget.style.background = 'transparent'); }}
               >
@@ -11699,20 +11939,73 @@ export default function AdminPortal() {
             height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '0 1rem', borderBottom: '1px solid var(--border-color)',
             background: 'rgba(12,10,23,0.85)', backdropFilter: 'blur(12px)',
-            position: 'sticky', top: 0, zIndex: 50, gap: '0.75rem', flexShrink: 0,
+            position: 'sticky', top: 0, zIndex: 50, gap: '0.5rem', flexShrink: 0,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <button onClick={() => setSidebarOpen(o => !o)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+              <button onClick={() => setSidebarOpen(o => !o)} title="Toggle Menu" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 <Menu size={16} />
               </button>
-              <h1 className="dash-header-title">
+              <h1 className="dash-header-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {PAGE_TITLES[activeTab] || 'Dashboard'}
               </h1>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectNavTab('theme_studio')}
+                    title="Gold & Brand Color Studio"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.32rem 0.6rem', borderRadius: 999,
+                      border: `1px solid ${activeTab === 'theme_studio' ? 'var(--accent)' : 'rgba(255,255,255,0.12)'}`,
+                      background: activeTab === 'theme_studio' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
+                      color: activeTab === 'theme_studio' ? 'var(--accent)' : 'var(--text-primary)',
+                      fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    <Palette size={13} style={{ color: 'var(--accent)' }} />
+                    <span className="dash-header-quick-label">Theme Color</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectNavTab('settings')}
+                    title="Settings & Global Cloud Sync"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                      padding: '0.32rem 0.6rem', borderRadius: 999,
+                      border: `1px solid ${activeTab === 'settings' ? 'var(--accent)' : 'rgba(255,255,255,0.12)'}`,
+                      background: activeTab === 'settings' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
+                      color: activeTab === 'settings' ? 'var(--accent)' : 'var(--text-primary)',
+                      fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    <Settings size={13} style={{ color: '#30d158' }} />
+                    <span className="dash-header-quick-label">Settings</span>
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSelectNavTab('help')}
+                title="Help Center"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.32rem 0.6rem', borderRadius: 999,
+                  border: `1px solid ${activeTab === 'help' ? 'var(--accent)' : 'rgba(255,255,255,0.12)'}`,
+                  background: activeTab === 'help' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)',
+                  color: activeTab === 'help' ? 'var(--accent)' : 'var(--text-primary)',
+                  fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <HelpCircle size={13} style={{ color: 'var(--accent)' }} />
+                <span className="dash-header-quick-label">Help</span>
+              </button>
+
               <button
                 onClick={() => handleRefresh()}
-                title="Refresh"
+                title="Refresh & Sync"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 6, borderRadius: 8, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
@@ -11802,7 +12095,7 @@ export default function AdminPortal() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <ABtn variant="primary" size="sm" onClick={() => { setActiveTab('bookings'); setLiveSignal(null); }}>
+                    <ABtn variant="primary" size="sm" onClick={() => { handleSelectNavTab('bookings'); setLiveSignal(null); }}>
                       View in Bookings →
                     </ABtn>
                     <button
