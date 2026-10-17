@@ -11501,19 +11501,31 @@ export default function AdminPortal() {
         @media (max-width: 767px) {
           .dash-shell { flex-direction: column; overflow-x: hidden; }
 
-          /* Sidebar becomes a slide-in overlay drawer above NavHeader */
+          /* Sidebar becomes a slide-in overlay drawer above NavHeader with full mobile scrollability */
           .dash-sidebar {
             position: fixed;
             left: 0; top: 0; bottom: 0;
             height: 100dvh;
+            max-height: 100dvh;
             z-index: 1200;
             transform: translateX(-100%);
-            width: min(260px, 84vw) !important;
+            width: min(280px, 86vw) !important;
             box-shadow: 8px 0 40px rgba(0,0,0,0.65);
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
           }
           .dash-sidebar.sidebar-open {
             transform: translateX(0);
             animation: slideInLeft 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
+          }
+          .dash-sidebar nav {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior-y: contain !important;
+            touch-action: pan-y !important;
           }
           /* Dark backdrop behind drawer */
           .dash-sidebar-backdrop {
@@ -11523,6 +11535,7 @@ export default function AdminPortal() {
             z-index: 1199;
             background: rgba(0,0,0,0.65);
             backdrop-filter: blur(3px);
+            touch-action: none;
           }
           .dash-main { min-height: 100vh; max-width: 100vw; overflow-x: hidden; }
           .dash-content { padding: 1rem 0.875rem; overflow-x: hidden; }
