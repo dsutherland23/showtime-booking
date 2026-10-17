@@ -11481,13 +11481,22 @@ export default function AdminPortal() {
         .dash-shell { display: flex; min-height: 100vh; background: var(--bg-primary); font-family: var(--font-body); }
         .dash-sidebar {
           width: var(--sidebar-w, 220px);
-          min-height: 100vh;
+          height: 100vh;
+          max-height: 100dvh;
           background: var(--bg-secondary);
           border-right: 1px solid var(--border-color);
           display: flex; flex-direction: column;
           transition: width 0.28s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94);
           overflow: hidden; flex-shrink: 0;
-          position: sticky; top: 0; height: 100vh; z-index: 100;
+          position: sticky; top: 0; z-index: 100;
+        }
+        .dash-sidebar nav {
+          flex: 1 1 0% !important;
+          min-height: 0 !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          overscroll-behavior-y: contain !important;
+          scroll-padding-bottom: 2rem;
         }
         .dash-sidebar-backdrop { display: none; }
         .dash-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
@@ -11526,6 +11535,7 @@ export default function AdminPortal() {
             -webkit-overflow-scrolling: touch !important;
             overscroll-behavior-y: contain !important;
             touch-action: pan-y !important;
+            padding-bottom: 2.5rem !important;
           }
           /* Dark backdrop behind drawer */
           .dash-sidebar-backdrop {
@@ -11576,7 +11586,7 @@ export default function AdminPortal() {
           </div>
 
           {/* Nav */}
-          <nav style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0.5rem', scrollbarWidth: 'thin' }}>
+          <nav style={{ flex: '1 1 0%', minHeight: 0, overflowY: 'auto', padding: '0.5rem 0.5rem 3rem 0.5rem', scrollbarWidth: 'thin' }}>
             {grouped.map((section, si) => (
               <div key={section.id} style={{ marginBottom: si < grouped.length - 1 ? '0.25rem' : 0 }}>
                 {sidebarOpen && (

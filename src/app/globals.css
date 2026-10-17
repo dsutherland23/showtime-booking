@@ -1934,3 +1934,10 @@ a, button, [role="button"] {
   }
 }
 
+/* ── Hide global site footer inside admin dashboard shell ── */
+body:has(.dash-shell) .global-footer,
+.app-layout:has(.dash-shell) .global-footer {
+  display: none !important;
+}
+
+
