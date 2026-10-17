@@ -13,8 +13,15 @@ import {
   HomepageConfig, HomepageStatItem, SEED_HOMEPAGE_CONFIG,
   AboutUsConfig, PrivacySectionItem, PrivacyPolicyConfig, AccessibilityConfig,
   SEED_ABOUT_CONFIG, SEED_PRIVACY_CONFIG, SEED_ACCESSIBILITY_CONFIG,
-  AgencyService, SEED_SERVICES
+  AgencyService, SEED_SERVICES,
+  PlatformSettings, AuditLogEntry
 } from '@/utils/db';
+import {
+  AccentTheme,
+  PRESET_ACCENT_THEMES,
+  applyAccentTheme,
+  adjustLightness,
+} from '@/utils/theme';
 import {
   LayoutDashboard, Calendar, Music, MapPin, Users, Ticket, Receipt,
   DollarSign, Megaphone, Radio, FileText, ShieldCheck, Cable, Settings,
@@ -29,7 +36,8 @@ import {
   Key, Copy, Server, Database, Cpu, Zap, UserCheck, FileCode, RotateCcw,
   HelpCircle, BookOpen, ChevronDown, Rocket, Lightbulb,
   ArrowRight, FileCheck, FilePlus, Split, Share2, Landmark,
-  Award, Compass, Target, Briefcase, Plane, Headphones, HeartHandshake
+  Award, Compass, Target, Briefcase, Plane, Headphones, HeartHandshake,
+  Palette
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -216,9 +224,11 @@ function ABtn({
   const [hov, setHov] = useState(false);
   const s: Record<string, React.CSSProperties> = {
     primary: {
-      background: hov ? 'linear-gradient(135deg,#ffde7a,#e5bd44)' : 'var(--accent-gradient)',
+      background: 'var(--accent-gradient)',
+      filter: hov ? 'brightness(1.15)' : 'none',
       color: '#07050e', fontWeight: 600,
-      boxShadow: hov ? '0 6px 20px rgba(212,175,55,0.4)' : '0 4px 14px rgba(212,175,55,0.25)',
+      boxShadow: hov ? 'var(--glow-gold-strong, 0 6px 20px rgba(212,175,55,0.4))' : 'var(--glow-gold, 0 4px 14px rgba(212,175,55,0.25))',
+      transition: 'all 0.2s ease',
     },
     success: {
       background: hov ? 'linear-gradient(135deg, #34d95f 0%, #229940 100%)' : 'linear-gradient(135deg, #30d158 0%, #1f8b3a 100%)',
@@ -229,7 +239,8 @@ function ABtn({
     secondary: {
       background: hov ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
       color: hov ? 'var(--accent)' : 'var(--text-primary)',
-      border: `1px solid ${hov ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.12)'}`,
+      border: `1px solid ${hov ? 'var(--accent)' : 'rgba(255,255,255,0.12)'}`,
+      transition: 'all 0.2s ease',
     },
     ghost: {
       background: hov ? 'rgba(255,255,255,0.06)' : 'transparent',
@@ -510,9 +521,10 @@ function FImageUpload({ value, onChange, label, aspect = 'square', helperText }:
               background: 'rgba(0,0,0,0.3)',
               display: 'flex',
               flexDirection: aspect === 'wide' ? 'column' : 'row',
+              flexWrap: 'wrap',
               alignItems: 'center',
               gap: 10,
-              padding: 6
+              padding: 8
             }}>
               <div style={{
                 position: 'relative',
@@ -527,11 +539,11 @@ function FImageUpload({ value, onChange, label, aspect = 'square', helperText }:
                 <img src={value} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexGrow: 1, width: aspect === 'wide' ? '100%' : 'auto', padding: aspect === 'wide' ? '2px 4px' : '0 4px', minWidth: 0 }}>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 6, flex: '1 1 140px', width: aspect === 'wide' ? '100%' : 'auto', padding: aspect === 'wide' ? '2px 4px' : '0 4px', minWidth: 0 }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                   {isBase64 ? '✓ Local image uploaded' : '✓ Image attached'}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -540,7 +552,7 @@ function FImageUpload({ value, onChange, label, aspect = 'square', helperText }:
                       border: '1px solid var(--border-color)',
                       color: 'var(--text-primary)',
                       fontSize: '0.72rem',
-                      padding: '3px 8px',
+                      padding: '4px 9px',
                       borderRadius: 6,
                       cursor: 'pointer'
                     }}
@@ -555,7 +567,7 @@ function FImageUpload({ value, onChange, label, aspect = 'square', helperText }:
                       border: '1px solid rgba(239,68,68,0.3)',
                       color: '#ff453a',
                       fontSize: '0.72rem',
-                      padding: '3px 8px',
+                      padding: '4px 9px',
                       borderRadius: 6,
                       cursor: 'pointer'
                     }}
@@ -603,7 +615,7 @@ function FImageUpload({ value, onChange, label, aspect = 'square', helperText }:
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
       <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</label>
       {children}
     </div>
@@ -611,8 +623,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function FGrid({ children, cols }: { children: React.ReactNode; cols?: number }) {
+  const minColWidth = cols ? (cols >= 3 ? '170px' : '220px') : '180px';
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: cols ? `repeat(${cols}, minmax(0, 1fr))` : 'repeat(auto-fill, minmax(180px,1fr))', gap: '0.9rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColWidth}), 1fr))`, gap: '0.9rem' }}>
       {children}
     </div>
   );
@@ -643,22 +656,22 @@ function Modal({ open, onClose, title, children, width = 540, className = '' }: 
     <div
       onClick={onClose}
       className={`showtime-modal-backdrop ${className ? className + '-backdrop' : ''}`}
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(0.5rem, 2.5vw, 1rem)', backdropFilter: 'blur(6px)' }}
     >
       <div
         onClick={e => e.stopPropagation()}
         className={`showtime-modal-card ${className}`}
-        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: 'min(90vh, 100dvh - 2rem)', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.7)', animation: 'scaleIn 0.2s ease' }}
+        style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: width, maxHeight: 'min(92vh, 100dvh - 1rem)', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box', boxShadow: '0 24px 60px rgba(0,0,0,0.75)', animation: 'scaleIn 0.2s ease' }}
       >
         {title ? (
-          <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{title}</h3>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}>
+          <div className="no-print" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: 'clamp(0.85rem, 3vw, 1.1rem) clamp(0.9rem, 3.5vw, 1.4rem)', borderBottom: '1px solid var(--border-color)' }}>
+            <h3 style={{ fontSize: 'clamp(0.88rem, 2.8vw, 0.98rem)', fontWeight: 600, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3, wordBreak: 'break-word' }}>{title}</h3>
+            <button onClick={onClose} aria-label="Close modal" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 6, flexShrink: 0 }}>
               <X size={16} />
             </button>
           </div>
         ) : null}
-        <div style={{ padding: title ? '1.4rem' : '1.25rem' }}>{children}</div>
+        <div style={{ padding: title ? 'clamp(0.85rem, 3.5vw, 1.4rem)' : 'clamp(0.85rem, 3.5vw, 1.25rem)', boxSizing: 'border-box', maxWidth: '100%', overflowX: 'hidden' }}>{children}</div>
       </div>
     </div>
   );
@@ -669,16 +682,16 @@ function ConfirmDlg({ open, title, message, onConfirm, onCancel }: {
 }) {
   if (!open) return null;
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-      <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', padding: '1.5rem', width: '100%', maxWidth: 380, boxShadow: 'var(--shadow-xl)', animation: 'scaleIn 0.18s ease' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10060, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}>
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(255,255,255,0.1)', padding: 'clamp(1rem, 4vw, 1.5rem)', width: '100%', maxWidth: 380, boxShadow: 'var(--shadow-xl)', animation: 'scaleIn 0.18s ease' }}>
         <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
-          <AlertTriangle size={20} color="#ff9f0a" />
+          <AlertTriangle size={20} color="#ff9f0a" style={{ flexShrink: 0 }} />
           <div>
             <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.25rem' }}>{title}</h4>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0 }}>{message}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <ABtn variant="ghost" onClick={onCancel} size="sm">Cancel</ABtn>
           <ABtn variant="danger" onClick={onConfirm} size="sm">Delete</ABtn>
         </div>
@@ -1567,7 +1580,7 @@ function BookingsSection({
             </div>
 
             {/* Event & Logistics Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '0.9rem' }}>
               {/* Event Logistics */}
               <div style={{ padding: '0.9rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -1615,8 +1628,8 @@ function BookingsSection({
                 </div>
                 <div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Email Address</div>
-                  <a href={`mailto:${(detailItem.data as any).email || (detailItem.data as any).client_email}`} style={{ fontSize: '0.82rem', color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Mail size={12} /> {(detailItem.data as any).email || (detailItem.data as any).client_email || '—'}
+                  <a href={`mailto:${(detailItem.data as any).email || (detailItem.data as any).client_email}`} style={{ fontSize: '0.82rem', color: 'var(--accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, wordBreak: 'break-all' }}>
+                    <Mail size={12} style={{ flexShrink: 0 }} /> {(detailItem.data as any).email || (detailItem.data as any).client_email || '—'}
                   </a>
                 </div>
                 <div>
@@ -1640,7 +1653,7 @@ function BookingsSection({
                   Financial Breakdown
                 </span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, textAlign: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: 10, textAlign: 'center' }}>
                 <div style={{ padding: '0.65rem', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Guarantee / Offer</div>
                   <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>
@@ -2212,7 +2225,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 <Field label="Biography"><FTextarea value={form.bio} onChange={v => setForm(f => ({ ...f, bio: v }))} rows={3} /></Field>
 
                 {/* Image fields with device upload + preview support */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.9rem' }}>
                   <FImageUpload 
                     label="Profile Image" 
                     value={form.profile_image} 
@@ -2249,7 +2262,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                       key={trk.id || idx}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '60px 1fr auto',
+                        gridTemplateColumns: '60px minmax(0, 1fr) auto',
                         gap: '0.65rem',
                         alignItems: 'center',
                         padding: '0.55rem 0.75rem',
@@ -2279,7 +2292,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                           <Music size={14} color="var(--accent)" />
                         </div>
                       )}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.45rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '0.45rem', minWidth: 0 }}>
                         <input
                           value={trk.title}
                           onChange={e => {
@@ -2287,7 +2300,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                             setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, title: v } : item));
                           }}
                           placeholder="Track / Performance Title"
-                          style={{ ...iStyle, fontSize: '0.78rem', height: 32 }}
+                          style={{ ...iStyle, fontSize: '0.78rem', height: 32, minWidth: 0 }}
                         />
                         <input
                           value={trk.youtube_url}
@@ -2296,7 +2309,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                             setShowcaseTracks(prev => prev.map((item, i) => i === idx ? { ...item, youtube_url: v } : item));
                           }}
                           placeholder="https://www.youtube.com/watch?v=..."
-                          style={{ ...iStyle, fontSize: '0.78rem', height: 32, color: 'var(--accent)' }}
+                          style={{ ...iStyle, fontSize: '0.78rem', height: 32, color: 'var(--accent)', minWidth: 0 }}
                         />
                       </div>
                       <ABtn variant="danger" size="sm" onClick={() => setShowcaseTracks(prev => prev.filter(item => item.id !== trk.id))} title="Remove Track">
@@ -2322,8 +2335,10 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                     <FInput value={newTrackSubtitle} onChange={setNewTrackSubtitle} placeholder="e.g. Official Live Performance Reel" />
                   </Field>
                   <Field label="Duration">
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <FInput value={newTrackDuration} onChange={setNewTrackDuration} placeholder="e.g. 3:45" />
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 110px', minWidth: 0 }}>
+                        <FInput value={newTrackDuration} onChange={setNewTrackDuration} placeholder="e.g. 3:45" />
+                      </div>
                       <ABtn variant="primary" size="sm" onClick={handleAddTrack}><Plus size={12} />Add</ABtn>
                     </div>
                   </Field>
@@ -2336,9 +2351,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   Showcase Gallery Photos (Displayed Below YouTube Tracks)
                 </div>
                 {mediaGallery.map((med, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: '0.5rem', alignItems: 'center', marginBottom: '0.45rem' }}>
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr) auto', gap: '0.5rem', alignItems: 'center', marginBottom: '0.45rem' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={med.url} alt="" style={{ width: 72, height: 44, objectFit: 'cover', borderRadius: 5 }} />
+                    <img src={med.url} alt="" style={{ width: 64, height: 42, objectFit: 'cover', borderRadius: 5 }} />
                     <input
                       value={med.url}
                       onChange={e => {
@@ -2346,15 +2361,17 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                         setMediaGallery(prev => prev.map((m, i) => i === idx ? { ...m, url: v } : m));
                       }}
                       placeholder="Photo URL..."
-                      style={{ ...iStyle, fontSize: '0.78rem', height: 32 }}
+                      style={{ ...iStyle, fontSize: '0.78rem', height: 32, minWidth: 0 }}
                     />
                     <ABtn variant="danger" size="sm" onClick={() => setMediaGallery(prev => prev.filter((_, i) => i !== idx))}>
                       <Trash2 size={12} />
                     </ABtn>
                   </div>
                 ))}
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <FInput value={newGalleryImageUrl} onChange={setNewGalleryImageUrl} placeholder="Paste image URL to add to showcase gallery..." />
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                    <FInput value={newGalleryImageUrl} onChange={setNewGalleryImageUrl} placeholder="Paste image URL to add to showcase gallery..." />
+                  </div>
                   <ABtn
                     variant="secondary"
                     size="sm"
@@ -2383,17 +2400,17 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   <div
                     key={plat}
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '110px 1fr 140px auto',
-                      gap: '0.55rem',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
                       alignItems: 'center',
-                      padding: '0.55rem 0.75rem',
+                      padding: '0.6rem 0.75rem',
                       borderRadius: 8,
                       background: 'rgba(255,255,255,0.03)',
                       border: '1px solid rgba(255,255,255,0.08)'
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--accent)' }}>{plat}</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--accent)', minWidth: 95, flex: '0 0 auto' }}>{plat}</span>
                     <input
                       value={data?.url || ''}
                       onChange={e => {
@@ -2401,7 +2418,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                         setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], url } }));
                       }}
                       placeholder={`https://${plat.toLowerCase().replace(/\s+/g, '')}.com/...`}
-                      style={{ ...iStyle, fontSize: '0.8rem', height: 32 }}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 34, flex: '2 1 180px', minWidth: 140 }}
                     />
                     <input
                       type="number"
@@ -2412,7 +2429,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                         setSocialsEdit(prev => ({ ...prev, [plat]: { ...prev[plat], followers } }));
                       }}
                       placeholder="Followers"
-                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, color: 'var(--accent)', fontWeight: 600 }}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 34, color: 'var(--accent)', fontWeight: 600, flex: '1 1 110px', minWidth: 95 }}
                     />
                     <ABtn
                       variant="danger"
@@ -2436,7 +2453,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
                   + Add / Update Social Platform
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 140px auto', gap: '0.5rem', alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '0.6rem', alignItems: 'end' }}>
                   <Field label="Platform">
                     <FSelect
                       value={newSocialPlatform}
@@ -2448,9 +2465,13 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                     <FInput value={newSocialUrl} onChange={setNewSocialUrl} placeholder="https://..." />
                   </Field>
                   <Field label="Followers / Listeners">
-                    <FInput value={newSocialFollowers} onChange={setNewSocialFollowers} type="number" placeholder="e.g. 450000" />
+                    <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <FInput value={newSocialFollowers} onChange={setNewSocialFollowers} type="number" placeholder="e.g. 450000" />
+                      </div>
+                      <ABtn variant="primary" size="sm" onClick={handleAddSocial}><Plus size={12} />Set</ABtn>
+                    </div>
                   </Field>
-                  <ABtn variant="primary" size="sm" onClick={handleAddSocial}><Plus size={12} />Set</ABtn>
                 </div>
               </div>
             </div>
@@ -2463,7 +2484,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 <strong style={{ color: 'var(--accent)' }}>Availability &amp; Routing Calendar:</strong> Click any date cell below to toggle between <strong style={{ color: '#30d158' }}>Available</strong> and <strong style={{ color: '#ff453a' }}>Booked / Locked Hold</strong>, then click Save.
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '1rem', alignItems: 'start' }}>
                 {/* Interactive Calendar Grid */}
                 <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
@@ -2496,6 +2517,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                             background: isLocked ? 'rgba(239,68,68,0.22)' : 'rgba(48,209,88,0.12)',
                             color: isLocked ? '#fca5a5' : '#86efac',
                             textDecoration: isLocked ? 'line-through' : 'none',
+                            padding: 0,
                           }}
                           title={isLocked ? `${dStr}: Locked — Click to make Available` : `${dStr}: Available — Click to Lock`}
                         >
@@ -2507,10 +2529,12 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 </div>
 
                 {/* Quick Date Picker & Locked Dates List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 }}>
                   <Field label="Block / Unblock Specific Date">
-                    <div style={{ display: 'flex', gap: '0.45rem' }}>
-                      <FInput value={customDateInput} onChange={setCustomDateInput} type="date" />
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                        <FInput value={customDateInput} onChange={setCustomDateInput} type="date" />
+                      </div>
                       <ABtn
                         variant="secondary"
                         size="sm"
@@ -2978,7 +3002,7 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
               />
             </Field>
             <Field label="City & Country">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 135px), 1fr))', gap: '0.4rem' }}>
                 <FInput value={form.city} onChange={v => setForm(f => ({ ...f, city: v }))} placeholder="City (e.g. Kingston)" />
                 <FInput value={form.country} onChange={v => setForm(f => ({ ...f, country: v }))} placeholder="Country (e.g. Jamaica)" />
               </div>
@@ -3028,9 +3052,9 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
               flexDirection: 'column',
               gap: '0.5rem',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Ticket size={14} /> Ticketing Platform URL (e.g. Eventbrite, Ticketmaster, Caribtix)
+                  <Ticket size={14} style={{ flexShrink: 0 }} /> Ticketing Platform URL (e.g. Eventbrite, Ticketmaster, Caribtix)
                 </span>
                 {form.ticket_link && (
                   <a
@@ -3070,7 +3094,7 @@ function EventsSection({ events, artists, venues, onRefresh, showToast }: {
             {/* Dual 2026 Image Uploads (Poster + Wide Header Banner) */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
               gap: '1rem',
               padding: '1rem',
               background: 'rgba(255,255,255,0.02)',
@@ -4992,7 +5016,7 @@ function FinanceSection({
                 {/* Two-Column Grid: Billed To & Engagement Details */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
                   gap: '1.25rem',
                   padding: '1.25rem 0',
                   borderBottom: `1px solid ${isWhite ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`
@@ -5117,8 +5141,8 @@ function FinanceSection({
                 </div>
 
                 {/* Itemized Deliverables Table */}
-                <div style={{ padding: '1.25rem 0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                <div style={{ padding: '1.25rem 0', overflowX: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: 6 }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: isWhite ? '#475569' : '#a1a1aa', letterSpacing: '0.05em' }}>
                       Itemized Tour Deliverables & Guarantees
                     </span>
@@ -5139,7 +5163,7 @@ function FinanceSection({
                     )}
                   </div>
 
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+                  <table style={{ width: '100%', minWidth: 420, borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{
                         background: isWhite ? '#f8fafc' : 'transparent',
@@ -5240,7 +5264,7 @@ function FinanceSection({
 
                 {/* Financial Summary & Breakdown Box */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                  <div style={{ width: 340, display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.84rem' }}>
+                  <div style={{ width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.84rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: isWhite ? '#475569' : '#9ca3af' }}>
                       <span>Subtotal</span>
                       <strong style={{ color: isWhite ? '#0f172a' : '#fff' }}>{fmtCurrency(totals.subtotal)}</strong>
@@ -5336,7 +5360,8 @@ function FinanceSection({
                     padding: '1rem',
                     background: isWhite ? '#f0fdf4' : 'rgba(48,209,88,0.04)',
                     borderRadius: 8,
-                    border: `1px solid ${isWhite ? '#86efac' : 'rgba(48,209,88,0.2)'}`
+                    border: `1px solid ${isWhite ? '#86efac' : 'rgba(48,209,88,0.2)'}`,
+                    overflowX: 'auto'
                   }}>
                     <div style={{
                       fontSize: '0.74rem',
@@ -5350,7 +5375,7 @@ function FinanceSection({
                     }}>
                       <CheckCircle size={14} /> Official Payment Settlement Schedule
                     </div>
-                    <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', minWidth: 360, fontSize: '0.78rem', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ color: isWhite ? '#475569' : '#9ca3af', borderBottom: `1px solid ${isWhite ? '#bbf7d0' : 'rgba(255,255,255,0.06)'}` }}>
                           <th style={{ padding: '4px 0', textAlign: 'left' }}>Date</th>
@@ -5377,7 +5402,7 @@ function FinanceSection({
                 <div style={{
                   marginTop: '1.5rem',
                   display: 'grid',
-                  gridTemplateColumns: '1.4fr 1fr',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
                   gap: '1.5rem',
                   borderTop: `2px solid ${isWhite ? '#e2e8f0' : 'rgba(255,255,255,0.08)'}`,
                   paddingTop: '1.25rem'
@@ -5726,12 +5751,12 @@ function FinanceSection({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {form.line_items.map((item, idx) => (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 140px 110px 32px', gap: '0.5rem', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div key={item.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>
                     <input
                       value={item.description}
                       onChange={e => updateLineItem(item.id, { description: e.target.value })}
                       placeholder="Item description..."
-                      style={{ ...iStyle, fontSize: '0.8rem', height: 32 }}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, flex: '2 1 180px', minWidth: 140 }}
                     />
                     <input
                       type="number"
@@ -5739,7 +5764,7 @@ function FinanceSection({
                       value={item.qty}
                       onChange={e => updateLineItem(item.id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
                       placeholder="Qty"
-                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, textAlign: 'center' }}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, textAlign: 'center', flex: '0 1 70px', minWidth: 60 }}
                     />
                     <input
                       type="number"
@@ -5748,16 +5773,16 @@ function FinanceSection({
                       value={item.unit_price}
                       onChange={e => updateLineItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
                       placeholder="Unit Price"
-                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, textAlign: 'right' }}
+                      style={{ ...iStyle, fontSize: '0.8rem', height: 32, textAlign: 'right', flex: '1 1 110px', minWidth: 95 }}
                     />
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, textAlign: 'right', color: 'var(--accent)' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, textAlign: 'right', color: 'var(--accent)', flex: '1 1 95px', minWidth: 80 }}>
                       {fmtCurrency(item.qty * item.unit_price)}
                     </div>
                     <button
                       type="button"
                       onClick={() => removeLineItem(item.id)}
                       disabled={form.line_items.length <= 1}
-                      style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 2 }}
+                      style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 4, flex: '0 0 auto' }}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -5767,7 +5792,7 @@ function FinanceSection({
             </div>
 
             {/* Discount, Tax & Totals Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', background: 'rgba(212,175,55,0.03)', padding: '0.85rem', borderRadius: 8, border: '1px solid rgba(212,175,55,0.15)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '1rem', background: 'rgba(212,175,55,0.03)', padding: '0.85rem', borderRadius: 8, border: '1px solid rgba(212,175,55,0.15)' }}>
               <Field label="Discount %">
                 <FInput
                   type="number"
@@ -5803,7 +5828,7 @@ function FinanceSection({
                 </Field>
               )}
 
-              <div style={{ gridColumn: form.type === 'Quote' ? 'span 3' : 'span 1', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '1.5rem', fontSize: '0.85rem' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.85rem' }}>
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>Subtotal: </span>
                   <strong>{fmtCurrency(builderTotals.subtotal)}</strong>
@@ -5837,7 +5862,7 @@ function FinanceSection({
             </FGrid>
 
             {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
               <ABtn variant="ghost" type="button" onClick={() => setBuilderOpen(false)}>
                 Cancel
               </ABtn>
@@ -5871,7 +5896,7 @@ function FinanceSection({
               <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                 Invoice Billing Strategy:
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => setDepositPct(100)}
@@ -7455,7 +7480,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(${Math.max(1, Math.min(stats.length, 4))}, minmax(0, 1fr))`,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 130px), 1fr))',
               gap: '1.25rem',
               padding: '1rem 0.5rem'
             }}>
@@ -7968,7 +7993,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
           {/* Services Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
             gap: '1rem'
           }}>
             {servicesList.map((srv, idx) => {
@@ -9216,7 +9241,7 @@ function StaffSection({ users, onRefresh, showToast }: {
         </>
       ) : (
         /* Matrix View */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.25rem' }}>
           {Object.entries(ROLE_PERMISSIONS).map(([roleName, data]) => {
             const holders = users.filter(u => u.role === roleName);
             return (
@@ -9309,29 +9334,29 @@ function StaffSection({ users, onRefresh, showToast }: {
           width={560}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 10, flexWrap: 'wrap' }}>
               <div style={{
                 width: 52, height: 52, borderRadius: '50%',
                 background: 'linear-gradient(135deg, rgba(212,175,55,0.3) 0%, rgba(212,175,55,0.1) 100%)',
                 border: '2px solid rgba(212,175,55,0.5)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)'
+                fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)', flexShrink: 0
               }}>
                 {initials(dossierItem.first_name, dossierItem.last_name)}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                 <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {dossierItem.first_name} {dossierItem.last_name}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{dossierItem.email}</div>
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: 6 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>{dossierItem.email}</div>
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: 6, flexWrap: 'wrap' }}>
                   <StatusBadge status={dossierItem.role} />
                   <StatusBadge status={dossierItem.status} />
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.85rem' }}>
               <div style={{ padding: '0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Phone / Direct Extension</span>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>{dossierItem.phone || '+1 (800) 555-0199'}</div>
@@ -9543,7 +9568,7 @@ function IntegrationsSection({ integrations, onRefresh, showToast }: {
       </div>
 
       {/* Integrations Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px,1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.25rem' }}>
         {filtered.map(int => {
           const Icon = PROVIDER_ICONS[int.provider] || Link2;
           const ok = int.status === 'Connected';
@@ -9693,13 +9718,19 @@ function IntegrationsSection({ integrations, onRefresh, showToast }: {
 // ─── Settings Section ─────────────────────────────────────────────────────────
 
 function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 'error') => void }) {
-  const [subTab, setSubTab] = useState<'branding' | 'policies' | 'security' | 'backup'>('branding');
+  const { user, profile } = useAuth();
+  const [subTab, setSubTab] = useState<'branding' | 'theme' | 'policies' | 'security' | 'cloudSync' | 'backup'>('branding');
   const [agencyName, setAgencyName] = useState('Showtime Entertainment Services LLC');
-  const [domain, setDomain] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('st_settings_domain') || 'showtimeservices.com' : 'showtimeservices.com');
+  const [domain, setDomain] = useState('showtimeservices.com');
   const [contactEmail, setContactEmail] = useState('bookings@showtimeservices.com');
   const [contactPhone, setContactPhone] = useState('+1 (800) 555-0199');
-  const [currency, setCurrency] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('st_settings_currency') || 'USD ($)' : 'USD ($)');
+  const [currency, setCurrency] = useState('USD ($)');
   const [timezone, setTimezone] = useState('America/Jamaica');
+
+  // Brand Theme & Accent Customization
+  const [accentColor, setAccentColor] = useState('#d4af37');
+  const [accentTheme, setAccentTheme] = useState('gold');
+  const [accentSecondary, setAccentSecondary] = useState('#f5d061');
 
   // Policy settings
   const [depositPct, setDepositPct] = useState('50% Standard Deposit');
@@ -9712,21 +9743,172 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
   const [sessionTimeout, setSessionTimeout] = useState('24 Hours');
   const [auditLogging, setAuditLogging] = useState(true);
 
+  // Cloud Edge Sync state
+  const [syncingCloud, setSyncingCloud] = useState(false);
+  const [pushingCloud, setPushingCloud] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Load platform settings and audit logs on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const settings = await db.getPlatformSettings();
+        if (!mounted) return;
+        setAgencyName(settings.agencyName || 'Showtime Entertainment Services LLC');
+        setDomain(settings.domain || 'showtimeservices.com');
+        setContactEmail(settings.contactEmail || 'bookings@showtimeservices.com');
+        setContactPhone(settings.contactPhone || '+1 (800) 555-0199');
+        setCurrency(settings.currency || 'USD ($)');
+        setTimezone(settings.timezone || 'America/Jamaica');
+        setDepositPct(settings.depositPct || '50% Standard Deposit');
+        setEscrowWindow(settings.escrowWindow || '48 Hours Post-Performance');
+        setProposalExpiry(settings.proposalExpiry || '7 Days');
+        setAutoReminders(settings.autoReminders !== false);
+        setRequire2FA(settings.require2FA !== false);
+        setSessionTimeout(settings.sessionTimeout || '24 Hours');
+        setAuditLogging(settings.auditLogging !== false);
+        const col = settings.accentColor || '#d4af37';
+        const thm = settings.accentTheme || 'gold';
+        const sec = settings.accentSecondary || '#f5d061';
+        setAccentColor(col);
+        setAccentTheme(thm);
+        setAccentSecondary(sec);
+        applyAccentTheme(col, sec);
+
+        if (settings.lastCloudSync) {
+          setLastSyncTime(new Date(settings.lastCloudSync).toLocaleTimeString());
+        }
+        const logs = await db.getAuditLogs();
+        if (mounted) setAuditLogs(logs);
+      } catch (err) {
+        console.warn('Failed to load edge settings:', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSelectTheme = (theme: AccentTheme) => {
+    setAccentTheme(theme.id);
+    setAccentColor(theme.primary);
+    setAccentSecondary(theme.secondary);
+    applyAccentTheme(theme.primary, theme.secondary);
+  };
+
+  const handleCustomColorChange = (hex: string) => {
+    setAccentTheme('custom');
+    setAccentColor(hex);
+    const sec = adjustLightness(hex, 40);
+    setAccentSecondary(sec);
+    applyAccentTheme(hex, sec);
+  };
+
+  const handleResetToGold = () => {
+    setAccentTheme('gold');
+    setAccentColor('#d4af37');
+    setAccentSecondary('#f5d061');
+    applyAccentTheme('#d4af37', '#f5d061');
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
-    await new Promise(r => setTimeout(r, 600));
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('st_settings_domain', domain);
-      localStorage.setItem('st_settings_currency', currency);
+    try {
+      await db.updatePlatformSettings({
+        agencyName,
+        domain,
+        contactEmail,
+        contactPhone,
+        currency,
+        timezone,
+        depositPct,
+        escrowWindow,
+        proposalExpiry,
+        autoReminders,
+        require2FA,
+        sessionTimeout,
+        auditLogging,
+        accentColor,
+        accentTheme,
+        accentSecondary,
+      });
+      applyAccentTheme(accentColor, accentSecondary);
+      setLastSyncTime(new Date().toLocaleTimeString());
+      const updatedLogs = await db.getAuditLogs();
+      setAuditLogs(updatedLogs);
+      setSaved(true);
+      showToast('Settings & theme saved & replicated globally via Cloudflare D1 Edge.', 'success');
+      setTimeout(() => setSaved(false), 3500);
+    } catch {
+      showToast('Failed to save settings to edge.', 'error');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setSaved(true);
-    showToast('Platform settings successfully saved.', 'success');
-    setTimeout(() => setSaved(false), 3500);
+  };
+
+  const handlePullCloudState = async () => {
+    setSyncingCloud(true);
+    try {
+      const res = await db.syncAllStoresFromCloud();
+      const settings = await db.getPlatformSettings();
+      setAgencyName(settings.agencyName || 'Showtime Entertainment Services LLC');
+      setDomain(settings.domain || 'showtimeservices.com');
+      setContactEmail(settings.contactEmail || 'bookings@showtimeservices.com');
+      setContactPhone(settings.contactPhone || '+1 (800) 555-0199');
+      setCurrency(settings.currency || 'USD ($)');
+      setTimezone(settings.timezone || 'America/Jamaica');
+      setDepositPct(settings.depositPct || '50% Standard Deposit');
+      setEscrowWindow(settings.escrowWindow || '48 Hours Post-Performance');
+      setProposalExpiry(settings.proposalExpiry || '7 Days');
+      setAutoReminders(settings.autoReminders !== false);
+      setRequire2FA(settings.require2FA !== false);
+      setSessionTimeout(settings.sessionTimeout || '24 Hours');
+      setAuditLogging(settings.auditLogging !== false);
+      const col = settings.accentColor || '#d4af37';
+      const thm = settings.accentTheme || 'gold';
+      const sec = settings.accentSecondary || '#f5d061';
+      setAccentColor(col);
+      setAccentTheme(thm);
+      setAccentSecondary(sec);
+      applyAccentTheme(col, sec);
+
+      setLastSyncTime(new Date().toLocaleTimeString());
+      const logs = await db.getAuditLogs();
+      setAuditLogs(logs);
+      showToast(`✓ Edge Synced! Updated ${res.syncedKeys} configuration stores from Cloudflare D1.`, 'success');
+    } catch {
+      showToast('Cloud Edge sync failed. Check connection.', 'error');
+    } finally {
+      setSyncingCloud(false);
+    }
+  };
+
+  const handlePushCloudState = async () => {
+    setPushingCloud(true);
+    try {
+      const res = await db.pushAllStoresToCloud();
+      if (res.success) {
+        setLastSyncTime(new Date().toLocaleTimeString());
+        const adminName = profile ? `${profile.first_name} ${profile.last_name}`.trim() : (user?.email || 'Executive Admin');
+        await db.logAudit('Manual Edge Push', 'Cloudflare D1', `Pushed ${res.pushedKeys} stores to edge database`, {
+          name: adminName,
+          email: user?.email || profile?.email || 'admin@showtimeservices.com'
+        });
+        const logs = await db.getAuditLogs();
+        setAuditLogs(logs);
+        showToast(`✓ All ${res.pushedKeys} portal stores published to Cloudflare D1 across 300+ global edge nodes!`, 'success');
+      } else {
+        showToast('Push failed or no stores found to publish.', 'error');
+      }
+    } catch {
+      showToast('Cloud Edge push encountered an error.', 'error');
+    } finally {
+      setPushingCloud(false);
+    }
   };
 
   const handleExportBackup = () => {
@@ -9774,7 +9956,10 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
       'st_users', 'st_artists_v2', 'st_artists', 'st_leads', 'st_bookings', 'st_contracts',
       'st_invoices', 'st_tasks', 'st_notifs', 'st_venues', 'st_customers', 'st_ticket_tiers',
       'st_promo_codes', 'st_campaigns', 'st_ad_placements', 'st_website_sections', 'st_integrations',
-      'st_events', 'st_settings_domain', 'st_settings_currency', 'st_active_user_id'
+      'st_events', 'st_settings_domain', 'st_settings_currency', 'st_active_user_id',
+      'st_homepage_config', 'st_about_config', 'st_privacy_config', 'st_accessibility_config',
+      'st_services', 'st_billing_docs', 'st_platform_settings', 'st_audit_logs',
+      'st_accent_color', 'st_accent_theme'
     ];
     
     keys.forEach(k => localStorage.removeItem(k));
@@ -9789,10 +9974,12 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
       {/* Sub navigation bar */}
       <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
         {[
-          { id: 'branding', label: 'General & Branding', icon: Globe },
-          { id: 'policies', label: 'Booking & Escrow Policies', icon: ShieldCheck },
-          { id: 'security', label: 'Security & Access', icon: Lock },
-          { id: 'backup',   label: 'Backup & Disaster Recovery', icon: Database }
+          { id: 'branding',  label: 'General & Branding',          icon: Globe },
+          { id: 'theme',     label: 'Theme & Accent Colors',       icon: Palette },
+          { id: 'policies',  label: 'Booking & Escrow Policies',   icon: ShieldCheck },
+          { id: 'security',  label: 'Security & Access',           icon: Lock },
+          { id: 'cloudSync', label: 'Cloud Edge Sync & Audit',     icon: RefreshCw },
+          { id: 'backup',    label: 'Backup & Disaster Recovery',  icon: Database }
         ].map(tab => {
           const Icon = tab.icon;
           const active = subTab === tab.id;
@@ -9802,7 +9989,7 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               onClick={() => setSubTab(tab.id as typeof subTab)}
               style={{
                 background: active ? 'rgba(212,175,55,0.15)' : 'transparent',
-                border: `1px solid ${active ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                border: `1px solid ${active ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
                 color: active ? 'var(--accent)' : 'var(--text-muted)',
                 padding: '0.45rem 0.9rem',
                 borderRadius: 8,
@@ -9811,7 +9998,8 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.4rem',
+                transition: 'all 0.15s ease',
               }}
             >
               <Icon size={14} /> {tab.label}
@@ -9834,17 +10022,230 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               <Field label="Default Operating Currency">
                 <FSelect value={currency} onChange={setCurrency} options={['USD ($)', 'EUR (€)', 'GBP (£)', 'JMD (J$)', 'CAD (C$)', 'AUD (A$)'].map(c => ({ value: c, label: c }))} />
               </Field>
-              <Field label="Operations Timezone">
-                <FSelect value={timezone} onChange={setTimezone} options={['America/Jamaica', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo'].map(t => ({ value: t, label: t }))} />
+              <Field label="Operations Timezone (Single Source of Truth)">
+                <FSelect value={timezone} onChange={setTimezone} options={['America/Jamaica', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo', 'UTC'].map(t => ({ value: t, label: t }))} />
               </Field>
             </div>
+
+            {/* Quick theme accent banner */}
+            <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--accent-gradient)', display: 'inline-block', boxShadow: 'var(--glow-gold)' }} />
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>Current Brand Accent Color: <span style={{ color: 'var(--accent)' }}>{accentColor.toUpperCase()}</span></div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Buttons, writing, badges and glows inherit this accent globally.</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubTab('theme')}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--accent)',
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: 6,
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <Palette size={13} /> Customize Theme Colors &rarr;
+              </button>
+            </div>
+
             <div style={{ marginTop: '1.4rem' }}>
               <ABtn variant={saved ? 'success' : 'primary'} type="submit" disabled={saving}>
                 {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
-                {saving ? 'Saving…' : saved ? '✓ Settings Saved!' : 'Save Agency Settings'}
+                {saving ? 'Saving to Cloudflare D1…' : saved ? '✓ Settings Saved to Edge!' : 'Save Agency Settings'}
               </ABtn>
             </div>
           </form>
+        </div>
+      )}
+
+      {subTab === 'theme' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Theme Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+              <Palette size={20} style={{ color: 'var(--accent)' }} />
+              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                Brand Accent &amp; Button Color Studio
+              </h4>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              Select your agency color below to instantly transform all gold buttons, headlines, glowing highlights, and badges across the entire website and admin portal. Changes are saved to Cloudflare D1 and sync worldwide.
+            </p>
+          </div>
+
+          {/* Preset Palettes Grid */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.5rem' }}>
+            <h5 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Curated Theme Presets
+            </h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+              {PRESET_ACCENT_THEMES.map(theme => {
+                const isSelected = accentTheme === theme.id || accentColor.toLowerCase() === theme.primary.toLowerCase();
+                return (
+                  <div
+                    key={theme.id}
+                    onClick={() => handleSelectTheme(theme)}
+                    style={{
+                      background: isSelected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                      border: `1.5px solid ${isSelected ? theme.primary : 'rgba(255,255,255,0.08)'}`,
+                      borderRadius: 10,
+                      padding: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      position: 'relative',
+                      boxShadow: isSelected ? `0 0 16px ${theme.primary}40` : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: '50%',
+                        background: `linear-gradient(135deg, ${theme.secondary} 0%, ${theme.primary} 100%)`,
+                        boxShadow: `0 2px 8px ${theme.primary}60`,
+                        display: 'inline-block'
+                      }} />
+                      {isSelected && (
+                        <span style={{
+                          fontSize: '0.68rem', fontWeight: 700, color: theme.primary,
+                          background: `${theme.primary}20`, padding: '0.15rem 0.45rem', borderRadius: 4
+                        }}>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
+                      {theme.name}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                      {theme.description}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Custom Color Picker Bar */}
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>Custom Hex Color:</span>
+                  <input
+                    type="color"
+                    value={accentColor}
+                    onChange={e => handleCustomColorChange(e.target.value)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      background: 'transparent',
+                    }}
+                  />
+                </label>
+                <input
+                  type="text"
+                  value={accentColor}
+                  onChange={e => handleCustomColorChange(e.target.value)}
+                  placeholder="#d4af37"
+                  style={{
+                    width: 100,
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: 6,
+                    border: '1px solid var(--border-color)',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'monospace',
+                    fontSize: '0.82rem',
+                    textTransform: 'uppercase'
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetToGold}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'var(--text-muted)',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: 6,
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Reset to Imperial Gold
+              </button>
+            </div>
+          </div>
+
+          {/* Real-Time Live Preview Sandbox */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.5rem' }}>
+            <h5 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Live UI Appearance Preview
+            </h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Buttons Preview Row */}
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                  Button Gradient &amp; Outlines:
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button className="btn-primary" style={{ padding: '0.6rem 1.4rem', borderRadius: 980, cursor: 'default' }}>
+                    Primary Button (Book Talent)
+                  </button>
+                  <button className="btn-secondary" style={{ padding: '0.6rem 1.4rem', borderRadius: 980, cursor: 'default' }}>
+                    Secondary Button (View Roster)
+                  </button>
+                  <ABtn variant="primary">Dashboard ABtn</ABtn>
+                </div>
+              </div>
+
+              {/* Text & Writing Preview Row */}
+              <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
+                  Writing &amp; Headline Gradients:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div>
+                    <span className="gold-gradient-text" style={{ fontSize: '1.35rem', fontWeight: 800 }}>
+                      Headline Gradient Writing &amp; Typography
+                    </span>
+                  </div>
+                  <div>
+                    <span className="shimmer-text" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
+                      ✦ Animated Live Showcase Shimmer Text
+                    </span>
+                  </div>
+                  <div>
+                    <span className="gold-badge">01 — TALENT ACCENT EYEBROW BADGE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <ABtn variant={saved ? 'success' : 'primary'} onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+                {saving ? 'Publishing Theme…' : saved ? '✓ Theme Saved Worldwide!' : 'Save Theme & Replicate Worldwide'}
+              </ABtn>
+            </div>
+          </div>
         </div>
       )}
 
@@ -9955,6 +10356,145 @@ function SettingsSection({ showToast }: { showToast: (m: string, t: 'success' | 
               </ABtn>
             </div>
           </form>
+        </div>
+      )}
+
+      {subTab === 'cloudSync' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Cloudflare D1 Live Edge Status */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+            border: '1px solid rgba(212,175,55,0.25)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#30d158', boxShadow: '0 0 8px #30d158' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#30d158' }}>
+                    Globally Connected Edge Database
+                  </span>
+                </div>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Cloudflare D1 Edge Network (300+ Cities Worldwide)
+                </h4>
+              </div>
+              {lastSyncTime && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '0.3rem 0.6rem', borderRadius: 6 }}>
+                  Last Synced: <strong style={{ color: 'var(--text-primary)' }}>{lastSyncTime}</strong>
+                </div>
+              )}
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+              Showtime uses Cloudflare D1 distributed edge storage with zero-cache revalidation. Any change you save — whether to artists, booking dates, website content, invoices, or settings — is instantaneously written to the global edge network so colleagues logging in from Kingston, Miami, London, Toronto, or Tokyo see the exact same real-time operational state.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <ABtn variant="primary" size="md" onClick={handlePullCloudState} disabled={syncingCloud}>
+                {syncingCloud ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+                {syncingCloud ? 'Pulling from Edge…' : '🔄 Pull Latest Edge State'}
+              </ABtn>
+              <ABtn variant="secondary" size="md" onClick={handlePushCloudState} disabled={pushingCloud}>
+                {pushingCloud ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Server size={14} />}
+                {pushingCloud ? 'Publishing All Stores…' : '☁️ Push All Local Stores to Edge'}
+              </ABtn>
+            </div>
+          </div>
+
+          {/* 2026 Best Practice Guidelines */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.5rem' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Zap size={16} style={{ color: 'var(--accent)' }} /> 2026 Global Multi-Admin Operational Standards
+            </h4>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                  🕒 Single Operational Timezone
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                  Active timezone is set to <strong style={{ color: 'var(--accent)' }}>{timezone}</strong>. All contract deadlines, booking holds, and call times share this unified clock so admins across different timezones never experience scheduling mismatches.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                  💵 Explicit Settlement Currency
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                  Standardized on <strong style={{ color: 'var(--accent)' }}>{currency}</strong>. All booking riders, deposits, and artist guarantees are stored in uniform base values to eliminate international currency conversion ambiguity.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                  ⚡ Edge Zero-Cache Headers
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+                  The <code style={{ color: 'var(--accent)', fontSize: '0.72rem' }}>/api/d1</code> edge worker injects strict <code style={{ color: 'var(--accent)', fontSize: '0.72rem' }}>no-store, no-cache</code> headers, ensuring regional CDN PoPs never serve stale admin data to remote staff.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Global Audit Trail */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Global Operational Audit Trail
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>
+                  Immutable log of administrative configuration changes synchronized across all international locations.
+                </p>
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {auditLogs.length} events logged
+              </span>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No audit entries recorded yet. Any configuration changes will appear here with an edge timestamp.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Timestamp</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Admin</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Action</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Scope</th>
+                      <th style={{ padding: '0.5rem 0.75rem' }}>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.slice(0, 10).map(log => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                          {new Date(log.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {log.admin_name}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', color: 'var(--accent)' }}>
+                          {log.action}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', color: 'var(--text-muted)' }}>
+                          {log.entity}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', color: 'var(--text-secondary)' }}>
+                          {log.details || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -10098,7 +10638,7 @@ function MaintenanceSection({ showToast }: { showToast: (msg: string, type: 'suc
       </div>
 
       {/* Main Grid: Pricing & Payment Box on Left, Features & SLA on Right */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
         
         {/* Card 1: Subscription Checkout & PayPal Auto-Deduct Form */}
         <div style={{
@@ -10743,6 +11283,9 @@ export default function AdminPortal() {
       setDataLoading(true);
     }
     try {
+      // 2026 Distributed Consistency: Pull latest global state from Cloudflare D1 edge before reading
+      await db.syncAllStoresFromCloud();
+
       const [
         aLeads, aBookings, aTasks, aInvoices, aArtists,
         aVenues, aCustomers, aUsers, aTiers, aPromos,
@@ -10956,17 +11499,17 @@ export default function AdminPortal() {
         .dash-header-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; margin: 0; }
 
         @media (max-width: 767px) {
-          .dash-shell { flex-direction: column; }
+          .dash-shell { flex-direction: column; overflow-x: hidden; }
 
-          /* Sidebar becomes a slide-in overlay drawer */
+          /* Sidebar becomes a slide-in overlay drawer above NavHeader */
           .dash-sidebar {
             position: fixed;
             left: 0; top: 0; bottom: 0;
-            height: 100vh;
-            z-index: 500;
+            height: 100dvh;
+            z-index: 1200;
             transform: translateX(-100%);
-            width: 240px !important;
-            box-shadow: 8px 0 40px rgba(0,0,0,0.5);
+            width: min(260px, 84vw) !important;
+            box-shadow: 8px 0 40px rgba(0,0,0,0.65);
           }
           .dash-sidebar.sidebar-open {
             transform: translateX(0);
@@ -10977,21 +11520,23 @@ export default function AdminPortal() {
             display: block;
             position: fixed;
             inset: 0;
-            z-index: 499;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(2px);
+            z-index: 1199;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(3px);
           }
-          .dash-main { min-height: 100vh; }
-          .dash-content { padding: 1rem 0.875rem; }
+          .dash-main { min-height: 100vh; max-width: 100vw; overflow-x: hidden; }
+          .dash-content { padding: 1rem 0.875rem; overflow-x: hidden; }
           .dash-stat-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
           .dash-two-col { grid-template-columns: 1fr; }
           .dash-notif-panel { right: -60px; width: min(300px, 90vw); }
           .dash-header-title { font-size: 0.9rem; }
+          .showtime-modal-backdrop { padding: 0.5rem !important; }
+          .showtime-modal-card { width: 100% !important; max-width: calc(100vw - 1rem) !important; max-height: calc(100dvh - 1rem) !important; border-radius: 12px !important; }
         }
 
         @media (max-width: 400px) {
           .dash-stat-grid { grid-template-columns: 1fr; }
-          .dash-content { padding: 0.75rem 0.75rem; }
+          .dash-content { padding: 0.75rem 0.65rem; }
         }
       `}</style>
 

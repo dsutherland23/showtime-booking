@@ -132,7 +132,7 @@ export default function Services() {
         .service-grid {
           margin-top: var(--spacing-xl);
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
           gap: 1.5rem;
         }
 

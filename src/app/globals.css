@@ -432,17 +432,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   user-select: none;
 }
 
-/* Apple's primary gold button — exact gradient */
+/* Apple's primary accent button — dynamic gradient */
 .btn-primary {
   background: var(--accent-gradient);
   color: #07050e;
   font-weight: 600;
-  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
+  box-shadow: var(--glow-gold, 0 4px 14px rgba(212, 175, 55, 0.25));
+  transition: all 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #ffde7a 0%, #e5bd44 100%);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  background: var(--accent-gradient);
+  filter: brightness(1.14);
+  box-shadow: var(--glow-gold-strong, 0 6px 20px rgba(212, 175, 55, 0.4));
   opacity: 1;
 }
 
@@ -454,13 +456,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   color: #f5f5f7;
   border: 1.5px solid rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  background: rgba(212, 175, 55, 0.08);
+  background: var(--accent-light, rgba(212, 175, 55, 0.08));
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.1);
+  box-shadow: var(--glow-sm, 0 4px 12px rgba(212, 175, 55, 0.1));
   opacity: 1;
 }
 
@@ -492,14 +495,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* Apple-style gradient text — used for emphasis */
 .gold-gradient-text {
-  background: linear-gradient(135deg, #f5d061 0%, #d4af37 100%);
+  background: var(--gold-gradient, var(--accent-gradient));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .gold-text-gradient {
-  background: linear-gradient(180deg, #ffffff 0%, #d4af37 100%);
+  background: var(--gold-text-gradient, linear-gradient(180deg, #ffffff 0%, var(--accent) 100%));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -974,13 +977,13 @@ body::after {
 .shimmer-text {
   background: linear-gradient(
     105deg,
-    #d4af37 0%,
-    #f5d061 20%,
+    var(--accent, #d4af37) 0%,
+    var(--accent-hover, #f5d061) 20%,
     #ffffff 35%,
-    #f5d061 50%,
-    #d4af37 65%,
-    #aa841c 80%,
-    #d4af37 100%
+    var(--accent-hover, #f5d061) 50%,
+    var(--accent, #d4af37) 65%,
+    var(--accent-dark, #aa841c) 80%,
+    var(--accent, #d4af37) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
@@ -1903,3 +1906,31 @@ a, button, [role="button"] {
     transform: translate(-50%, 0) scale(1);
   }
 }
+
+/* ── Global Mobile Modal, Form & Grid Safeguards (≤ 767px) ── */
+@media (max-width: 767px) {
+  .showtime-modal-backdrop {
+    z-index: 10050 !important;
+    padding: 0.5rem !important;
+  }
+
+  .showtime-modal-card,
+  dialog.admin-modal {
+    width: 100% !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .showtime-modal-card input,
+  .showtime-modal-card select,
+  .showtime-modal-card textarea,
+  dialog.admin-modal input,
+  dialog.admin-modal select,
+  dialog.admin-modal textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+

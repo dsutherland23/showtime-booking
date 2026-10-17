@@ -19,13 +19,29 @@ export async function POST(request: Request) {
         const artist = await d1.updateArtistProfile(payload.id, payload.updates);
         return NextResponse.json({ success: true, data: artist });
       }
+      case 'getAllStores': {
+        const val = await d1.getAllStores();
+        return NextResponse.json({ success: true, data: val }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        });
+      }
       case 'getStore': {
         const val = await d1.getStore(payload.key);
-        return NextResponse.json({ success: true, data: val });
+        return NextResponse.json({ success: true, data: val }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        });
       }
       case 'setStore': {
         const val = await d1.setStore(payload.key, payload.value);
         return NextResponse.json({ success: true, data: val });
+      }
+      case 'setStoreBatch': {
+        const res = await d1.setStoreBatch(payload.entries);
+        return NextResponse.json({ success: true, data: res });
       }
       case 'getLeads': {
         const leads = await d1.getLeads();

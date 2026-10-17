@@ -2429,6 +2429,171 @@ const getObjectStoreValue = <T>(key: string, seed: T): T => {
 };
 
 // ---------------------------------------------------------
+// 2026 Global Edge Synchronization Engine (Cloudflare Edge D1)
+// Connects directly to Cloudflare D1's distributed relational store across 300+ edge locations worldwide.
+// Ensures that changes made by an admin in one country are immediately hydrated
+// by colleagues logging in from any other country or device.
+// ---------------------------------------------------------
+
+export interface PlatformSettings {
+  agencyName: string;
+  domain: string;
+  contactEmail: string;
+  contactPhone: string;
+  currency: string;
+  timezone: string;
+  depositPct: string;
+  escrowWindow: string;
+  proposalExpiry: string;
+  autoReminders: boolean;
+  require2FA: boolean;
+  sessionTimeout: string;
+  auditLogging: boolean;
+  cloudSyncEnabled: boolean;
+  lastCloudSync?: string;
+  accentColor?: string;
+  accentTheme?: string;
+  accentSecondary?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  admin_name: string;
+  admin_email: string;
+  action: string;
+  entity: string;
+  entity_id?: string;
+  details?: string;
+  country?: string;
+  timestamp: string;
+}
+
+export async function fetchRemoteStore<T>(key: string, fallback: T): Promise<T> {
+  const local = typeof fallback === 'object' && !Array.isArray(fallback)
+    ? getObjectStoreValue<T>(key, fallback)
+    : (getStoreValue(key, fallback as any) as unknown as T);
+
+  if (typeof window === 'undefined') return local;
+
+  try {
+    const res = await fetch('/api/d1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getStore', payload: { key } }),
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data !== null && json.data !== undefined) {
+        setStoreValue(key, json.data);
+        return json.data as T;
+      }
+    }
+  } catch {
+    // Offline or network error: gracefully fall back to local storage cache
+  }
+
+  return local;
+}
+
+export async function persistRemoteStore<T>(key: string, data: T): Promise<T> {
+  // 1. Optimistically commit to local storage for instant zero-latency UI response
+  setStoreValue(key, data);
+
+  // 2. Dispatch cross-tab storage event
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('storage'));
+  }
+
+  // 3. Persist to Cloudflare Edge D1 (replicated globally to all countries)
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/d1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setStore', payload: { key, value: data } }),
+        cache: 'no-store',
+      });
+    } catch (err) {
+      console.warn(`[db.persistRemoteStore] Failed to sync ${key} to Cloudflare D1:`, err);
+    }
+  }
+
+  return data;
+}
+
+export async function syncAllStoresFromCloud(): Promise<{ success: boolean; syncedKeys: number }> {
+  if (typeof window === 'undefined') return { success: false, syncedKeys: 0 };
+  try {
+    const res = await fetch('/api/d1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getAllStores' }),
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data && typeof json.data === 'object') {
+        let count = 0;
+        for (const [key, value] of Object.entries(json.data)) {
+          if (value !== null && value !== undefined) {
+            setStoreValue(key, value);
+            count++;
+          }
+        }
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('st_cloud_sync_completed', { detail: { count } }));
+        return { success: true, syncedKeys: count };
+      }
+    }
+  } catch (err) {
+    console.warn('[db.syncAllStoresFromCloud] Error syncing from Cloudflare D1:', err);
+  }
+  return { success: false, syncedKeys: 0 };
+}
+
+export async function pushAllStoresToCloud(): Promise<{ success: boolean; pushedKeys: number }> {
+  if (typeof window === 'undefined') return { success: false, pushedKeys: 0 };
+  const backupKeys = [
+    'st_homepage_config', 'st_about_config', 'st_privacy_config', 'st_accessibility_config',
+    'st_services', 'st_website_sections', 'st_bookings', 'st_leads', 'st_venues',
+    'st_customers', 'st_events', 'st_billing_docs', 'st_invoices', 'st_tasks',
+    'st_promo_codes', 'st_ticket_tiers', 'st_campaigns', 'st_ad_placements',
+    'st_integrations', 'st_users', 'st_contracts', 'st_platform_settings', 'st_audit_logs'
+  ];
+
+  const entries: Record<string, any> = {};
+  for (const k of backupKeys) {
+    const raw = localStorage.getItem(k);
+    if (raw) {
+      try {
+        entries[k] = JSON.parse(raw);
+      } catch {
+        entries[k] = raw;
+      }
+    }
+  }
+
+  try {
+    const res = await fetch('/api/d1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'setStoreBatch', payload: { entries } }),
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success) {
+        return { success: true, pushedKeys: Object.keys(entries).length };
+      }
+    }
+  } catch (err) {
+    console.warn('[db.pushAllStoresToCloud] Error pushing to Cloudflare D1:', err);
+  }
+  return { success: false, pushedKeys: 0 };
+}
+
+// ---------------------------------------------------------
 // Supabase Client Initialization (uses shared singleton)
 // ---------------------------------------------------------
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -2504,7 +2669,7 @@ export const db = {
       const { data, error } = await supabase.from('users').select('*');
       if (!error && data) return data as User[];
     }
-    return getStoreValue('st_users', SEED_USERS);
+    return fetchRemoteStore<User[]>('st_users', SEED_USERS);
   },
 
   async createUser(usr: Omit<User, 'id' | 'created_at'>): Promise<User> {
@@ -2515,7 +2680,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     users.push(newUsr);
-    setStoreValue('st_users', users);
+    await persistRemoteStore('st_users', users);
     return newUsr;
   },
 
@@ -2524,7 +2689,7 @@ export const db = {
     const idx = users.findIndex(u => u.id === id);
     if (idx !== -1) {
       users[idx] = { ...users[idx], ...updates };
-      setStoreValue('st_users', users);
+      await persistRemoteStore('st_users', users);
       return users[idx];
     }
     throw new Error('User not found');
@@ -2533,7 +2698,7 @@ export const db = {
   async deleteUser(id: string): Promise<boolean> {
     const users = await this.getUsers();
     const filtered = users.filter(u => u.id !== id);
-    setStoreValue('st_users', filtered);
+    await persistRemoteStore('st_users', filtered);
     return true;
   },
 
@@ -2681,7 +2846,7 @@ export const db = {
       const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
       if (!error && data) return data as Lead[];
     }
-    return getStoreValue('st_leads', SEED_LEADS);
+    return fetchRemoteStore<Lead[]>('st_leads', SEED_LEADS);
   },
 
   async createLead(leadData: Omit<Lead, 'id' | 'created_at' | 'status' | 'source'>): Promise<Lead> {
@@ -2725,7 +2890,7 @@ export const db = {
 
     const leads = await this.getLeads();
     leads.unshift(newLead);
-    setStoreValue('st_leads', leads);
+    await persistRemoteStore('st_leads', leads);
 
     // Auto create system notification for admin & agents
     const talentDisplay = computedArtistName || 'Talent';
@@ -2761,7 +2926,7 @@ export const db = {
     const idx = leads.findIndex(l => l.id === id);
     if (idx !== -1) {
       leads[idx] = { ...leads[idx], status };
-      setStoreValue('st_leads', leads);
+      await persistRemoteStore('st_leads', leads);
 
       // Trigger automatic workflows based on pipeline progress
       if (status === 'Proposal Sent') {
@@ -2790,7 +2955,7 @@ export const db = {
     const idx = leads.findIndex(l => l.id === id);
     if (idx !== -1) {
       leads[idx] = { ...leads[idx], ...updates };
-      setStoreValue('st_leads', leads);
+      await persistRemoteStore('st_leads', leads);
       return leads[idx];
     }
     throw new Error('Lead not found');
@@ -2803,7 +2968,7 @@ export const db = {
     }
     const leads = await this.getLeads();
     const filtered = leads.filter(l => l.id !== id);
-    setStoreValue('st_leads', filtered);
+    await persistRemoteStore('st_leads', filtered);
     return true;
   },
 
@@ -2850,7 +3015,7 @@ export const db = {
     };
 
     bookings.unshift(newBooking);
-    setStoreValue('st_bookings', bookings);
+    await persistRemoteStore('st_bookings', bookings);
 
     // Auto generate draft contract and draft invoice
     const newContract: Contract = {
@@ -2859,9 +3024,9 @@ export const db = {
       status: 'Draft',
       created_at: new Date().toISOString()
     };
-    const contracts = getStoreValue('st_contracts', SEED_CONTRACTS);
+    const contracts = await this.getContracts();
     contracts.unshift(newContract);
-    setStoreValue('st_contracts', contracts);
+    await persistRemoteStore('st_contracts', contracts);
 
     const newInvoice: Invoice = {
       id: 'inv-' + Math.random().toString(36).substr(2, 9),
@@ -2872,13 +3037,13 @@ export const db = {
       due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       created_at: new Date().toISOString()
     };
-    const invoices = getStoreValue('st_invoices', SEED_INVOICES);
+    const invoices = await this.getInvoices();
     invoices.unshift(newInvoice);
-    setStoreValue('st_invoices', invoices);
+    await persistRemoteStore('st_invoices', invoices);
 
     // Link back contract id
     newBooking.contract_id = newContract.id;
-    setStoreValue('st_bookings', bookings);
+    await persistRemoteStore('st_bookings', bookings);
 
     return newBooking;
   },
@@ -2889,7 +3054,7 @@ export const db = {
       const { data, error } = await supabase.from('bookings').select('*');
       if (!error && data) return data as Booking[];
     }
-    return getStoreValue('st_bookings', SEED_BOOKINGS);
+    return fetchRemoteStore<Booking[]>('st_bookings', SEED_BOOKINGS);
   },
 
   async updateBookingStatus(id: string, status: Booking['status']): Promise<Booking> {
@@ -2897,7 +3062,7 @@ export const db = {
     const idx = bookings.findIndex(b => b.id === id);
     if (idx !== -1) {
       bookings[idx].status = status;
-      setStoreValue('st_bookings', bookings);
+      await persistRemoteStore('st_bookings', bookings);
 
       // Sync status changes to contracts & invoices
       if (status === 'Contract Sent') {
@@ -2905,7 +3070,7 @@ export const db = {
         const ctr = contracts.find(c => c.booking_id === id);
         if (ctr) {
           ctr.status = 'Sent';
-          setStoreValue('st_contracts', contracts);
+          await persistRemoteStore('st_contracts', contracts);
         }
       } else if (status === 'Deposit Paid') {
         const invoices = await this.getInvoices();
@@ -2913,12 +3078,12 @@ export const db = {
         if (inv) {
           inv.status = 'Paid';
           inv.balance_due = 0;
-          setStoreValue('st_invoices', invoices);
+          await persistRemoteStore('st_invoices', invoices);
         }
         
         // Elevate booking to confirmed
         bookings[idx].status = 'Confirmed';
-        setStoreValue('st_bookings', bookings);
+        await persistRemoteStore('st_bookings', bookings);
 
         // Block calendar for artist
         await this.blockArtistDate(bookings[idx].artist_id, bookings[idx].event_date);
@@ -2934,7 +3099,7 @@ export const db = {
 
   // --- CONTRACTS ---
   async getContracts(): Promise<Contract[]> {
-    return getStoreValue('st_contracts', SEED_CONTRACTS);
+    return fetchRemoteStore<Contract[]>('st_contracts', SEED_CONTRACTS);
   },
 
   async signContract(id: string, signature: string): Promise<Contract> {
@@ -2944,7 +3109,7 @@ export const db = {
       contracts[idx].status = 'Signed';
       contracts[idx].signed_at = new Date().toISOString();
       contracts[idx].signature_data = signature;
-      setStoreValue('st_contracts', contracts);
+      await persistRemoteStore('st_contracts', contracts);
 
       // Auto update booking status to Deposit Paid trigger
       const bookings = await this.getBookings();
@@ -2961,12 +3126,12 @@ export const db = {
 
   // --- INVOICES ---
   async getInvoices(): Promise<Invoice[]> {
-    return getStoreValue('st_invoices', SEED_INVOICES);
+    return fetchRemoteStore<Invoice[]>('st_invoices', SEED_INVOICES);
   },
 
   // --- PAYMENTS ---
   async getPayments(): Promise<Payment[]> {
-    return getStoreValue('st_payments', []);
+    return fetchRemoteStore<Payment[]>('st_payments', []);
   },
 
   async processPayment(invoiceId: string, amount: number, method: Payment['payment_method'], reference?: string): Promise<Payment> {
@@ -2981,7 +3146,7 @@ export const db = {
     };
 
     payments.unshift(newPayment);
-    setStoreValue('st_payments', payments);
+    await persistRemoteStore('st_payments', payments);
 
     const invoices = await this.getInvoices();
     const inv = invoices.find(i => i.id === invoiceId);
@@ -2992,7 +3157,7 @@ export const db = {
       } else {
         inv.status = 'Partially Paid';
       }
-      setStoreValue('st_invoices', invoices);
+      await persistRemoteStore('st_invoices', invoices);
 
       // Sync booking status
       const bookings = await this.getBookings();
@@ -3062,7 +3227,7 @@ export const db = {
 
   // --- TASKS ---
   async getTasks(): Promise<Task[]> {
-    return getStoreValue('st_tasks', SEED_TASKS);
+    return fetchRemoteStore<Task[]>('st_tasks', SEED_TASKS);
   },
 
   async createTask(title: string, description: string, due_date: string, assigned_to: string): Promise<Task> {
@@ -3077,7 +3242,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     tasks.unshift(newTask);
-    setStoreValue('st_tasks', tasks);
+    await persistRemoteStore('st_tasks', tasks);
     return newTask;
   },
 
@@ -3090,7 +3255,7 @@ export const db = {
         tasks[idx].status === 'In Progress' ? 'Completed' : 'Pending';
       
       tasks[idx].status = nextStatus;
-      setStoreValue('st_tasks', tasks);
+      await persistRemoteStore('st_tasks', tasks);
       return tasks[idx];
     }
     throw new Error('Task not found');
@@ -3157,7 +3322,7 @@ export const db = {
   async deleteBooking(id: string): Promise<boolean> {
     const bookings = await this.getBookings();
     const filtered = bookings.filter(b => b.id !== id);
-    setStoreValue('st_bookings', filtered);
+    await persistRemoteStore('st_bookings', filtered);
     return true;
   },
 
@@ -3166,7 +3331,7 @@ export const db = {
     const idx = bookings.findIndex(b => b.id === id);
     if (idx !== -1) {
       bookings[idx] = { ...bookings[idx], ...updates };
-      setStoreValue('st_bookings', bookings);
+      await persistRemoteStore('st_bookings', bookings);
       return bookings[idx];
     }
     throw new Error('Booking not found');
@@ -3180,7 +3345,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     bookings.unshift(newBk);
-    setStoreValue('st_bookings', bookings);
+    await persistRemoteStore('st_bookings', bookings);
 
     await this.createNotification(
       'usr-admin-1',
@@ -3203,7 +3368,7 @@ export const db = {
   async deleteArtist(id: string): Promise<boolean> {
     const artists = await this.getArtists();
     const filtered = artists.filter(a => a.id !== id);
-    setStoreValue('st_artists_v2', filtered);
+    await persistRemoteStore('st_artists_v2', filtered);
     return true;
   },
 
@@ -3214,13 +3379,13 @@ export const db = {
       id: 'art-' + Math.random().toString(36).substr(2, 9)
     };
     artists.push(newArt);
-    setStoreValue('st_artists_v2', artists);
+    await persistRemoteStore('st_artists_v2', artists);
     return newArt;
   },
 
   // --- VENUES ---
   async getVenues(): Promise<Venue[]> {
-    return getStoreValue('st_venues', SEED_VENUES);
+    return fetchRemoteStore<Venue[]>('st_venues', SEED_VENUES);
   },
 
   async createVenue(venue: Omit<Venue, 'id'>): Promise<Venue> {
@@ -3230,7 +3395,7 @@ export const db = {
       id: 'ven-' + Math.random().toString(36).substr(2, 9)
     };
     venues.push(newVen);
-    setStoreValue('st_venues', venues);
+    await persistRemoteStore('st_venues', venues);
     return newVen;
   },
 
@@ -3239,7 +3404,7 @@ export const db = {
     const idx = venues.findIndex(v => v.id === id);
     if (idx !== -1) {
       venues[idx] = { ...venues[idx], ...updates };
-      setStoreValue('st_venues', venues);
+      await persistRemoteStore('st_venues', venues);
       return venues[idx];
     }
     throw new Error('Venue not found');
@@ -3248,13 +3413,13 @@ export const db = {
   async deleteVenue(id: string): Promise<boolean> {
     const venues = await this.getVenues();
     const filtered = venues.filter(v => v.id !== id);
-    setStoreValue('st_venues', filtered);
+    await persistRemoteStore('st_venues', filtered);
     return true;
   },
 
   // --- CUSTOMERS ---
   async getCustomers(): Promise<Customer[]> {
-    return getStoreValue('st_customers', SEED_CUSTOMERS);
+    return fetchRemoteStore<Customer[]>('st_customers', SEED_CUSTOMERS);
   },
 
   async createCustomer(customer: Omit<Customer, 'id'>): Promise<Customer> {
@@ -3264,7 +3429,7 @@ export const db = {
       id: 'cust-' + Math.random().toString(36).substr(2, 9)
     };
     customers.push(newCust);
-    setStoreValue('st_customers', customers);
+    await persistRemoteStore('st_customers', customers);
     return newCust;
   },
 
@@ -3273,7 +3438,7 @@ export const db = {
     const idx = customers.findIndex(c => c.id === id);
     if (idx !== -1) {
       customers[idx] = { ...customers[idx], ...updates };
-      setStoreValue('st_customers', customers);
+      await persistRemoteStore('st_customers', customers);
       return customers[idx];
     }
     throw new Error('Customer not found');
@@ -3282,13 +3447,13 @@ export const db = {
   async deleteCustomer(id: string): Promise<boolean> {
     const customers = await this.getCustomers();
     const filtered = customers.filter(c => c.id !== id);
-    setStoreValue('st_customers', filtered);
+    await persistRemoteStore('st_customers', filtered);
     return true;
   },
 
   // --- TICKET TIERS ---
   async getTicketTiers(): Promise<TicketTier[]> {
-    return getStoreValue('st_ticket_tiers', SEED_TICKET_TIERS);
+    return fetchRemoteStore<TicketTier[]>('st_ticket_tiers', SEED_TICKET_TIERS);
   },
 
   async createTicketTier(tier: Omit<TicketTier, 'id'>): Promise<TicketTier> {
@@ -3298,7 +3463,7 @@ export const db = {
       id: 'tier-' + Math.random().toString(36).substr(2, 9)
     };
     tiers.push(newTier);
-    setStoreValue('st_ticket_tiers', tiers);
+    await persistRemoteStore('st_ticket_tiers', tiers);
     return newTier;
   },
 
@@ -3307,7 +3472,7 @@ export const db = {
     const idx = tiers.findIndex(t => t.id === id);
     if (idx !== -1) {
       tiers[idx] = { ...tiers[idx], ...updates };
-      setStoreValue('st_ticket_tiers', tiers);
+      await persistRemoteStore('st_ticket_tiers', tiers);
       return tiers[idx];
     }
     throw new Error('Ticket tier not found');
@@ -3316,13 +3481,13 @@ export const db = {
   async deleteTicketTier(id: string): Promise<boolean> {
     const tiers = await this.getTicketTiers();
     const filtered = tiers.filter(t => t.id !== id);
-    setStoreValue('st_ticket_tiers', filtered);
+    await persistRemoteStore('st_ticket_tiers', filtered);
     return true;
   },
 
   // --- PROMO CODES ---
   async getPromoCodes(): Promise<PromoCode[]> {
-    return getStoreValue('st_promo_codes', SEED_PROMO_CODES);
+    return fetchRemoteStore<PromoCode[]>('st_promo_codes', SEED_PROMO_CODES);
   },
 
   async createPromoCode(promo: Omit<PromoCode, 'id'>): Promise<PromoCode> {
@@ -3332,7 +3497,7 @@ export const db = {
       id: 'promo-' + Math.random().toString(36).substr(2, 9)
     };
     promos.push(newPromo);
-    setStoreValue('st_promo_codes', promos);
+    await persistRemoteStore('st_promo_codes', promos);
     return newPromo;
   },
 
@@ -3341,7 +3506,7 @@ export const db = {
     const idx = promos.findIndex(p => p.id === id);
     if (idx !== -1) {
       promos[idx] = { ...promos[idx], ...updates };
-      setStoreValue('st_promo_codes', promos);
+      await persistRemoteStore('st_promo_codes', promos);
       return promos[idx];
     }
     throw new Error('Promo code not found');
@@ -3350,7 +3515,7 @@ export const db = {
   async deletePromoCode(id: string): Promise<boolean> {
     const promos = await this.getPromoCodes();
     const filtered = promos.filter(p => p.id !== id);
-    setStoreValue('st_promo_codes', filtered);
+    await persistRemoteStore('st_promo_codes', filtered);
     return true;
   },
 
@@ -3363,7 +3528,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     invoices.unshift(newInv);
-    setStoreValue('st_invoices', invoices);
+    await persistRemoteStore('st_invoices', invoices);
     return newInv;
   },
 
@@ -3372,7 +3537,7 @@ export const db = {
     const idx = invoices.findIndex(i => i.id === id);
     if (idx !== -1) {
       invoices[idx] = { ...invoices[idx], ...updates };
-      setStoreValue('st_invoices', invoices);
+      await persistRemoteStore('st_invoices', invoices);
       return invoices[idx];
     }
     throw new Error('Invoice not found');
@@ -3381,13 +3546,13 @@ export const db = {
   async deleteInvoice(id: string): Promise<boolean> {
     const invoices = await this.getInvoices();
     const filtered = invoices.filter(i => i.id !== id);
-    setStoreValue('st_invoices', filtered);
+    await persistRemoteStore('st_invoices', filtered);
     return true;
   },
 
   // --- CAMPAIGNS ---
   async getCampaigns(): Promise<MarketingCampaign[]> {
-    return getStoreValue('st_campaigns', SEED_CAMPAIGNS);
+    return fetchRemoteStore<MarketingCampaign[]>('st_campaigns', SEED_CAMPAIGNS);
   },
 
   async createCampaign(camp: Omit<MarketingCampaign, 'id' | 'created_at' | 'openRate'>): Promise<MarketingCampaign> {
@@ -3399,7 +3564,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     camps.unshift(newCamp);
-    setStoreValue('st_campaigns', camps);
+    await persistRemoteStore('st_campaigns', camps);
     return newCamp;
   },
 
@@ -3408,7 +3573,7 @@ export const db = {
     const idx = camps.findIndex(c => c.id === id);
     if (idx !== -1) {
       camps[idx] = { ...camps[idx], ...updates };
-      setStoreValue('st_campaigns', camps);
+      await persistRemoteStore('st_campaigns', camps);
       return camps[idx];
     }
     throw new Error('Campaign not found');
@@ -3417,13 +3582,13 @@ export const db = {
   async deleteCampaign(id: string): Promise<boolean> {
     const camps = await this.getCampaigns();
     const filtered = camps.filter(c => c.id !== id);
-    setStoreValue('st_campaigns', filtered);
+    await persistRemoteStore('st_campaigns', filtered);
     return true;
   },
 
   // --- AD PLACEMENTS ---
   async getAdPlacements(): Promise<AdPlacement[]> {
-    return getStoreValue('st_ad_placements', SEED_AD_PLACEMENTS);
+    return fetchRemoteStore<AdPlacement[]>('st_ad_placements', SEED_AD_PLACEMENTS);
   },
 
   async createAdPlacement(ad: Omit<AdPlacement, 'id' | 'impressions' | 'clickRate' | 'revenue'>): Promise<AdPlacement> {
@@ -3436,7 +3601,7 @@ export const db = {
       revenue: 0
     };
     ads.push(newAd);
-    setStoreValue('st_ad_placements', ads);
+    await persistRemoteStore('st_ad_placements', ads);
     return newAd;
   },
 
@@ -3445,7 +3610,7 @@ export const db = {
     const idx = ads.findIndex(a => a.id === id);
     if (idx !== -1) {
       ads[idx] = { ...ads[idx], ...updates };
-      setStoreValue('st_ad_placements', ads);
+      await persistRemoteStore('st_ad_placements', ads);
       return ads[idx];
     }
     throw new Error('Ad placement not found');
@@ -3454,13 +3619,13 @@ export const db = {
   async deleteAdPlacement(id: string): Promise<boolean> {
     const ads = await this.getAdPlacements();
     const filtered = ads.filter(a => a.id !== id);
-    setStoreValue('st_ad_placements', filtered);
+    await persistRemoteStore('st_ad_placements', filtered);
     return true;
   },
 
   // --- WEBSITE SECTIONS ---
   async getWebsiteSections(): Promise<WebsiteSection[]> {
-    return getStoreValue('st_website_sections', SEED_WEBSITE_SECTIONS);
+    return fetchRemoteStore<WebsiteSection[]>('st_website_sections', SEED_WEBSITE_SECTIONS);
   },
 
   async createWebsiteSection(sec: Omit<WebsiteSection, 'id'>): Promise<WebsiteSection> {
@@ -3470,7 +3635,7 @@ export const db = {
       id: 'sec-' + Math.random().toString(36).substr(2, 9)
     };
     secs.push(newSec);
-    setStoreValue('st_website_sections', secs);
+    await persistRemoteStore('st_website_sections', secs);
     return newSec;
   },
 
@@ -3479,7 +3644,7 @@ export const db = {
     const idx = secs.findIndex(s => s.id === id);
     if (idx !== -1) {
       secs[idx] = { ...secs[idx], ...updates };
-      setStoreValue('st_website_sections', secs);
+      await persistRemoteStore('st_website_sections', secs);
       return secs[idx];
     }
     throw new Error('Website section not found');
@@ -3488,7 +3653,7 @@ export const db = {
   async deleteWebsiteSection(id: string): Promise<boolean> {
     const secs = await this.getWebsiteSections();
     const filtered = secs.filter(s => s.id !== id);
-    setStoreValue('st_website_sections', filtered);
+    await persistRemoteStore('st_website_sections', filtered);
     return true;
   },
 
@@ -3507,7 +3672,7 @@ export const db = {
         // fallback to store
       }
     }
-    return getObjectStoreValue<HomepageConfig>('st_homepage_config', SEED_HOMEPAGE_CONFIG);
+    return fetchRemoteStore<HomepageConfig>('st_homepage_config', SEED_HOMEPAGE_CONFIG);
   },
 
   async updateHomepageConfig(updates: Partial<HomepageConfig>): Promise<HomepageConfig> {
@@ -3519,7 +3684,7 @@ export const db = {
         items: updates.marquee?.items !== undefined ? updates.marquee.items : current.marquee.items,
       }
     };
-    setStoreValue('st_homepage_config', updated);
+    await persistRemoteStore('st_homepage_config', updated);
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -3556,7 +3721,7 @@ export const db = {
         // fallback to store
       }
     }
-    return getObjectStoreValue<AboutUsConfig>('st_about_config', SEED_ABOUT_CONFIG);
+    return fetchRemoteStore<AboutUsConfig>('st_about_config', SEED_ABOUT_CONFIG);
   },
 
   async updateAboutConfig(updates: Partial<AboutUsConfig>): Promise<AboutUsConfig> {
@@ -3567,7 +3732,7 @@ export const db = {
       markets_list: updates.markets_list !== undefined ? updates.markets_list : current.markets_list,
       highlights: updates.highlights !== undefined ? updates.highlights : current.highlights
     };
-    setStoreValue('st_about_config', updated);
+    await persistRemoteStore('st_about_config', updated);
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -3604,7 +3769,7 @@ export const db = {
         // fallback to store
       }
     }
-    return getObjectStoreValue<PrivacyPolicyConfig>('st_privacy_config', SEED_PRIVACY_CONFIG);
+    return fetchRemoteStore<PrivacyPolicyConfig>('st_privacy_config', SEED_PRIVACY_CONFIG);
   },
 
   async updatePrivacyConfig(updates: Partial<PrivacyPolicyConfig>): Promise<PrivacyPolicyConfig> {
@@ -3614,7 +3779,7 @@ export const db = {
       ...updates,
       sections: updates.sections !== undefined ? updates.sections : current.sections
     };
-    setStoreValue('st_privacy_config', updated);
+    await persistRemoteStore('st_privacy_config', updated);
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -3651,7 +3816,7 @@ export const db = {
         // fallback to store
       }
     }
-    return getObjectStoreValue<AccessibilityConfig>('st_accessibility_config', SEED_ACCESSIBILITY_CONFIG);
+    return fetchRemoteStore<AccessibilityConfig>('st_accessibility_config', SEED_ACCESSIBILITY_CONFIG);
   },
 
   async updateAccessibilityConfig(updates: Partial<AccessibilityConfig>): Promise<AccessibilityConfig> {
@@ -3662,7 +3827,7 @@ export const db = {
       conformance_points: updates.conformance_points !== undefined ? updates.conformance_points : current.conformance_points,
       methodology_points: updates.methodology_points !== undefined ? updates.methodology_points : current.methodology_points
     };
-    setStoreValue('st_accessibility_config', updated);
+    await persistRemoteStore('st_accessibility_config', updated);
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -3699,7 +3864,7 @@ export const db = {
         // fallback
       }
     }
-    const current = getStoreValue<AgencyService>('st_services', SEED_SERVICES);
+    const current = await fetchRemoteStore<AgencyService[]>('st_services', SEED_SERVICES);
     return [...current].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
   },
 
@@ -3713,7 +3878,7 @@ export const db = {
       updated_at: new Date().toISOString(),
     };
     const updated = [...list, newService];
-    setStoreValue('st_services', updated);
+    await persistRemoteStore('st_services', updated);
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('website_sections').upsert({
@@ -3744,7 +3909,7 @@ export const db = {
     };
     const updatedList = [...list];
     updatedList[idx] = updatedItem;
-    setStoreValue('st_services', updatedList);
+    await persistRemoteStore('st_services', updatedList);
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('website_sections').upsert({
@@ -3767,7 +3932,7 @@ export const db = {
   async deleteService(id: string): Promise<boolean> {
     const list = await this.getServices();
     const updated = list.filter(s => s.id !== id);
-    setStoreValue('st_services', updated);
+    await persistRemoteStore('st_services', updated);
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('website_sections').upsert({
@@ -3788,7 +3953,7 @@ export const db = {
   },
 
   async resetServices(): Promise<AgencyService[]> {
-    setStoreValue('st_services', SEED_SERVICES);
+    await persistRemoteStore('st_services', SEED_SERVICES);
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('website_sections').upsert({
@@ -3810,7 +3975,7 @@ export const db = {
 
   // --- INTEGRATIONS ---
   async getIntegrations(): Promise<Integration[]> {
-    return getStoreValue('st_integrations', SEED_INTEGRATIONS);
+    return fetchRemoteStore<Integration[]>('st_integrations', SEED_INTEGRATIONS);
   },
 
   async createIntegration(int: Omit<Integration, 'id'>): Promise<Integration> {
@@ -3820,7 +3985,7 @@ export const db = {
       id: 'int-' + Math.random().toString(36).substr(2, 9)
     };
     ints.push(newInt);
-    setStoreValue('st_integrations', ints);
+    await persistRemoteStore('st_integrations', ints);
     return newInt;
   },
 
@@ -3829,7 +3994,7 @@ export const db = {
     const idx = ints.findIndex(i => i.id === id);
     if (idx !== -1) {
       ints[idx] = { ...ints[idx], ...updates };
-      setStoreValue('st_integrations', ints);
+      await persistRemoteStore('st_integrations', ints);
       return ints[idx];
     }
     throw new Error('Integration not found');
@@ -3838,13 +4003,13 @@ export const db = {
   async deleteIntegration(id: string): Promise<boolean> {
     const ints = await this.getIntegrations();
     const filtered = ints.filter(i => i.id !== id);
-    setStoreValue('st_integrations', filtered);
+    await persistRemoteStore('st_integrations', filtered);
     return true;
   },
 
   // --- SHOW EVENTS ---
   async getEvents(): Promise<ShowEvent[]> {
-    return getStoreValue('st_events', SEED_EVENTS);
+    return fetchRemoteStore<ShowEvent[]>('st_events', SEED_EVENTS);
   },
 
   async createEvent(evt: Omit<ShowEvent, 'id' | 'created_at'>): Promise<ShowEvent> {
@@ -3855,7 +4020,7 @@ export const db = {
       created_at: new Date().toISOString()
     };
     events.unshift(newEvt);
-    setStoreValue('st_events', events);
+    await persistRemoteStore('st_events', events);
     return newEvt;
   },
 
@@ -3864,7 +4029,7 @@ export const db = {
     const idx = events.findIndex(e => e.id === id);
     if (idx !== -1) {
       events[idx] = { ...events[idx], ...updates };
-      setStoreValue('st_events', events);
+      await persistRemoteStore('st_events', events);
       return events[idx];
     }
     throw new Error('Event not found');
@@ -3873,13 +4038,13 @@ export const db = {
   async deleteEvent(id: string): Promise<boolean> {
     const events = await this.getEvents();
     const filtered = events.filter(e => e.id !== id);
-    setStoreValue('st_events', filtered);
+    await persistRemoteStore('st_events', filtered);
     return true;
   },
 
   // --- BILLING DOCUMENTS (Quotes, Invoices, Receipts, Credit Notes) ---
   async getBillingDocs(): Promise<BillingDoc[]> {
-    return getStoreValue('st_billing_docs', SEED_BILLING_DOCS);
+    return fetchRemoteStore<BillingDoc[]>('st_billing_docs', SEED_BILLING_DOCS);
   },
 
   _nextDocNumber(docs: BillingDoc[], type: BillingDocType): string {
@@ -3901,7 +4066,7 @@ export const db = {
       created_at: new Date().toISOString(),
     };
     docs.unshift(doc);
-    setStoreValue('st_billing_docs', docs);
+    await persistRemoteStore('st_billing_docs', docs);
     return doc;
   },
 
@@ -3910,13 +4075,13 @@ export const db = {
     const idx = docs.findIndex(d => d.id === id);
     if (idx === -1) throw new Error('Document not found');
     docs[idx] = { ...docs[idx], ...updates };
-    setStoreValue('st_billing_docs', docs);
+    await persistRemoteStore('st_billing_docs', docs);
     return docs[idx];
   },
 
   async deleteBillingDoc(id: string): Promise<boolean> {
     const docs = await this.getBillingDocs();
-    setStoreValue('st_billing_docs', docs.filter(d => d.id !== id));
+    await persistRemoteStore('st_billing_docs', docs.filter(d => d.id !== id));
     return true;
   },
 
@@ -4057,6 +4222,81 @@ export const db = {
       return { success: true, recordsRestored: count };
     } catch (err: unknown) {
       return { success: false, recordsRestored: 0, error: (err as Error).message || 'Failed to parse JSON' };
+    }
+  },
+
+  // --- 2026 GLOBAL EDGE SYNC & PLATFORM SETTINGS ---
+  syncAllStoresFromCloud: syncAllStoresFromCloud,
+  pushAllStoresToCloud: pushAllStoresToCloud,
+
+  async getPlatformSettings(): Promise<PlatformSettings> {
+    const fallback: PlatformSettings = {
+      agencyName: 'Showtime Entertainment Services LLC',
+      domain: 'showtimeservices.com',
+      contactEmail: 'bookings@showtimeservices.com',
+      contactPhone: '+1 (800) 555-0199',
+      currency: 'USD ($)',
+      timezone: 'America/Jamaica',
+      depositPct: '50% Standard Deposit',
+      escrowWindow: '48 Hours Post-Performance',
+      proposalExpiry: '7 Days',
+      autoReminders: true,
+      require2FA: true,
+      sessionTimeout: '24 Hours',
+      auditLogging: true,
+      cloudSyncEnabled: true,
+      lastCloudSync: new Date().toISOString(),
+      accentColor: '#d4af37',
+      accentTheme: 'gold',
+      accentSecondary: '#f5d061',
+    };
+    return fetchRemoteStore<PlatformSettings>('st_platform_settings', fallback);
+  },
+
+  async updatePlatformSettings(settings: Partial<PlatformSettings>): Promise<PlatformSettings> {
+    const current = await this.getPlatformSettings();
+    const updated: PlatformSettings = {
+      ...current,
+      ...settings,
+      lastCloudSync: new Date().toISOString(),
+    };
+    await persistRemoteStore('st_platform_settings', updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('st_settings_domain', updated.domain);
+      localStorage.setItem('st_settings_currency', updated.currency);
+      if (updated.accentColor) {
+        localStorage.setItem('st_accent_color', updated.accentColor);
+      }
+      if (updated.accentTheme) {
+        localStorage.setItem('st_accent_theme', updated.accentTheme);
+      }
+      window.dispatchEvent(new CustomEvent('st_settings_updated', { detail: updated }));
+    }
+    await this.logAudit('Updated Platform Settings', 'System Settings', `Updated domain, theme accent (${updated.accentColor || 'Gold'}) or agency policies`);
+    return updated;
+  },
+
+  async getAuditLogs(): Promise<AuditLogEntry[]> {
+    return fetchRemoteStore<AuditLogEntry[]>('st_audit_logs', []);
+  },
+
+  async logAudit(action: string, entity: string, details?: string, adminUser?: { name?: string; email?: string }): Promise<void> {
+    try {
+      const logs = await this.getAuditLogs();
+      const newEntry: AuditLogEntry = {
+        id: 'aud-' + Math.random().toString(36).substring(2, 9),
+        admin_name: adminUser?.name || 'Executive Admin',
+        admin_email: adminUser?.email || 'admin@showtimeservices.com',
+        action,
+        entity,
+        details,
+        country: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Global',
+        timestamp: new Date().toISOString(),
+      };
+      const updatedLogs = [newEntry, ...logs].slice(0, 100);
+      await persistRemoteStore('st_audit_logs', updatedLogs);
+    } catch {
+      // Non-blocking
     }
   }
 };

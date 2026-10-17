@@ -2211,6 +2211,8 @@ function ArtistProfile() {
           margin: auto;
           box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255,255,255,0.05);
           overflow-y: auto;
+          overflow-x: hidden;
+          box-sizing: border-box;
           max-height: 90vh;
         }
 

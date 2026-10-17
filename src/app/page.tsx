@@ -357,7 +357,7 @@ export default function Home() {
           <FlowSection aria-label="Talent Booking" style={{ backgroundColor: '#0f0a1d', color: '#fff' }} className="border-t border-white/5">
             <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">01 &mdash; Talent Booking</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>01 &mdash; Talent Booking</p>
                 <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Booking</span>
               </div>
 
@@ -365,7 +365,7 @@ export default function Home() {
                 <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Reserve <br />
-                    <span className="text-[#d4af37]">Elite</span> Talent.
+                    <span style={{ color: 'var(--accent)' }}>Elite</span> Talent.
                   </h3>
                   <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
                     Structured deposit schedules &amp; dynamic performance agreements. We connect festivals and promoters directly with the legendary names of Caribbean reggae, dancehall, and live sounds.
@@ -383,14 +383,14 @@ export default function Home() {
                   </div>
 
                   <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
-                    <Link href="/book" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full hover:scale-105 transition duration-300 flex items-center gap-2" style={{ background: 'linear-gradient(135deg, #f5d061 0%, #d4af37 100%)', color: '#07050e' }}>
+                    <Link href="/book" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full hover:scale-105 transition duration-300 flex items-center gap-2" style={{ background: 'var(--accent-gradient)', color: '#07050e', boxShadow: 'var(--glow-gold)' }}>
                       Reserve Artist <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
 
                 <div className="lg:col-span-5 flex justify-center">
-                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border border-[#d4af37]/30 shadow-[0_0_20px_rgba(212,175,55,0.1)] shadow-2xl group">
+                  <div className="relative w-full max-w-md aspect-[4/3] rounded-2xl overflow-hidden border shadow-2xl group" style={{ borderColor: 'var(--accent-light, rgba(212,175,55,0.3))', boxShadow: 'var(--glow-gold)' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
                       src="/images/artist_dancehall.jpg" 
@@ -399,7 +399,7 @@ export default function Home() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent animate-pulse" style={{ animationDuration: '4s' }} />
                     <div className="absolute bottom-4 left-4">
-                      <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Live Performance</p>
+                      <p className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--accent)' }}>Live Performance</p>
                       <p className="text-sm font-bold text-white">Dancehall &amp; Reggae Headliners</p>
                     </div>
                   </div>
@@ -505,7 +505,7 @@ export default function Home() {
           <FlowSection aria-label="Visa & Permits" style={{ backgroundColor: '#130413', color: '#fff' }} className="border-t border-white/5">
             <div className="flex flex-col justify-between h-full min-h-[calc(100vh-8vw)] w-full">
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">03 &mdash; Visa &amp; Permits</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>03 &mdash; Visa &amp; Permits</p>
                 <span className="text-xs font-semibold text-white/50 tracking-wider">Showtime Compliance</span>
               </div>
 
@@ -513,7 +513,7 @@ export default function Home() {
                 <div className="lg:col-span-7 flex flex-col items-start gap-4 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl p-6 md:p-8 shadow-xl">
                   <h3 className="text-[clamp(2.2rem,5.5vw,4.5rem)] font-extrabold leading-[1.0] tracking-tighter uppercase">
                     Visa &amp; <br />
-                    <span className="text-[#d4af37]">Permit</span> Compliance.
+                    <span style={{ color: 'var(--accent)' }}>Permit</span> Compliance.
                   </h3>
                   <p className="text-base md:text-lg text-white/70 max-w-xl mt-4 leading-relaxed">
                     US O-Visas, UK Certificates of Sponsorship (COS), Schengen declarations, and work permits handled by dedicated compliance managers to guarantee border clearance.
@@ -521,17 +521,17 @@ export default function Home() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md mt-6">
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-[#d4af37] uppercase tracking-wider mb-1">O-1 &amp; COS</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>O-1 &amp; COS</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Sponsorship Filing &amp; Petition Support</p>
                     </div>
                     <div className="border border-white/10 bg-white/5 p-4 rounded-xl">
-                      <h4 className="text-[11px] font-bold text-[#d4af37] uppercase tracking-wider mb-1">Border Clearance</h4>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent)' }}>Border Clearance</h4>
                       <p className="text-xs md:text-sm font-medium text-white/90">Dual Citizenship &amp; Permit Verification</p>
                     </div>
                   </div>
 
                   <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
-                    <Link href="/contact" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 hover:border-[#d4af37] hover:text-[#d4af37] transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
+                    <Link href="/contact" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full border border-white/20 transition duration-300 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', color: '#fff' }}>
                       Consult Compliance Team <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
@@ -549,13 +549,13 @@ export default function Home() {
                     
                     {/* Passport Stamp Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                      <div className="visa-stamp border-[5px] border-[#d4af37] text-[#d4af37] font-black text-2xl md:text-3xl uppercase tracking-widest px-4 py-1.5 rounded-xl rotate-[-12deg] scale-[2.5] opacity-0 bg-black/45 backdrop-blur-[1px] shadow-[0_0_15px_rgba(212,175,55,0.35)]">
+                      <div className="visa-stamp font-black text-2xl md:text-3xl uppercase tracking-widest px-4 py-1.5 rounded-xl rotate-[-12deg] scale-[2.5] opacity-0 bg-black/45 backdrop-blur-[1px]" style={{ border: '5px solid var(--accent)', color: 'var(--accent)', boxShadow: 'var(--glow-gold)' }}>
                         Approved
                       </div>
                     </div>
 
                     <div className="absolute bottom-4 left-4 z-20">
-                      <p className="text-xs text-[#d4af37] font-bold tracking-widest uppercase">Compliance</p>
+                      <p className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--accent)' }}>Compliance</p>
                       <p className="text-sm font-bold text-white">Hassle-Free Border Clearances</p>
                     </div>
                   </div>

@@ -123,6 +123,20 @@ export async function onRequestGet({ request, env }) {
       return json({ success: true, data: rows[0] ? parseArtistRow(rows[0]) : null });
     }
 
+    if (action === 'getAllStores') {
+      const rows = await executeQuery(env, 'SELECT key, value, updated_at FROM site_store');
+      const stores = {};
+      for (const row of rows) {
+        if (!row.key) continue;
+        try {
+          stores[row.key] = JSON.parse(row.value);
+        } catch {
+          stores[row.key] = row.value;
+        }
+      }
+      return json({ success: true, data: stores });
+    }
+
     if (action === 'getStore' && key) {
       const rows = await executeQuery(env, 'SELECT value FROM site_store WHERE key = ? LIMIT 1', [key]);
       let value = null;
@@ -238,6 +252,20 @@ export async function onRequestPost({ request, env }) {
         return json({ success: true, data: updatedArtist });
       }
 
+      case 'getAllStores': {
+        const rows = await executeQuery(env, 'SELECT key, value, updated_at FROM site_store');
+        const stores = {};
+        for (const row of rows) {
+          if (!row.key) continue;
+          try {
+            stores[row.key] = JSON.parse(row.value);
+          } catch {
+            stores[row.key] = row.value;
+          }
+        }
+        return json({ success: true, data: stores });
+      }
+
       case 'getStore': {
         const key = payload?.key;
         if (!key) return json({ success: false, error: 'Missing key' }, 400);
@@ -264,6 +292,21 @@ export async function onRequestPost({ request, env }) {
           [key, strVal]
         );
         return json({ success: true, data: val });
+      }
+
+      case 'setStoreBatch': {
+        const entries = payload?.entries;
+        if (!entries || typeof entries !== 'object') return json({ success: false, error: 'Missing entries' }, 400);
+        for (const [k, v] of Object.entries(entries)) {
+          if (!k) continue;
+          const strVal = typeof v === 'string' ? v : JSON.stringify(v);
+          await executeQuery(
+            env,
+            'INSERT INTO site_store (key, value, updated_at) VALUES (?, ?, datetime(\'now\')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at',
+            [k, strVal]
+          );
+        }
+        return json({ success: true, count: Object.keys(entries).length });
       }
 
       case 'getLeads': {

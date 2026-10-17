@@ -11,6 +11,7 @@ import { CookieConsent } from '@/components/CookieConsent';
 import Link from 'next/link';
 import React from 'react';
 import { ShowtimeLogo } from '@/components/ShowtimeLogo';
+import { AccentThemeInit } from '@/components/AccentThemeInit';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://showtimeservices.com';
 
@@ -90,7 +91,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var c=localStorage.getItem('st_accent_color');if(c){document.documentElement.style.setProperty('--accent',c);document.documentElement.style.setProperty('--gold-primary',c);}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
+        <AccentThemeInit />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
             <div className="app-layout">

@@ -137,6 +137,20 @@ export const d1 = {
   },
 
   // --- SITE STORE (CROSS-DEVICE SYNC) ---
+  async getAllStores() {
+    const rows = await executeD1Query('SELECT key, value, updated_at FROM site_store');
+    const stores: Record<string, any> = {};
+    for (const row of rows) {
+      if (!row.key) continue;
+      try {
+        stores[row.key] = JSON.parse(row.value);
+      } catch {
+        stores[row.key] = row.value;
+      }
+    }
+    return stores;
+  },
+
   async getStore(key: string) {
     const rows = await executeD1Query('SELECT value FROM site_store WHERE key = ? LIMIT 1', [key]);
     if (!rows[0] || !rows[0].value) return null;
@@ -154,6 +168,15 @@ export const d1 = {
       [key, strVal]
     );
     return value;
+  },
+
+  async setStoreBatch(entries: Record<string, any>) {
+    if (!entries || typeof entries !== 'object') return { success: false };
+    for (const [k, v] of Object.entries(entries)) {
+      if (!k) continue;
+      await this.setStore(k, v);
+    }
+    return { success: true, count: Object.keys(entries).length };
   },
 
   // --- LEADS ---
