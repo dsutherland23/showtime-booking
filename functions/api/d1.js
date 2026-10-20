@@ -8,11 +8,11 @@ const ACCOUNT_ID = 'df4dfe0ec35e0d41666c57de349dee65';
 const DATABASE_ID = '774fe766-2ed6-48e4-b1bb-535a76b7cf39';
 
 function getD1Token(env) {
+  // Token must come from environment variables only — never hardcode credentials.
+  // Set CLOUDFLARE_D1_TOKEN or CLOUDFLARE_API_TOKEN in the Pages project's settings.
   if (env?.CLOUDFLARE_D1_TOKEN) return env.CLOUDFLARE_D1_TOKEN;
   if (env?.CLOUDFLARE_API_TOKEN) return env.CLOUDFLARE_API_TOKEN;
-  const p1 = 'cfat';
-  const p2 = 'pIRpRLLxKuWvJAtyYEKFv90jWYDgJjqwksJ0aE980387dda5';
-  return `${p1}_${p2}`;
+  return '';
 }
 
 function corsHeaders() {
