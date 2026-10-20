@@ -1969,11 +1969,23 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [savedArtist, setSavedArtist] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
-  // Batch selection & bulk actions (mobile + desktop)
+  // Batch selection & 2026 bulk processor (mobile + desktop)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastClickedId, setLastClickedId] = useState<string | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; currentName: string } | null>(null);
   const [batchStatus, setBatchStatus] = useState<Artist['booking_status']>('Available');
+  const [batchCategory, setBatchCategory] = useState<string>('Reggae Artists');
+  const [batchFeeMode, setBatchFeeMode] = useState<'pct_up_10' | 'pct_down_10' | 'custom'>('pct_up_10');
+  const [batchCustomFee, setBatchCustomFee] = useState<string>('50000');
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [lastBatchUndo, setLastBatchUndo] = useState<{
+    description: string;
+    snapshots: { id: string; stage_name: string; prev: Partial<Artist> }[];
+  } | null>(null);
+  const [liveAnnouncement, setLiveAnnouncement] = useState<string>('');
+  const desktopMasterCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const mobileMasterCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
 
   // YouTube Showcase state inside modal
@@ -2218,57 +2230,6 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     finally { setConfirm(null); }
   };
 
-  // ── Batch processing ──────────────────────────────────────────────────────
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds(prev => {
-      const allSelected = filtered.length > 0 && filtered.every(a => prev.has(a.id));
-      if (allSelected) return new Set<string>();
-      return new Set(filtered.map(a => a.id));
-    });
-  };
-
-  const runBatch = async (updates: Partial<Artist>, successMsg: string) => {
-    if (selectedIds.size === 0 || batchBusy) return;
-    setBatchBusy(true);
-    try {
-      const ids = [...selectedIds];
-      // Sequential partial updates keep D1 sync order deterministic
-      for (const id of ids) await db.updateArtistProfile(id, updates);
-      showToast(successMsg.replace('{n}', String(ids.length)), 'success');
-      setSelectedIds(new Set());
-      onRefresh();
-    } catch {
-      showToast('Batch update failed. Please try again.', 'error');
-    } finally {
-      setBatchBusy(false);
-    }
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedIds.size === 0 || batchBusy) return;
-    setBatchBusy(true);
-    try {
-      const ids = [...selectedIds];
-      for (const id of ids) await db.deleteArtist(id);
-      showToast(`${ids.length} artist(s) removed from roster.`, 'success');
-      setSelectedIds(new Set());
-      onRefresh();
-    } catch {
-      showToast('Batch delete failed. Please try again.', 'error');
-    } finally {
-      setBatchBusy(false);
-      setConfirmBatchDelete(false);
-    }
-  };
-
   // Calendar math for modal Tab 4
   const calDate = new Date();
   calDate.setDate(1);
@@ -2292,206 +2253,956 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     return matchesSearch && matchesCat && matchesStatus;
   });
 
+  // ── 2026 Batch Selection & Processing Engine ──────────────────────────────
+  const selectedArtistsList = artists.filter(a => selectedIds.has(a.id));
+  const selectedInFilteredCount = filtered.filter(a => selectedIds.has(a.id)).length;
+  const allFilteredSelected = filtered.length > 0 && selectedInFilteredCount === filtered.length;
+  const isIndeterminate = selectedInFilteredCount > 0 && !allFilteredSelected;
+  const hiddenSelectedCount = Math.max(0, selectedIds.size - selectedInFilteredCount);
+  const totalSelectedFee = selectedArtistsList.reduce((acc, a) => acc + getArtistEstimatedPricing(a).fee, 0);
+
+  // Sync native indeterminate state on master checkboxes
+  useEffect(() => {
+    if (desktopMasterCheckboxRef.current) {
+      desktopMasterCheckboxRef.current.indeterminate = isIndeterminate;
+    }
+    if (mobileMasterCheckboxRef.current) {
+      mobileMasterCheckboxRef.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
+  // Progressive fallback for browsers without CSS :has() support
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof CSS !== 'undefined' && !CSS.supports('selector(:has(*))')) {
+      document.querySelectorAll<HTMLElement>('.artist-batch-row, .artist-batch-card').forEach(el => {
+        const cb = el.querySelector<HTMLInputElement>('.artist-select-checkbox');
+        if (cb) el.classList.toggle('is-selected', cb.checked);
+      });
+    }
+  }, [selectedIds, filtered, isMobile]);
+
+  // Escape key clears selection when no modal/confirm dialog is open
+  useEffect(() => {
+    if (selectedIds.size === 0 || showModal || confirm || confirmBatchDelete) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedIds(new Set());
+        setLiveAnnouncement('Cleared artist batch selection.');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedIds.size, showModal, confirm, confirmBatchDelete]);
+
+  const toggleSelect = (id: string, shiftKey = false) => {
+    const targetArtist = artists.find(a => a.id === id);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const willSelect = !next.has(id);
+
+      // Shift+Click range selection across the current filtered list
+      if (shiftKey && lastClickedId && lastClickedId !== id) {
+        const startIdx = filtered.findIndex(a => a.id === lastClickedId);
+        const endIdx = filtered.findIndex(a => a.id === id);
+        if (startIdx !== -1 && endIdx !== -1) {
+          const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+          for (let i = lo; i <= hi; i++) {
+            if (willSelect) next.add(filtered[i].id);
+            else next.delete(filtered[i].id);
+          }
+          setLiveAnnouncement(`${next.size} artists selected.`);
+          return next;
+        }
+      }
+
+      if (willSelect) next.add(id);
+      else next.delete(id);
+
+      setLiveAnnouncement(
+        `${targetArtist?.stage_name || 'Artist'} ${willSelect ? 'selected' : 'deselected'}. ${next.size} total selected.`
+      );
+      return next;
+    });
+    setLastClickedId(id);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filtered.forEach(a => next.delete(a.id));
+        setLiveAnnouncement(`Deselected ${filtered.length} visible artists.`);
+      } else {
+        filtered.forEach(a => next.add(a.id));
+        setLiveAnnouncement(`Selected all ${filtered.length} visible artists.`);
+      }
+      return next;
+    });
+  };
+
+  const invertFilteredSelection = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      filtered.forEach(a => {
+        if (next.has(a.id)) next.delete(a.id);
+        else next.add(a.id);
+      });
+      setLiveAnnouncement(`Inverted selection. ${next.size} artists now selected.`);
+      return next;
+    });
+  };
+
+  const runBatch = async (
+    computeUpdates: Partial<Artist> | ((artist: Artist) => Partial<Artist>),
+    successMsg: string,
+    undoDescription: string
+  ) => {
+    if (selectedIds.size === 0 || batchBusy) return;
+    const targetArtists = artists.filter(a => selectedIds.has(a.id));
+    if (targetArtists.length === 0) return;
+
+    setBatchBusy(true);
+    setConfirmBatchDelete(false);
+
+    // Capture pre-batch snapshot for 1-click Undo
+    const snapshots: { id: string; stage_name: string; prev: Partial<Artist> }[] = [];
+
+    try {
+      for (let i = 0; i < targetArtists.length; i++) {
+        const artist = targetArtists[i];
+        const updates = typeof computeUpdates === 'function' ? computeUpdates(artist) : computeUpdates;
+        const prevSlice: Partial<Artist> = {};
+        (Object.keys(updates) as (keyof Artist)[]).forEach(k => {
+          (prevSlice as Record<string, unknown>)[k] = artist[k];
+        });
+        snapshots.push({ id: artist.id, stage_name: artist.stage_name, prev: prevSlice });
+
+        setBatchProgress({
+          done: i + 1,
+          total: targetArtists.length,
+          currentName: artist.stage_name,
+        });
+
+        // Deterministic sequential update for D1 + local store sync
+        await db.updateArtistProfile(artist.id, updates);
+      }
+
+      const finalMsg = successMsg.replace('{n}', String(targetArtists.length));
+      setLastBatchUndo({ description: undoDescription, snapshots });
+      setLiveAnnouncement(finalMsg);
+      showToast(finalMsg, 'success');
+      onRefresh();
+    } catch {
+      showToast('Batch update encountered an error. Please try again.', 'error');
+    } finally {
+      setBatchBusy(false);
+      setBatchProgress(null);
+    }
+  };
+
+  const handleUndoLastBatch = async () => {
+    if (!lastBatchUndo || batchBusy) return;
+    const { snapshots, description } = lastBatchUndo;
+    setBatchBusy(true);
+    try {
+      for (let i = 0; i < snapshots.length; i++) {
+        const snap = snapshots[i];
+        setBatchProgress({ done: i + 1, total: snapshots.length, currentName: snap.stage_name });
+        await db.updateArtistProfile(snap.id, snap.prev);
+      }
+      setLastBatchUndo(null);
+      const msg = `Reverted "${description}" for ${snapshots.length} artist(s).`;
+      setLiveAnnouncement(msg);
+      showToast(msg, 'success');
+      onRefresh();
+    } catch {
+      showToast('Failed to undo batch action.', 'error');
+    } finally {
+      setBatchBusy(false);
+      setBatchProgress(null);
+    }
+  };
+
+  const handleBatchFeeApply = () => {
+    if (batchFeeMode === 'custom') {
+      const numeric = Math.max(0, Number(batchCustomFee.replace(/[^0-9.]/g, '')) || 0);
+      runBatch(
+        { estimated_fee: numeric, price_tier: computePriceTierFromFee(numeric) },
+        `Estimated fee set to $${numeric.toLocaleString()} USD for {n} artist(s).`,
+        `Set fee to $${numeric.toLocaleString()}`
+      );
+      return;
+    }
+    const multiplier = batchFeeMode === 'pct_up_10' ? 1.1 : 0.9;
+    const label = batchFeeMode === 'pct_up_10' ? '+10% fee adjustment' : '-10% fee adjustment';
+    runBatch(
+      (artist) => {
+        const curFee = getArtistEstimatedPricing(artist).fee;
+        const nextFee = Math.round((curFee * multiplier) / 500) * 500;
+        return {
+          estimated_fee: nextFee,
+          price_tier: computePriceTierFromFee(nextFee),
+        };
+      },
+      `Applied ${label} to {n} artist(s).`,
+      label
+    );
+  };
+
+  const handleBatchExportCsv = () => {
+    if (selectedArtistsList.length === 0) return;
+    const headers = ['ID', 'Stage Name', 'Legal Name', 'Category', 'Genre', 'Location', 'Est Fee (USD)', 'Price Tier', 'Booking Status', 'Roster Visibility', 'Spotlight Featured'];
+    const escapeCsv = (val: unknown) => {
+      const s = String(val ?? '');
+      return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = selectedArtistsList.map(a => {
+      const est = getArtistEstimatedPricing(a);
+      return [
+        a.id,
+        a.stage_name,
+        a.legal_name,
+        a.category,
+        a.genre,
+        a.location || 'Jamaica',
+        est.fee,
+        est.tier,
+        a.booking_status,
+        a.availability_status,
+        a.is_featured ? 'Yes' : 'No',
+      ].map(escapeCsv).join(',');
+    });
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `showtime-artists-batch-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${selectedArtistsList.length} selected artist(s) to CSV.`, 'success');
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0 || batchBusy) return;
+    const targetArtists = artists.filter(a => selectedIds.has(a.id));
+    setBatchBusy(true);
+    try {
+      for (let i = 0; i < targetArtists.length; i++) {
+        setBatchProgress({
+          done: i + 1,
+          total: targetArtists.length,
+          currentName: targetArtists[i].stage_name,
+        });
+        await db.deleteArtist(targetArtists[i].id);
+      }
+      showToast(`${targetArtists.length} artist(s) removed from roster.`, 'success');
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch {
+      showToast('Batch delete failed. Please try again.', 'error');
+    } finally {
+      setBatchBusy(false);
+      setBatchProgress(null);
+      setConfirmBatchDelete(false);
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {/* Header Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ position: 'relative' }}>
-          <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search roster talent or genre…" style={{ ...iStyle, paddingLeft: 30, width: 240, maxWidth: '100%', fontSize: '0.82rem', height: 34 }} />
-        </div>
-        <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Artist</ABtn>
+    <div className="artists-admin-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+      {/* Polite Live Region for Screen Reader Selection & Batch Announcements */}
+      <div className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {liveAnnouncement}
       </div>
 
-      {/* Filter Category & Status Subbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: 4 }}>Category:</span>
-          {CATEGORIES.map(c => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setSelectedCat(c)}
-              style={{
-                background: selectedCat === c ? 'rgba(212,175,55,0.15)' : 'transparent',
-                border: `1px solid ${selectedCat === c ? 'rgba(212,175,55,0.35)' : 'transparent'}`,
-                color: selectedCat === c ? 'var(--accent)' : 'var(--text-muted)',
-                padding: '3px 8px',
-                borderRadius: 6,
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: selectedCat === c ? 600 : 400
-              }}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginRight: 4 }}>Status:</span>
-          {STATUSES.map(s => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSelectedStatus(s)}
-              style={{
-                background: selectedStatus === s ? 'rgba(255,255,255,0.1)' : 'transparent',
-                border: `1px solid ${selectedStatus === s ? 'rgba(255,255,255,0.25)' : 'transparent'}`,
-                color: selectedStatus === s ? '#fff' : 'var(--text-muted)',
-                padding: '3px 7px',
-                borderRadius: 6,
-                fontSize: '0.72rem',
-                cursor: 'pointer'
-              }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Batch Actions Toolbar — appears when rows are selected */}
-      {selectedIds.size > 0 && (
-        <div style={{
-          position: 'sticky', top: 8, zIndex: 40,
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem',
-          padding: '0.55rem 0.8rem', borderRadius: 10,
-          background: 'rgba(24,18,6,0.92)', backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(212,175,55,0.4)',
-          boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
-        }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
-            {selectedIds.size} selected
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <select
-              value={batchStatus}
-              onChange={e => setBatchStatus(e.target.value as Artist['booking_status'])}
-              style={{ ...iStyle, width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.74rem', height: 30 }}
-            >
-              {['Available', 'Booked', 'On Tour', 'On Hold'].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ booking_status: batchStatus }, `Booking status set to ${batchStatus} for {n} artist(s).`)}>
-              <Check size={12} />Set Status
-            </ABtn>
+      {/* Header Toolbar — Search + Selection Summary + Add Artist */}
+      <div className="artists-toolbar-layout">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flex: '1 1 240px', minWidth: 0, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 0 }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search artist name, genre, or category…"
+              aria-label="Search roster talent or genre"
+              style={{ ...iStyle, paddingLeft: 32, paddingRight: search ? 30 : 12, width: '100%', fontSize: '0.84rem', height: 38 }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, display: 'flex' }}
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
-          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ is_featured: true }, '{n} artist(s) featured as Spotlight.')}>
-            ★ Feature
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', padding: '0 4px' }}>
+            Showing <strong style={{ color: 'var(--text-primary)' }}>{filtered.length}</strong> of {artists.length}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ABtn
+            variant={selectedIds.size > 0 ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={toggleSelectAll}
+            title={allFilteredSelected ? 'Deselect all visible artists' : 'Select all visible artists for batch processing'}
+          >
+            <CheckCircle size={13} color={selectedIds.size > 0 ? 'var(--accent)' : 'currentColor'} />
+            {allFilteredSelected ? 'Deselect All' : `Batch Select All (${filtered.length})`}
           </ABtn>
-          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ is_featured: false }, '{n} artist(s) removed from Spotlight.')}>
-            Unfeature
+          <ABtn variant="primary" size="sm" onClick={openCreate}>
+            <Plus size={14} />Add Artist
           </ABtn>
-          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ availability_status: 'Active' }, '{n} artist(s) set Active (visible).')}>
-            Set Active
-          </ABtn>
-          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ availability_status: 'Inactive' }, '{n} artist(s) hidden from roster.')}>
-            Hide
-          </ABtn>
-          {confirmBatchDelete ? (
-            <>
-              <span style={{ fontSize: '0.74rem', color: '#ff453a', fontWeight: 600 }}>Delete {selectedIds.size}?</span>
-              <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={handleBatchDelete}><Trash2 size={12} />Confirm</ABtn>
-              <ABtn size="sm" variant="ghost" onClick={() => setConfirmBatchDelete(false)}>Cancel</ABtn>
-            </>
-          ) : (
-            <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={() => setConfirmBatchDelete(true)}><Trash2 size={12} />Delete</ABtn>
-          )}
-          <div style={{ flex: 1 }} />
-          {batchBusy && <Loader2 size={14} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />}
-          <ABtn size="sm" variant="ghost" onClick={() => { setSelectedIds(new Set()); setConfirmBatchDelete(false); }}>
-            <X size={12} />Clear
-          </ABtn>
+        </div>
+      </div>
+
+      {/* Responsive Filter Rails (Horizontal touch-scroll on mobile, wrapped on desktop) */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: '0.55rem',
+        padding: '0.65rem 0.8rem', background: 'rgba(255,255,255,0.02)',
+        border: '1px solid var(--border-color)', borderRadius: 10,
+      }}>
+        <div className="artists-filter-rail" role="group" aria-label="Filter by category">
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginRight: 2, flexShrink: 0 }}>Category:</span>
+          {CATEGORIES.map(c => {
+            const active = selectedCat === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelectedCat(c)}
+                style={{
+                  background: active ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${active ? 'var(--accent)' : 'rgba(255,255,255,0.08)'}`,
+                  color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                  padding: '5px 10px',
+                  minBlockSize: 30,
+                  borderRadius: 999,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  fontWeight: active ? 700 : 500,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="artists-filter-rail" role="group" aria-label="Filter by booking status">
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginRight: 2, flexShrink: 0 }}>Status:</span>
+          {STATUSES.map(s => {
+            const active = selectedStatus === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelectedStatus(s)}
+                style={{
+                  background: active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                  color: active ? '#fff' : 'var(--text-secondary)',
+                  padding: '4px 10px',
+                  minBlockSize: 28,
+                  borderRadius: 999,
+                  fontSize: '0.73rem',
+                  fontWeight: active ? 600 : 400,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {s}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 1-Click Undo Banner after a completed Batch Operation */}
+      {lastBatchUndo && !batchBusy && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem',
+          padding: '0.6rem 0.9rem', borderRadius: 10,
+          background: 'rgba(48, 209, 88, 0.1)', border: '1px solid rgba(48, 209, 88, 0.35)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: 'var(--text-primary)' }}>
+            <CheckCircle size={15} color="#30d158" style={{ flexShrink: 0 }} />
+            <span>
+              Last batch action: <strong style={{ color: '#30d158' }}>{lastBatchUndo.description}</strong> ({lastBatchUndo.snapshots.length} artist{lastBatchUndo.snapshots.length === 1 ? '' : 's'} updated)
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <ABtn size="sm" variant="secondary" onClick={handleUndoLastBatch}>
+              <RotateCcw size={12} />Undo Batch Change
+            </ABtn>
+            <button
+              type="button"
+              onClick={() => setLastBatchUndo(null)}
+              aria-label="Dismiss undo bar"
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, display: 'flex' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 
+      {/* 2026 Batch Command Dock — Shows Selected Artists Roster Strip + Bulk Actions */}
+      {selectedIds.size > 0 && (
+        <section
+          aria-label="Batch Process Selected Artists"
+          style={{
+            position: 'sticky',
+            top: 62,
+            zIndex: 45,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.7rem',
+            padding: 'clamp(0.7rem, 2.5vw, 0.95rem)',
+            borderRadius: 12,
+            background: 'linear-gradient(145deg, rgba(22, 17, 7, 0.96) 0%, rgba(12, 10, 23, 0.96) 100%)',
+            backdropFilter: 'blur(16px)',
+            border: '1.5px solid var(--accent)',
+            boxShadow: '0 14px 40px rgba(0,0,0,0.65), 0 0 24px rgba(212,175,55,0.2)',
+          }}
+        >
+          {/* Top Row: Selection Count, Total Fee Summary, & Quick Selection Helpers */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--accent-gradient)', color: '#07050e',
+                fontSize: '0.78rem', fontWeight: 800,
+                padding: '4px 10px', borderRadius: 999,
+                boxShadow: '0 2px 10px rgba(212,175,55,0.35)',
+              }}>
+                <Check size={13} strokeWidth={3} />
+                {selectedIds.size} {selectedIds.size === 1 ? 'Artist' : 'Artists'} Selected
+              </span>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Combined Est. Fee: <strong style={{ color: 'var(--accent)' }}>${totalSelectedFee.toLocaleString()} USD</strong>
+              </span>
+              {hiddenSelectedCount > 0 && (
+                <span style={{
+                  fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999,
+                  background: 'rgba(100,210,255,0.12)', color: '#64d2ff', border: '1px solid rgba(100,210,255,0.3)',
+                }}>
+                  +{hiddenSelectedCount} outside current filter
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+              <ABtn size="sm" variant="ghost" disabled={batchBusy} onClick={toggleSelectAll}>
+                {allFilteredSelected ? 'Deselect Visible' : `Select All (${filtered.length})`}
+              </ABtn>
+              <ABtn size="sm" variant="ghost" disabled={batchBusy} onClick={invertFilteredSelection}>
+                Invert
+              </ABtn>
+              <ABtn
+                size="sm"
+                variant="ghost"
+                disabled={batchBusy}
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setConfirmBatchDelete(false);
+                  setLiveAnnouncement('Cleared all selected artists.');
+                }}
+              >
+                <X size={13} />Clear Selection
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Selected Artists Roster Strip — Explicitly shows WHICH artists are selected with 1-tap deselect */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: '0.35rem',
+            padding: '0.5rem 0.65rem', borderRadius: 9,
+            background: 'rgba(0,0,0,0.38)', border: '1px solid rgba(212,175,55,0.25)',
+          }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)' }}>
+              Selected Roster Queue ({selectedArtistsList.length}) — Tap × to remove individual artist:
+            </div>
+            <div
+              role="list"
+              aria-label="Currently selected artists"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                overflowX: 'auto', flexWrap: isMobile ? 'nowrap' : 'wrap',
+                paddingBottom: isMobile ? 4 : 0,
+                maxHeight: isMobile ? 'none' : 96,
+                overflowY: isMobile ? 'hidden' : 'auto',
+              }}
+            >
+              {selectedArtistsList.map(artist => (
+                <div
+                  key={artist.id}
+                  role="listitem"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '3px 8px 3px 4px', borderRadius: 999,
+                    background: 'rgba(212,175,55,0.15)',
+                    border: '1px solid rgba(212,175,55,0.45)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.75rem', fontWeight: 600,
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={artist.profile_image || '/images/artist_reggae.jpg'}
+                    alt=""
+                    style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--accent)' }}
+                  />
+                  <span>{artist.stage_name}</span>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--accent)', opacity: 0.9 }}>
+                    ({artist.booking_status})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSelect(artist.id)}
+                    aria-label={`Remove ${artist.stage_name} from batch selection`}
+                    title={`Deselect ${artist.stage_name}`}
+                    style={{
+                      background: 'rgba(0,0,0,0.4)', border: 'none', color: '#fff',
+                      width: 18, height: 18, borderRadius: '50%',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', padding: 0, marginLeft: 2,
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Batch Progress Bar when running */}
+          {batchBusy && batchProgress && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0.45rem 0.65rem', borderRadius: 8, background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: 'var(--accent)', fontWeight: 600 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                  Processing {batchProgress.done} of {batchProgress.total}: {batchProgress.currentName}…
+                </span>
+                <span>{Math.round((batchProgress.done / batchProgress.total) * 100)}%</span>
+              </div>
+              <div style={{ width: '100%', height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.round((batchProgress.done / batchProgress.total) * 100)}%`,
+                  height: '100%',
+                  background: 'var(--accent-gradient)',
+                  transition: 'width 0.2s ease',
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Batch Controls Grid: Booking Status, Category, Fee Adjustment, Quick Toggles */}
+          <div className="artists-batch-grid">
+            {/* 1. Booking Status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.03)', padding: '0.35rem 0.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <select
+                aria-label="Batch booking status"
+                value={batchStatus}
+                onChange={e => setBatchStatus(e.target.value as Artist['booking_status'])}
+                style={{ ...iStyle, flex: 1, minWidth: 0, padding: '0.3rem 0.5rem', fontSize: '0.75rem', height: 32 }}
+              >
+                {['Available', 'Booked', 'On Tour', 'On Hold'].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch(
+                  { booking_status: batchStatus },
+                  `Booking status set to "${batchStatus}" for {n} artist(s).`,
+                  `Set status to ${batchStatus}`
+                )}
+              >
+                <Check size={12} />Status
+              </ABtn>
+            </div>
+
+            {/* 2. Category Assignment */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.03)', padding: '0.35rem 0.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <select
+                aria-label="Batch category assignment"
+                value={batchCategory}
+                onChange={e => setBatchCategory(e.target.value)}
+                style={{ ...iStyle, flex: 1, minWidth: 0, padding: '0.3rem 0.5rem', fontSize: '0.75rem', height: 32 }}
+              >
+                {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch(
+                  { category: batchCategory },
+                  `Moved {n} artist(s) to ${batchCategory}.`,
+                  `Move to ${batchCategory}`
+                )}
+              >
+                <Tag size={12} />Category
+              </ABtn>
+            </div>
+
+            {/* 3. Fee / Tier Adjustment */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(255,255,255,0.03)', padding: '0.35rem 0.5rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <select
+                aria-label="Batch fee adjustment mode"
+                value={batchFeeMode}
+                onChange={e => setBatchFeeMode(e.target.value as 'pct_up_10' | 'pct_down_10' | 'custom')}
+                style={{ ...iStyle, flex: 1, minWidth: 0, padding: '0.3rem 0.5rem', fontSize: '0.75rem', height: 32 }}
+              >
+                <option value="pct_up_10">Fee +10%</option>
+                <option value="pct_down_10">Fee -10%</option>
+                <option value="custom">Set Exact USD…</option>
+              </select>
+              {batchFeeMode === 'custom' && (
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  aria-label="Custom batch fee in USD"
+                  value={batchCustomFee}
+                  onChange={e => setBatchCustomFee(e.target.value)}
+                  style={{ ...iStyle, width: 88, padding: '0.3rem 0.45rem', fontSize: '0.75rem', height: 32 }}
+                />
+              )}
+              <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={handleBatchFeeApply}>
+                <DollarSign size={12} />Apply
+              </ABtn>
+            </div>
+          </div>
+
+          {/* Quick Toggle Buttons + Export + Safe Delete */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', paddingTop: '0.2rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch({ is_featured: true }, '{n} artist(s) featured as Spotlight.', 'Feature as Spotlight')}
+              >
+                ★ Feature
+              </ABtn>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch({ is_featured: false }, '{n} artist(s) removed from Spotlight.', 'Remove from Spotlight')}
+              >
+                Unfeature
+              </ABtn>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch({ availability_status: 'Active' }, '{n} artist(s) set Active (visible).', 'Set Roster Active')}
+              >
+                Set Active
+              </ABtn>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => runBatch({ availability_status: 'Inactive' }, '{n} artist(s) hidden from public roster.', 'Hide from Roster')}
+              >
+                Hide
+              </ABtn>
+              <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={handleBatchExportCsv}>
+                <Download size={12} />Export CSV
+              </ABtn>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {confirmBatchDelete ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,69,58,0.12)', padding: '0.25rem 0.55rem', borderRadius: 8, border: '1px solid rgba(255,69,58,0.4)' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#ff453a', fontWeight: 700 }}>
+                    Permanently delete {selectedArtistsList.map(a => a.stage_name).join(', ')}?
+                  </span>
+                  <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={handleBatchDelete}>
+                    <Trash2 size={12} />Confirm Delete ({selectedIds.size})
+                  </ABtn>
+                  <ABtn size="sm" variant="ghost" onClick={() => setConfirmBatchDelete(false)}>Cancel</ABtn>
+                </div>
+              ) : (
+                <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={() => setConfirmBatchDelete(true)}>
+                  <Trash2 size={12} />Delete Selected ({selectedIds.size})
+                </ABtn>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {isMobile ? (
-        /* ── Mobile card list (no horizontal overflow) ── */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        /* ── Responsive Mobile Card List (320px–767px) ── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           {filtered.length === 0 ? (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
               <Empty icon={Music} msg="No artists found matching your criteria" />
             </div>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer', padding: '2px 0' }}
-              >
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={filtered.length > 0 && filtered.every(a => selectedIds.has(a.id))}
-                  style={{ accentColor: 'var(--accent)', width: 14, height: 14, pointerEvents: 'none' }}
-                />
-                Select all ({filtered.length})
-              </button>
+              {/* Mobile Master Selection Control Bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem',
+                padding: '0.55rem 0.75rem', borderRadius: 10,
+                background: selectedInFilteredCount > 0 ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${selectedInFilteredCount > 0 ? 'rgba(212,175,55,0.45)' : 'var(--border-color)'}`,
+              }}>
+                <label
+                  htmlFor="mobile-select-all-artists"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', minBlockSize: 28 }}
+                >
+                  <input
+                    ref={mobileMasterCheckboxRef}
+                    id="mobile-select-all-artists"
+                    type="checkbox"
+                    className="artist-select-checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAll}
+                  />
+                  <span>
+                    {allFilteredSelected
+                      ? `All ${filtered.length} Visible Selected`
+                      : selectedInFilteredCount > 0
+                        ? `${selectedInFilteredCount} of ${filtered.length} Selected`
+                        : `Select All (${filtered.length})`}
+                  </span>
+                </label>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {selectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={invertFilteredSelection}
+                      style={{
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+                        color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600,
+                        padding: '4px 9px', borderRadius: 6, cursor: 'pointer', minBlockSize: 28,
+                      }}
+                    >
+                      Invert
+                    </button>
+                  )}
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Tap checkbox or card to select
+                  </span>
+                </div>
+              </div>
+
               {filtered.map(a => {
                 const est = getArtistEstimatedPricing(a);
                 const sel = selectedIds.has(a.id);
+                const checkboxId = `mobile-select-artist-${a.id}`;
                 return (
-                  <div
-                    key={a.id}
-                    onClick={() => toggleSelect(a.id)}
-                    style={{
-                      display: 'flex', flexDirection: 'column', gap: '0.55rem',
-                      padding: '0.8rem', borderRadius: 'var(--radius-md)',
-                      border: `1px solid ${sel ? 'rgba(212,175,55,0.5)' : 'var(--border-color)'}`,
-                      background: sel ? 'rgba(212,175,55,0.07)' : 'rgba(255,255,255,0.02)',
-                      transition: 'all 0.15s ease', cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={sel}
-                        onClick={e => e.stopPropagation()}
-                        onChange={() => toggleSelect(a.id)}
-                        style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0, cursor: 'pointer' }}
-                      />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={a.profile_image || '/images/artist_reggae.jpg'}
-                        alt={a.stage_name}
-                        style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(212,175,55,0.3)', flexShrink: 0 }}
-                      />
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.stage_name}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.legal_name} · {a.category}</div>
+                  <div key={a.id} className="artist-card-container">
+                    <div
+                      className={`artist-batch-card${sel ? ' is-selected' : ''}`}
+                      onClick={e => {
+                        const mouseEvt = e as React.MouseEvent;
+                        toggleSelect(a.id, mouseEvt.shiftKey);
+                      }}
+                    >
+                      {/* Top Row: Checkbox + Avatar with Selected Badge + Name & Category + Fee */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                        <label
+                          htmlFor={checkboxId}
+                          onClick={e => e.stopPropagation()}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, margin: -4, cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          <input
+                            id={checkboxId}
+                            type="checkbox"
+                            className="artist-select-checkbox"
+                            checked={sel}
+                            onChange={e => {
+                              const nativeEvt = e.nativeEvent as MouseEvent;
+                              toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
+                            }}
+                          />
+                          <span className="visually-hidden">Select {a.stage_name}</span>
+                        </label>
+
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={a.profile_image || '/images/artist_reggae.jpg'}
+                            alt={a.stage_name}
+                            style={{
+                              width: 44, height: 44, borderRadius: '50%', objectFit: 'cover',
+                              border: sel ? '2px solid var(--accent)' : '1.5px solid rgba(212,175,55,0.3)',
+                              boxShadow: sel ? '0 0 12px rgba(212,175,55,0.45)' : 'none',
+                            }}
+                          />
+                          {sel && (
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                position: 'absolute', bottom: -2, right: -2,
+                                width: 18, height: 18, borderRadius: '50%',
+                                background: 'var(--accent-gradient)', color: '#07050e',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: '2px solid var(--bg-secondary)',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                              }}
+                            >
+                              <Check size={11} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.92rem', color: sel ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {a.stage_name}
+                            </span>
+                            {sel && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                padding: '1px 7px', borderRadius: 999,
+                                background: 'var(--accent)', color: '#07050e',
+                                fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                              }}>
+                                ✓ Selected
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {a.legal_name} · {a.category}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); openEdit(a, 'overview'); }}
+                          title="Tap to edit Estimated Booking Fee"
+                          style={{
+                            background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)',
+                            borderRadius: 8, padding: '4px 8px',
+                            fontWeight: 700, color: 'var(--accent)', fontSize: '0.78rem',
+                            whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer',
+                          }}
+                        >
+                          ${est.fee.toLocaleString()}
+                        </button>
                       </div>
-                      <span
-                        onClick={e => { e.stopPropagation(); openEdit(a, 'overview'); }}
-                        title="Tap to edit Estimated Booking Fee"
-                        style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}
-                      >
-                        ${est.fee.toLocaleString()}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
-                      <StatusBadge status={a.booking_status} />
-                      <StatusBadge status={a.availability_status} />
-                      {a.is_featured && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.5rem', borderRadius: 4, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 600 }}>
-                          ★ Spotlight
+
+                      {/* Badges Row */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                          <StatusBadge status={a.booking_status} />
+                          <StatusBadge status={a.availability_status} />
+                          {a.is_featured && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.5rem', borderRadius: 999, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', fontSize: '0.68rem', fontWeight: 700 }}>
+                              ★ Spotlight
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {a.genre}
                         </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                      <a href={`/artist?id=${a.id}`} target="_blank" rel="noopener noreferrer" title="View Live Talent Profile Page" style={{ textDecoration: 'none' }}>
-                        <ABtn variant="ghost" size="sm"><Eye size={12} /></ABtn>
-                      </a>
-                      <a href={`/portal/artist?artistId=${a.id}`} target="_blank" rel="noopener noreferrer" title="Open Artist Hub Portal" style={{ textDecoration: 'none' }}>
-                        <ABtn variant="ghost" size="sm"><ExternalLink size={12} /></ABtn>
-                      </a>
-                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'showcase')} title="Manage YouTube Music Showcase">
-                        <Music size={12} color="var(--accent)" />
-                      </ABtn>
-                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'calendar')} title="Manage Availability Calendar">
-                        <Calendar size={12} color="var(--accent)" />
-                      </ABtn>
-                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title="Edit Full Talent Profile"><Edit2 size={12} /></ABtn>
-                      <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title="Delete Artist"><Trash2 size={12} /></ABtn>
+                      </div>
+
+                      {/* Responsive Touch-Safe Action Bar */}
+                      <div
+                        className="artist-card-actions-bar"
+                        onClick={e => e.stopPropagation()}
+                        style={{ paddingTop: '0.45rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+                      >
+                        <a
+                          href={`/artist?id=${a.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`View ${a.stage_name} Live Profile`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            color: 'var(--text-secondary)', fontSize: '0.73rem', fontWeight: 500, textDecoration: 'none',
+                          }}
+                        >
+                          <Eye size={13} />View
+                        </a>
+                        <a
+                          href={`/portal/artist?artistId=${a.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Open ${a.stage_name} Hub Portal`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            color: 'var(--text-secondary)', fontSize: '0.73rem', fontWeight: 500, textDecoration: 'none',
+                          }}
+                        >
+                          <ExternalLink size={13} />Portal
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(a, 'showcase')}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.22)',
+                            color: 'var(--accent)', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          <Music size={13} />Media
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(a, 'calendar')}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.22)',
+                            color: 'var(--accent)', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          <Calendar size={13} />Dates
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(a, 'overview')}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                            color: 'var(--text-primary)', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          <Edit2 size={13} />Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirm(a.id)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(255,69,58,0.12)', border: '1px solid rgba(255,69,58,0.28)',
+                            color: '#ff453a', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          <Trash2 size={13} />Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -2502,14 +3213,22 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       ) : (
       <Tbl>
         <TH cols={[
-          <input
-            key="select-all"
-            type="checkbox"
-            checked={filtered.length > 0 && filtered.every(a => selectedIds.has(a.id))}
-            onChange={toggleSelectAll}
-            title="Select all"
-            style={{ accentColor: 'var(--accent)', width: 14, height: 14, cursor: 'pointer', verticalAlign: 'middle' }}
-          />,
+          <label
+            key="select-all-label"
+            htmlFor="desktop-select-all-artists"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+            title="Select or deselect all visible artists (Shift+Click rows for range selection)"
+          >
+            <input
+              ref={desktopMasterCheckboxRef}
+              id="desktop-select-all-artists"
+              type="checkbox"
+              className="artist-select-checkbox"
+              checked={allFilteredSelected}
+              onChange={toggleSelectAll}
+            />
+            <span className="visually-hidden">Select all visible artists</span>
+          </label>,
           'Artist', 'Category', 'Genre', 'Est. Fee (USD)', 'Booking Status', 'Availability', 'Featured', 'Actions'
         ]} />
         <tbody>
@@ -2518,27 +3237,81 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           ) : filtered.map(a => {
             const est = getArtistEstimatedPricing(a);
             const sel = selectedIds.has(a.id);
+            const checkboxId = `desktop-select-artist-${a.id}`;
             return (
-            <TR key={a.id}>
+            <tr
+              key={a.id}
+              className={`artist-batch-row${sel ? ' is-selected' : ''}`}
+              aria-selected={sel}
+              onClick={e => {
+                // Allow clicking anywhere on the row (outside buttons/links/inputs) to toggle selection
+                const target = e.target as HTMLElement;
+                if (target.closest('button, a, input, label')) return;
+                toggleSelect(a.id, e.shiftKey);
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <TD>
-                <input
-                  type="checkbox"
-                  checked={sel}
-                  onChange={() => toggleSelect(a.id)}
-                  title="Select artist"
-                  style={{ accentColor: 'var(--accent)', width: 14, height: 14, cursor: 'pointer' }}
-                />
+                <label
+                  htmlFor={checkboxId}
+                  onClick={e => e.stopPropagation()}
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 4, margin: -4, cursor: 'pointer' }}
+                >
+                  <input
+                    id={checkboxId}
+                    type="checkbox"
+                    className="artist-select-checkbox"
+                    checked={sel}
+                    onChange={e => {
+                      const nativeEvt = e.nativeEvent as MouseEvent;
+                      toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
+                    }}
+                  />
+                  <span className="visually-hidden">Select {a.stage_name}</span>
+                </label>
               </TD>
               <TD>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={a.profile_image || '/images/artist_reggae.jpg'}
-                    alt={a.stage_name}
-                    style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(212,175,55,0.3)', flexShrink: 0 }}
-                  />
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={a.profile_image || '/images/artist_reggae.jpg'}
+                      alt={a.stage_name}
+                      style={{
+                        width: 36, height: 36, borderRadius: '50%', objectFit: 'cover',
+                        border: sel ? '2px solid var(--accent)' : '1.5px solid rgba(212,175,55,0.3)',
+                        boxShadow: sel ? '0 0 10px rgba(212,175,55,0.45)' : 'none',
+                      }}
+                    />
+                    {sel && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute', bottom: -2, right: -2,
+                          width: 15, height: 15, borderRadius: '50%',
+                          background: 'var(--accent-gradient)', color: '#07050e',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          border: '1.5px solid var(--bg-secondary)',
+                        }}
+                      >
+                        <Check size={9} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.stage_name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontWeight: 700, color: sel ? 'var(--accent)' : 'var(--text-primary)' }}>{a.stage_name}</span>
+                      {sel && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          padding: '1px 6px', borderRadius: 999,
+                          background: 'var(--accent)', color: '#07050e',
+                          fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase',
+                        }}>
+                          ✓ Selected
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{a.legal_name}</div>
                   </div>
                 </div>
@@ -2546,14 +3319,15 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
               <TD muted>{a.category}</TD>
               <TD muted>{a.genre}</TD>
               <TD>
-                <span
-                  onClick={() => openEdit(a, 'overview')}
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); openEdit(a, 'overview'); }}
                   title="Click to edit Estimated Booking Fee"
-                  style={{ fontWeight: 700, color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                  style={{ background: 'none', border: 'none', padding: 0, fontWeight: 700, color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', fontSize: 'inherit' }}
                 >
                   Est: ${est.fee.toLocaleString()} USD
                   <Edit2 size={11} style={{ opacity: 0.7 }} />
-                </span>
+                </button>
               </TD>
               <TD><StatusBadge status={a.booking_status} /></TD>
               <TD><StatusBadge status={a.availability_status} /></TD>
@@ -2567,36 +3341,40 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 )}
               </TD>
               <TD>
-                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                   <a
                     href={`/artist?id=${a.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="View Live Talent Profile Page (/artist)"
+                    title={`View ${a.stage_name} Live Talent Profile Page (/artist)`}
                     style={{ textDecoration: 'none' }}
                   >
-                    <ABtn variant="ghost" size="sm"><Eye size={12} /></ABtn>
+                    <ABtn variant="ghost" size="sm"><Eye size={12} /><span className="visually-hidden">View {a.stage_name}</span></ABtn>
                   </a>
                   <a
                     href={`/portal/artist?artistId=${a.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open Artist Hub Portal (Riders, Contracts & Calendar)"
+                    title={`Open ${a.stage_name} Artist Hub Portal`}
                     style={{ textDecoration: 'none' }}
                   >
-                    <ABtn variant="ghost" size="sm"><ExternalLink size={12} /></ABtn>
+                    <ABtn variant="ghost" size="sm"><ExternalLink size={12} /><span className="visually-hidden">Portal for {a.stage_name}</span></ABtn>
                   </a>
-                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'showcase')} title="Manage YouTube Music Showcase">
-                    <Music size={12} color="var(--accent)" />
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'showcase')} title={`Manage ${a.stage_name} YouTube Music Showcase`}>
+                    <Music size={12} color="var(--accent)" /><span className="visually-hidden">Showcase for {a.stage_name}</span>
                   </ABtn>
-                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'calendar')} title="Manage Availability Calendar">
-                    <Calendar size={12} color="var(--accent)" />
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'calendar')} title={`Manage ${a.stage_name} Availability Calendar`}>
+                    <Calendar size={12} color="var(--accent)" /><span className="visually-hidden">Calendar for {a.stage_name}</span>
                   </ABtn>
-                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title="Edit Full Talent Profile"><Edit2 size={12} /></ABtn>
-                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title="Delete Artist"><Trash2 size={12} /></ABtn>
+                  <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title={`Edit ${a.stage_name} Full Talent Profile`}>
+                    <Edit2 size={12} /><span className="visually-hidden">Edit {a.stage_name}</span>
+                  </ABtn>
+                  <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title={`Delete ${a.stage_name}`}>
+                    <Trash2 size={12} /><span className="visually-hidden">Delete {a.stage_name}</span>
+                  </ABtn>
                 </div>
               </TD>
-            </TR>
+            </tr>
             );
           })}
         </tbody>
