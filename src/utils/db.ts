@@ -2537,7 +2537,23 @@ export async function syncAllStoresFromCloud(): Promise<{ success: boolean; sync
         let count = 0;
         for (const [key, value] of Object.entries(json.data)) {
           if (value !== null && value !== undefined) {
-            setStoreValue(key, value);
+            if (key === 'st_deleted_artist_ids' && Array.isArray(value)) {
+              // Never let a stale remote tombstone list erase local deletions: merge (union) both.
+              let localIds: string[] = [];
+              try { localIds = JSON.parse(localStorage.getItem(key) || '[]'); } catch { localIds = []; }
+              const union = Array.from(new Set([...(Array.isArray(localIds) ? localIds : []), ...(value as string[])]));
+              setStoreValue(key, union);
+              if (union.length !== (value as string[]).length) {
+                fetch('/api/d1', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'setStore', payload: { key, value: union } }),
+                  cache: 'no-store',
+                }).catch(() => {});
+              }
+            } else {
+              setStoreValue(key, value);
+            }
             count++;
           }
         }
@@ -3384,7 +3400,8 @@ export const db = {
     // 2. Supabase: remove the canonical row when Supabase is configured
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('artists').delete().eq('id', id);
+        const { error: sbErr } = await supabase.from('artists').delete().eq('id', id);
+        if (sbErr) console.error('[db.deleteArtist] Supabase delete failed (artist is hidden via tombstone):', sbErr.message);
       } catch (err) {
         console.warn('[db.deleteArtist] Supabase delete warning:', err);
       }
@@ -3393,12 +3410,16 @@ export const db = {
     // 3. Cloudflare D1: delete the canonical row from the artists table
     if (typeof window !== 'undefined') {
       try {
-        await fetch('/api/d1', {
+        const res = await fetch('/api/d1', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'deleteArtist', payload: { id } }),
           cache: 'no-store',
         });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          console.error('[db.deleteArtist] D1 delete failed (artist is hidden via tombstone):', json?.error || res.status);
+        }
       } catch (err) {
         console.warn('[db.deleteArtist] D1 delete warning:', err);
       }

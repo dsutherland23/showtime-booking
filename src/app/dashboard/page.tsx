@@ -2039,9 +2039,44 @@ function SelectCheckbox({
 
 // ─── Artists Section (2026 Agency EPK & Roster CMS) ───────────────────────────
 
-function ArtistsSection({ artists, onRefresh, showToast }: {
+function ArtistsSection({ artists: artistsProp, onRefresh, showToast }: {
   artists: Artist[]; onRefresh: () => void; showToast: (m: string, t: 'success' | 'error') => void;
 }) {
+  // Optimistic overlay: guarantees the UI reflects delete/archive/batch actions immediately,
+  // even if the background refresh is slow, stale, or fails.
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [overrides, setOverrides] = useState<Record<string, Partial<Artist>>>({});
+  const artists = React.useMemo(
+    () => artistsProp
+      .filter(a => !removedIds.has(a.id))
+      .map(a => (overrides[a.id] ? { ...a, ...overrides[a.id] } : a)),
+    [artistsProp, removedIds, overrides]
+  );
+  const markRemoved = (ids: string[]) => setRemovedIds(prev => {
+    const next = new Set(prev);
+    ids.forEach(id => next.add(id));
+    return next;
+  });
+  const markUpdated = (id: string, updates: Partial<Artist>) =>
+    setOverrides(prev => ({ ...prev, [id]: { ...prev[id], ...updates } }));
+  // Once fresh server data confirms an action, drop the corresponding overlay entries.
+  useEffect(() => {
+    const ids = new Set(artistsProp.map(a => a.id));
+    setRemovedIds(prev => {
+      const next = new Set([...prev].filter(id => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+    setOverrides(prev => {
+      const next: Record<string, Partial<Artist>> = {};
+      for (const [id, upd] of Object.entries(prev)) {
+        const base = artistsProp.find(a => a.id === id);
+        if (!base) continue;
+        const confirmed = (Object.keys(upd) as (keyof Artist)[]).every(k => base[k] === upd[k]);
+        if (!confirmed) next[id] = upd;
+      }
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [artistsProp]);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -2319,6 +2354,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         return next;
       });
       await db.deleteArtist(id);
+      markRemoved([id]);
       showToast(`${stageName} removed from roster.`, 'success');
       onRefresh();
     } catch (err: any) {
@@ -2333,6 +2369,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     const nextArchive = !isCurrentlyArchived;
     try {
       await db.archiveArtist(a.id, nextArchive);
+      markUpdated(a.id, nextArchive
+        ? { availability_status: 'Inactive', booking_status: 'On Hold' }
+        : { availability_status: 'Active', booking_status: 'Available' });
       showToast(
         nextArchive
           ? `${a.stage_name} archived. Talent hidden from active roster.`
@@ -2510,6 +2549,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
 
         // Deterministic sequential update for D1 + local store sync
         await db.updateArtistProfile(artist.id, updates);
+        markUpdated(artist.id, updates);
       }
 
       const finalMsg = successMsg.replace('{n}', String(targetArtists.length));
@@ -2534,6 +2574,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         const snap = snapshots[i];
         setBatchProgress({ done: i + 1, total: snapshots.length, currentName: snap.stage_name });
         await db.updateArtistProfile(snap.id, snap.prev);
+        markUpdated(snap.id, snap.prev);
       }
       setLastBatchUndo(null);
       const msg = `Reverted "${description}" for ${snapshots.length} artist(s).`;
@@ -2622,6 +2663,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           currentName: targetArtists[i].stage_name,
         });
         await db.deleteArtist(targetArtists[i].id);
+        markRemoved([targetArtists[i].id]);
       }
       showToast(`${targetArtists.length} artist(s) removed from roster.`, 'success');
       setSelectedIds(new Set());
@@ -2647,6 +2689,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           currentName: targetArtists[i].stage_name,
         });
         await db.archiveArtist(targetArtists[i].id, archive);
+        markUpdated(targetArtists[i].id, archive
+          ? { availability_status: 'Inactive', booking_status: 'On Hold' }
+          : { availability_status: 'Active', booking_status: 'Available' });
       }
       showToast(
         archive
