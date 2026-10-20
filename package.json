@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack && node scripts/export.js",
+    "deploy": "npm run build && npx wrangler pages deploy out --project-name showtime-booking --branch main --commit-dirty=true",
     "start": "next start",
     "lint": "eslint"
   },
