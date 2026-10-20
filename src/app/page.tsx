@@ -652,7 +652,7 @@ export default function Home() {
               <p className="section-eyebrow">Portfolio</p>
               <h2>Delivering under the spotlights.</h2>
               <p className="events-body">
-                From 35,000-seat stadium nights in Kingston to Coachella main stages,
+                From 35,000-seat stadium nights in Kingston to premier international festival stages,
                 Showtime handles contracting, hospitality compliance, and technical execution.
               </p>
               <div className="events-metrics">
