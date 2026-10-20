@@ -297,18 +297,29 @@ function Tbl({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TH({ cols }: { cols: string[] }) {
+function TH({ cols }: { cols: React.ReactNode[] }) {
   return (
     <thead>
       <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)' }}>
-        {cols.map(c => (
-          <th key={c} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+        {cols.map((c, i) => (
+          <th key={i} style={{ padding: '0.65rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
             {c}
           </th>
         ))}
       </tr>
     </thead>
   );
+}
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < breakpoint);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [breakpoint]);
+  return isMobile;
 }
 
 function TR({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
@@ -1958,6 +1969,13 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [savedArtist, setSavedArtist] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
+  // Batch selection & bulk actions (mobile + desktop)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchStatus, setBatchStatus] = useState<Artist['booking_status']>('Available');
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const isMobile = useIsMobile();
+
   // YouTube Showcase state inside modal
   const [showcaseTracks, setShowcaseTracks] = useState<ArtistTrack[]>([]);
   const [newTrackTitle, setNewTrackTitle] = useState('');
@@ -2200,6 +2218,57 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     finally { setConfirm(null); }
   };
 
+  // ── Batch processing ──────────────────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const allSelected = filtered.length > 0 && filtered.every(a => prev.has(a.id));
+      if (allSelected) return new Set<string>();
+      return new Set(filtered.map(a => a.id));
+    });
+  };
+
+  const runBatch = async (updates: Partial<Artist>, successMsg: string) => {
+    if (selectedIds.size === 0 || batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const ids = [...selectedIds];
+      // Sequential partial updates keep D1 sync order deterministic
+      for (const id of ids) await db.updateArtistProfile(id, updates);
+      showToast(successMsg.replace('{n}', String(ids.length)), 'success');
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch {
+      showToast('Batch update failed. Please try again.', 'error');
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0 || batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const ids = [...selectedIds];
+      for (const id of ids) await db.deleteArtist(id);
+      showToast(`${ids.length} artist(s) removed from roster.`, 'success');
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch {
+      showToast('Batch delete failed. Please try again.', 'error');
+    } finally {
+      setBatchBusy(false);
+      setConfirmBatchDelete(false);
+    }
+  };
+
   // Calendar math for modal Tab 4
   const calDate = new Date();
   calDate.setDate(1);
@@ -2229,7 +2298,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ position: 'relative' }}>
           <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search roster talent or genre…" style={{ ...iStyle, paddingLeft: 30, width: 240, fontSize: '0.82rem', height: 34 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search roster talent or genre…" style={{ ...iStyle, paddingLeft: 30, width: 240, maxWidth: '100%', fontSize: '0.82rem', height: 34 }} />
         </div>
         <ABtn variant="primary" size="sm" onClick={openCreate}><Plus size={13} />Add Artist</ABtn>
       </div>
@@ -2282,15 +2351,184 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
         </div>
       </div>
 
+      {/* Batch Actions Toolbar — appears when rows are selected */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'sticky', top: 8, zIndex: 40,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem',
+          padding: '0.55rem 0.8rem', borderRadius: 10,
+          background: 'rgba(24,18,6,0.92)', backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(212,175,55,0.4)',
+          boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+        }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+            {selectedIds.size} selected
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <select
+              value={batchStatus}
+              onChange={e => setBatchStatus(e.target.value as Artist['booking_status'])}
+              style={{ ...iStyle, width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.74rem', height: 30 }}
+            >
+              {['Available', 'Booked', 'On Tour', 'On Hold'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ booking_status: batchStatus }, `Booking status set to ${batchStatus} for {n} artist(s).`)}>
+              <Check size={12} />Set Status
+            </ABtn>
+          </div>
+          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ is_featured: true }, '{n} artist(s) featured as Spotlight.')}>
+            ★ Feature
+          </ABtn>
+          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ is_featured: false }, '{n} artist(s) removed from Spotlight.')}>
+            Unfeature
+          </ABtn>
+          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ availability_status: 'Active' }, '{n} artist(s) set Active (visible).')}>
+            Set Active
+          </ABtn>
+          <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatch({ availability_status: 'Inactive' }, '{n} artist(s) hidden from roster.')}>
+            Hide
+          </ABtn>
+          {confirmBatchDelete ? (
+            <>
+              <span style={{ fontSize: '0.74rem', color: '#ff453a', fontWeight: 600 }}>Delete {selectedIds.size}?</span>
+              <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={handleBatchDelete}><Trash2 size={12} />Confirm</ABtn>
+              <ABtn size="sm" variant="ghost" onClick={() => setConfirmBatchDelete(false)}>Cancel</ABtn>
+            </>
+          ) : (
+            <ABtn size="sm" variant="danger" disabled={batchBusy} onClick={() => setConfirmBatchDelete(true)}><Trash2 size={12} />Delete</ABtn>
+          )}
+          <div style={{ flex: 1 }} />
+          {batchBusy && <Loader2 size={14} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />}
+          <ABtn size="sm" variant="ghost" onClick={() => { setSelectedIds(new Set()); setConfirmBatchDelete(false); }}>
+            <X size={12} />Clear
+          </ABtn>
+        </div>
+      )}
+
+      {isMobile ? (
+        /* ── Mobile card list (no horizontal overflow) ── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {filtered.length === 0 ? (
+            <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+              <Empty icon={Music} msg="No artists found matching your criteria" />
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer', padding: '2px 0' }}
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={filtered.length > 0 && filtered.every(a => selectedIds.has(a.id))}
+                  style={{ accentColor: 'var(--accent)', width: 14, height: 14, pointerEvents: 'none' }}
+                />
+                Select all ({filtered.length})
+              </button>
+              {filtered.map(a => {
+                const est = getArtistEstimatedPricing(a);
+                const sel = selectedIds.has(a.id);
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => toggleSelect(a.id)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: '0.55rem',
+                      padding: '0.8rem', borderRadius: 'var(--radius-md)',
+                      border: `1px solid ${sel ? 'rgba(212,175,55,0.5)' : 'var(--border-color)'}`,
+                      background: sel ? 'rgba(212,175,55,0.07)' : 'rgba(255,255,255,0.02)',
+                      transition: 'all 0.15s ease', cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={sel}
+                        onClick={e => e.stopPropagation()}
+                        onChange={() => toggleSelect(a.id)}
+                        style={{ accentColor: 'var(--accent)', width: 16, height: 16, flexShrink: 0, cursor: 'pointer' }}
+                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={a.profile_image || '/images/artist_reggae.jpg'}
+                        alt={a.stage_name}
+                        style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(212,175,55,0.3)', flexShrink: 0 }}
+                      />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.stage_name}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.legal_name} · {a.category}</div>
+                      </div>
+                      <span
+                        onClick={e => { e.stopPropagation(); openEdit(a, 'overview'); }}
+                        title="Tap to edit Estimated Booking Fee"
+                        style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        ${est.fee.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                      <StatusBadge status={a.booking_status} />
+                      <StatusBadge status={a.availability_status} />
+                      {a.is_featured && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.5rem', borderRadius: 4, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 600 }}>
+                          ★ Spotlight
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                      <a href={`/artist?id=${a.id}`} target="_blank" rel="noopener noreferrer" title="View Live Talent Profile Page" style={{ textDecoration: 'none' }}>
+                        <ABtn variant="ghost" size="sm"><Eye size={12} /></ABtn>
+                      </a>
+                      <a href={`/portal/artist?artistId=${a.id}`} target="_blank" rel="noopener noreferrer" title="Open Artist Hub Portal" style={{ textDecoration: 'none' }}>
+                        <ABtn variant="ghost" size="sm"><ExternalLink size={12} /></ABtn>
+                      </a>
+                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'showcase')} title="Manage YouTube Music Showcase">
+                        <Music size={12} color="var(--accent)" />
+                      </ABtn>
+                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'calendar')} title="Manage Availability Calendar">
+                        <Calendar size={12} color="var(--accent)" />
+                      </ABtn>
+                      <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title="Edit Full Talent Profile"><Edit2 size={12} /></ABtn>
+                      <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title="Delete Artist"><Trash2 size={12} /></ABtn>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      ) : (
       <Tbl>
-        <TH cols={['Artist', 'Category', 'Genre', 'Est. Fee (USD)', 'Booking Status', 'Availability', 'Featured', 'Actions']} />
+        <TH cols={[
+          <input
+            key="select-all"
+            type="checkbox"
+            checked={filtered.length > 0 && filtered.every(a => selectedIds.has(a.id))}
+            onChange={toggleSelectAll}
+            title="Select all"
+            style={{ accentColor: 'var(--accent)', width: 14, height: 14, cursor: 'pointer', verticalAlign: 'middle' }}
+          />,
+          'Artist', 'Category', 'Genre', 'Est. Fee (USD)', 'Booking Status', 'Availability', 'Featured', 'Actions'
+        ]} />
         <tbody>
           {filtered.length === 0 ? (
-            <tr><td colSpan={8}><Empty icon={Music} msg="No artists found matching your criteria" /></td></tr>
+            <tr><td colSpan={9}><Empty icon={Music} msg="No artists found matching your criteria" /></td></tr>
           ) : filtered.map(a => {
             const est = getArtistEstimatedPricing(a);
+            const sel = selectedIds.has(a.id);
             return (
             <TR key={a.id}>
+              <TD>
+                <input
+                  type="checkbox"
+                  checked={sel}
+                  onChange={() => toggleSelect(a.id)}
+                  title="Select artist"
+                  style={{ accentColor: 'var(--accent)', width: 14, height: 14, cursor: 'pointer' }}
+                />
+              </TD>
               <TD>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2363,6 +2601,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
           })}
         </tbody>
       </Tbl>
+      )}
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? `Edit Talent EPK — ${editItem.stage_name}` : 'Add Roster Artist'} width={720}>
         {/* 5-Tab Navigation Bar */}
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1.15rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
