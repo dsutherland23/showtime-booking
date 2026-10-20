@@ -252,6 +252,19 @@ export async function onRequestPost({ request, env }) {
         return json({ success: true, data: updatedArtist });
       }
 
+      case 'deleteArtist': {
+        const id = payload?.id;
+        if (!id) return json({ success: false, error: 'Missing artist ID' }, 400);
+        await executeQuery(env, 'DELETE FROM artists WHERE id = ?', [id]);
+        // Remove any stale per-artist snapshot so it can't resurrect the profile
+        try {
+          await executeQuery(env, 'DELETE FROM site_store WHERE key = ?', [`artist_${id}`]);
+        } catch (e) {
+          // site_store may not exist in every environment — non-fatal
+        }
+        return json({ success: true, data: true });
+      }
+
       case 'getAllStores': {
         const rows = await executeQuery(env, 'SELECT key, value, updated_at FROM site_store');
         const stores = {};

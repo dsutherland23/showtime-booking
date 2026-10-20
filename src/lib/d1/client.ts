@@ -136,6 +136,18 @@ export const d1 = {
     return this.getArtistById(id);
   },
 
+  async deleteArtist(id: string) {
+    // Remove the canonical row from the artists table
+    await executeD1Query('DELETE FROM artists WHERE id = ?', [id]);
+    // Remove any stale per-artist snapshot so it can't resurrect the profile
+    try {
+      await executeD1Query('DELETE FROM site_store WHERE key = ?', [`artist_${id}`]);
+    } catch {
+      // site_store may not exist in every environment — non-fatal
+    }
+    return true;
+  },
+
   // --- SITE STORE (CROSS-DEVICE SYNC) ---
   async getAllStores() {
     const rows = await executeD1Query('SELECT key, value, updated_at FROM site_store');

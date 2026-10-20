@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS events (
 -- Bookings
 CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    artist_id UUID REFERENCES artists(id) ON DELETE RESTRICT,
+    artist_id UUID REFERENCES artists(id) ON DELETE SET NULL,
     client_id UUID REFERENCES clients(id) ON DELETE RESTRICT,
     event_id UUID REFERENCES events(id) ON DELETE RESTRICT,
     status VARCHAR(50) DEFAULT 'Inquiry' CHECK (status IN (
@@ -339,6 +339,16 @@ CREATE POLICY "Public can view active artists" ON artists
 CREATE POLICY "Artists and managers can update own profile" ON artists
     FOR UPDATE USING (manager_id = auth.uid() OR id = auth.uid() OR auth_is_staff())
     WITH CHECK (manager_id = auth.uid() OR id = auth.uid() OR auth_is_staff());
+
+CREATE POLICY "Staff can delete artists" ON artists
+    FOR DELETE USING (auth_is_staff());
+
+-- Migration for existing databases: allow deleting a talent that has bookings
+-- (bookings are retained with artist_id set to NULL instead of blocking the delete).
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_artist_id_fkey;
+ALTER TABLE bookings
+    ADD CONSTRAINT bookings_artist_id_fkey
+    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
 
 -- 3. CLIENTS TABLE
 -- Clients can ONLY view and update their own client record; Staff can view all

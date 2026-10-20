@@ -568,13 +568,22 @@ function ArtistProfile() {
     }
   };
 
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleDeleteProfileSubmit = async () => {
+    if (isDeleting) return;
+    setDeleteError('');
+    setIsDeleting(true);
     try {
       await db.deleteArtist(id);
       deleteDialogRef.current?.close();
       router.push('/talent');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setDeleteError(err?.message || 'Delete failed. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -3355,6 +3364,11 @@ function ArtistProfile() {
         <div className="delete-modal-body">
           <p>Are you sure you want to permanently delete the profile of <strong>{artist.stage_name}</strong> from Showtime Booking roster?</p>
           <p style={{ marginTop: '0.5rem', fontSize: '0.825rem', color: 'var(--text-muted)' }}>This action cannot be undone and will remove all associated metadata, profile riders, and custom image uploads.</p>
+          {deleteError && (
+            <p role="alert" style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '0.5rem', padding: '0.6rem 0.75rem' }}>
+              {deleteError}
+            </p>
+          )}
         </div>
 
         <div className="modal-actions">
@@ -3362,6 +3376,7 @@ function ArtistProfile() {
             type="button" 
             className="btn btn-secondary" 
             onClick={() => deleteDialogRef.current?.close()}
+            disabled={isDeleting}
           >
             Cancel
           </button>
@@ -3369,9 +3384,10 @@ function ArtistProfile() {
             type="button" 
             className="btn btn-danger" 
             onClick={handleDeleteProfileSubmit}
-            style={{ padding: '0.5rem 1.25rem' }}
+            disabled={isDeleting}
+            style={{ padding: '0.5rem 1.25rem', opacity: isDeleting ? 0.7 : 1, cursor: isDeleting ? 'not-allowed' : 'pointer' }}
           >
-            Delete Permanently
+            {isDeleting ? 'Deleting…' : 'Delete Permanently'}
           </button>
         </div>
       </dialog>

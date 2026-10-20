@@ -3366,9 +3366,49 @@ export const db = {
   },
 
   async deleteArtist(id: string): Promise<boolean> {
+    const errors: string[] = [];
+
+    // 1. Supabase: remove the canonical row when Supabase is the configured backend.
+    //    Child tables (socials, media, riders, availability) cascade automatically.
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('artists').delete().eq('id', id);
+      if (error) errors.push(`Supabase: ${error.message}`);
+    }
+
+    // 2. Cloudflare D1: delete the canonical row from the artists table.
+    //    Without this, getArtists() re-fetches the row and the talent reappears.
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/d1', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'deleteArtist', payload: { id } }),
+          cache: 'no-store',
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          errors.push(`D1: ${json?.error || `HTTP ${res.status}`}`);
+        }
+      } catch (err: any) {
+        errors.push(`D1: ${err?.message || 'network error'}`);
+      }
+    }
+
+    // 3. Local store + site_store snapshot (optimistic, best-effort)
     const artists = await this.getArtists();
     const filtered = artists.filter(a => a.id !== id);
     await persistRemoteStore('st_artists_v2', filtered);
+    setStoreValue('st_artists_v2', filtered);
+
+    // 4. Notify other open tabs/windows so their views update immediately
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('st_artist_deleted', { detail: { id } }));
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Talent was hidden locally but could not be fully deleted (${errors.join('; ')}). It may reappear after a refresh.`);
+    }
     return true;
   },
 
