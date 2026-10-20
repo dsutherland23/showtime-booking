@@ -44,11 +44,13 @@ export async function executeD1Query<T = any>(sql: string, params: any[] = []): 
   }
 
   const data = await res.json();
-  if (!data.success || !data.result?.[0]?.results) {
-    throw new Error(`D1 Query execution error: ${JSON.stringify(data.errors)}`);
+  if (!data.success) {
+    throw new Error(`D1 Query execution error: ${JSON.stringify(data.errors || data)}`);
   }
 
-  return data.result[0].results as T[];
+  // Handle both SELECT queries (which return results array) and mutations (INSERT/UPDATE/DELETE which return meta)
+  const results = data.result?.[0]?.results;
+  return (Array.isArray(results) ? results : []) as T[];
 }
 
 function parseD1ArtistRow(row: any) {

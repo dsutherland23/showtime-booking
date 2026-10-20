@@ -107,7 +107,7 @@ function ArtistProfile() {
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [coverImage, setCoverImage] = useState('');
-  const [bookingStatus, setBookingStatus] = useState<'Available' | 'Booked' | 'On Tour' | 'On Hold'>('Available');
+  const [bookingStatus, setBookingStatus] = useState<Artist['booking_status']>('Available');
   const [availabilityStatus, setAvailabilityStatus] = useState<'Active' | 'Inactive'>('Active');
   const [techRider, setTechRider] = useState('');
   const [hospRider, setHospRider] = useState('');

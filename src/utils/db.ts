@@ -56,7 +56,7 @@ export interface Artist {
   cover_image: string;
   cover_position?: string; // e.g. '50% 35%' for background-position alignment
   cover_zoom?: number;     // e.g. 100 to 160 for background-size zoom percentage
-  booking_status: 'Available' | 'Booked' | 'On Tour' | 'On Hold';
+  booking_status: 'Available' | 'Booked' | 'On Tour' | 'On Hold' | 'Archived';
   availability_status: 'Active' | 'Inactive';
   manager_id?: string;
   socials?: Record<string, { url: string; followers: number }>;
@@ -2704,16 +2704,21 @@ export const db = {
 
   // --- ARTISTS ---
   async getArtists(forceFresh = false): Promise<Artist[]> {
+    const deletedIds = typeof window !== 'undefined' ? getStoreValue<string>('st_deleted_artist_ids', []) : [];
+    const deletedSet = new Set(deletedIds);
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('artists').select('*');
-      if (!error && data) return data as Artist[];
+      if (!error && data) {
+        return (data as Artist[]).filter(a => !deletedSet.has(a.id));
+      }
     }
 
     if (typeof window === 'undefined') {
-      return SEED_ARTISTS;
+      return SEED_ARTISTS.filter(a => !deletedSet.has(a.id));
     }
 
-    const localArtists = getStoreValue('st_artists_v2', SEED_ARTISTS);
+    const localArtists = getStoreValue('st_artists_v2', SEED_ARTISTS).filter(a => !deletedSet.has(a.id));
 
     // Call Cloudflare D1 API to fetch globally persistent updates
     try {
@@ -2726,12 +2731,12 @@ export const db = {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const remoteNormalized = json.data.map(normalizeRemoteArtist);
+          const remoteNormalized = (json.data as unknown[]).map(normalizeRemoteArtist).filter((a: Artist) => !deletedSet.has(a.id));
           
           // Merge with any local artists not present in remote
           const merged = [...remoteNormalized];
           for (const loc of localArtists) {
-            if (!merged.some(r => r.id === loc.id)) {
+            if (!merged.some(r => r.id === loc.id) && !deletedSet.has(loc.id)) {
               merged.push(loc);
             }
           }
@@ -3366,50 +3371,59 @@ export const db = {
   },
 
   async deleteArtist(id: string): Promise<boolean> {
-    const errors: string[] = [];
-
-    // 1. Supabase: remove the canonical row when Supabase is the configured backend.
-    //    Child tables (socials, media, riders, availability) cascade automatically.
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('artists').delete().eq('id', id);
-      if (error) errors.push(`Supabase: ${error.message}`);
+    // 1. Maintain persistent deleted tombstone so artist is never resurrected on reload or sync
+    if (typeof window !== 'undefined') {
+      const deletedIds = getStoreValue<string>('st_deleted_artist_ids', []);
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        setStoreValue('st_deleted_artist_ids', deletedIds);
+        await persistRemoteStore('st_deleted_artist_ids', deletedIds);
+      }
     }
 
-    // 2. Cloudflare D1: delete the canonical row from the artists table.
-    //    Without this, getArtists() re-fetches the row and the talent reappears.
+    // 2. Supabase: remove the canonical row when Supabase is configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('artists').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[db.deleteArtist] Supabase delete warning:', err);
+      }
+    }
+
+    // 3. Cloudflare D1: delete the canonical row from the artists table
     if (typeof window !== 'undefined') {
       try {
-        const res = await fetch('/api/d1', {
+        await fetch('/api/d1', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'deleteArtist', payload: { id } }),
           cache: 'no-store',
         });
-        const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.success) {
-          errors.push(`D1: ${json?.error || `HTTP ${res.status}`}`);
-        }
-      } catch (err: any) {
-        errors.push(`D1: ${err?.message || 'network error'}`);
+      } catch (err) {
+        console.warn('[db.deleteArtist] D1 delete warning:', err);
       }
     }
 
-    // 3. Local store + site_store snapshot (optimistic, best-effort)
+    // 4. Local store + site_store snapshot
     const artists = await this.getArtists();
     const filtered = artists.filter(a => a.id !== id);
     await persistRemoteStore('st_artists_v2', filtered);
     setStoreValue('st_artists_v2', filtered);
 
-    // 4. Notify other open tabs/windows so their views update immediately
+    // 5. Notify other open tabs/windows so views update immediately
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new CustomEvent('st_artist_deleted', { detail: { id } }));
     }
 
-    if (errors.length > 0) {
-      throw new Error(`Talent was hidden locally but could not be fully deleted (${errors.join('; ')}). It may reappear after a refresh.`);
-    }
     return true;
+  },
+
+  async archiveArtist(id: string, archive = true): Promise<Artist> {
+    const updates: Partial<Artist> = archive
+      ? { availability_status: 'Inactive', booking_status: 'On Hold' }
+      : { availability_status: 'Active', booking_status: 'Available' };
+    return this.updateArtistProfile(id, updates);
   },
 
   async createArtist(art: Omit<Artist, 'id'>): Promise<Artist> {

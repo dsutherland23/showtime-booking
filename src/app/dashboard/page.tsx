@@ -37,7 +37,7 @@ import {
   HelpCircle, BookOpen, ChevronDown, Rocket, Lightbulb,
   ArrowRight, FileCheck, FilePlus, Split, Share2, Landmark,
   Award, Compass, Target, Briefcase, Plane, Headphones, HeartHandshake,
-  Palette
+  Palette, Archive, ArchiveRestore
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -341,9 +341,19 @@ function TR({ children, onClick }: { children: React.ReactNode; onClick?: () => 
   );
 }
 
-function TD({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
+function TD({ children, muted, style, className }: { children: React.ReactNode; muted?: boolean; style?: React.CSSProperties; className?: string }) {
   return (
-    <td style={{ padding: '0.6rem 0.75rem', fontSize: '0.82rem', color: muted ? 'var(--text-muted)' : 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+    <td
+      className={className}
+      style={{
+        padding: '0.6rem 0.75rem',
+        fontSize: '0.82rem',
+        color: muted ? 'var(--text-muted)' : 'var(--text-primary)',
+        verticalAlign: 'middle',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
+    >
       {children}
     </td>
   );
@@ -1954,6 +1964,79 @@ function BookingsSection({
   );
 }
 
+// ─── Custom Accessible 2026 Batch Checkbox ───────────────────────────────────
+
+function SelectCheckbox({
+  id,
+  checked,
+  indeterminate,
+  onChange,
+  label,
+  size = 20,
+}: {
+  id?: string;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  label: string;
+  size?: number;
+}) {
+  const active = checked || !!indeterminate;
+  return (
+    <label
+      htmlFor={id}
+      onClick={e => e.stopPropagation()}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        cursor: 'pointer',
+        padding: 5,
+        margin: -5,
+        minWidth: 32,
+        minHeight: 32,
+        userSelect: 'none',
+      }}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: 'none',
+        }}
+      />
+      <span
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 6,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: active ? '1.5px solid var(--accent)' : '1.5px solid rgba(255,255,255,0.38)',
+          background: active ? 'var(--accent-gradient)' : 'rgba(12,10,23,0.92)',
+          boxShadow: active ? '0 0 12px rgba(212,175,55,0.55)' : 'none',
+          transition: 'all 0.15s ease',
+          flexShrink: 0,
+        }}
+      >
+        {checked && <Check size={Math.round(size * 0.65)} strokeWidth={3.5} color="#07050e" />}
+        {!checked && indeterminate && (
+          <span style={{ width: Math.round(size * 0.5), height: 2.5, borderRadius: 2, background: '#07050e' }} />
+        )}
+      </span>
+      <span className="visually-hidden">{label}</span>
+    </label>
+  );
+}
+
 // ─── Artists Section (2026 Agency EPK & Roster CMS) ───────────────────────────
 
 function ArtistsSection({ artists, onRefresh, showToast }: {
@@ -1962,6 +2045,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalTab, setModalTab] = useState<'overview' | 'showcase' | 'socials' | 'calendar' | 'riders'>('overview');
   const [editItem, setEditItem] = useState<Artist | null>(null);
@@ -2007,7 +2091,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const [customDateInput, setCustomDateInput] = useState('');
 
   const CATEGORIES = ['All', 'Reggae Artists', 'Dancehall Artists', 'DJs', 'Soca Artists', 'Afrobeats Artists', 'R&B Artists'];
-  const STATUSES = ['All', 'Available', 'Booked', 'On Tour', 'On Hold'];
+  const STATUSES = ['All', 'Available', 'Booked', 'On Tour', 'On Hold', 'Archived'];
 
   const blank = {
     stage_name: '',
@@ -2225,9 +2309,40 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   };
 
   const handleDelete = async (id: string) => {
-    try { await db.deleteArtist(id); onRefresh(); showToast('Artist removed.', 'success'); }
-    catch { showToast('Failed to delete.', 'error'); }
-    finally { setConfirm(null); }
+    const artistToDelete = artists.find(a => a.id === id);
+    const stageName = artistToDelete?.stage_name || 'Artist';
+    try {
+      // Optimistically remove from local selection immediately
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      await db.deleteArtist(id);
+      showToast(`${stageName} removed from roster.`, 'success');
+      onRefresh();
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to delete artist.', 'error');
+    } finally {
+      setConfirm(null);
+    }
+  };
+
+  const handleArchiveToggle = async (a: Artist) => {
+    const isCurrentlyArchived = a.availability_status === 'Inactive' || a.booking_status === 'On Hold';
+    const nextArchive = !isCurrentlyArchived;
+    try {
+      await db.archiveArtist(a.id, nextArchive);
+      showToast(
+        nextArchive
+          ? `${a.stage_name} archived. Talent hidden from active roster.`
+          : `${a.stage_name} restored to active roster.`,
+        'success'
+      );
+      onRefresh();
+    } catch {
+      showToast('Failed to update archive status.', 'error');
+    }
   };
 
   // Calendar math for modal Tab 4
@@ -2249,7 +2364,12 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       a.category.toLowerCase().includes(search.toLowerCase()) ||
       a.legal_name.toLowerCase().includes(search.toLowerCase());
     const matchesCat = selectedCat === 'All' || a.category === selectedCat;
-    const matchesStatus = selectedStatus === 'All' || a.booking_status === selectedStatus;
+    const isArchived = a.availability_status === 'Inactive' || a.booking_status === 'On Hold';
+    const matchesStatus = selectedStatus === 'All'
+      ? !isArchived
+      : selectedStatus === 'Archived'
+        ? isArchived
+        : !isArchived && a.booking_status === selectedStatus;
     return matchesSearch && matchesCat && matchesStatus;
   });
 
@@ -2260,6 +2380,11 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
   const isIndeterminate = selectedInFilteredCount > 0 && !allFilteredSelected;
   const hiddenSelectedCount = Math.max(0, selectedIds.size - selectedInFilteredCount);
   const totalSelectedFee = selectedArtistsList.reduce((acc, a) => acc + getArtistEstimatedPricing(a).fee, 0);
+
+  // List to display in Table / Cards (allows toggling "Show Selected Only")
+  const displayList = showOnlySelected
+    ? filtered.filter(a => selectedIds.has(a.id))
+    : filtered;
 
   // Sync native indeterminate state on master checkboxes
   useEffect(() => {
@@ -2510,6 +2635,35 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
     }
   };
 
+  const handleBatchArchive = async (archive = true) => {
+    if (selectedIds.size === 0 || batchBusy) return;
+    const targetArtists = artists.filter(a => selectedIds.has(a.id));
+    setBatchBusy(true);
+    try {
+      for (let i = 0; i < targetArtists.length; i++) {
+        setBatchProgress({
+          done: i + 1,
+          total: targetArtists.length,
+          currentName: targetArtists[i].stage_name,
+        });
+        await db.archiveArtist(targetArtists[i].id, archive);
+      }
+      showToast(
+        archive
+          ? `${targetArtists.length} artist(s) archived.`
+          : `${targetArtists.length} artist(s) unarchived.`,
+        'success'
+      );
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch {
+      showToast(`Batch ${archive ? 'archive' : 'unarchive'} failed. Please try again.`, 'error');
+    } finally {
+      setBatchBusy(false);
+      setBatchProgress(null);
+    }
+  };
+
   return (
     <div className="artists-admin-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
       {/* Polite Live Region for Screen Reader Selection & Batch Announcements */}
@@ -2540,12 +2694,28 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
               </button>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', padding: '0 4px' }}>
-            Showing <strong style={{ color: 'var(--text-primary)' }}>{filtered.length}</strong> of {artists.length}
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', padding: '0 4px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            Showing <strong style={{ color: 'var(--text-primary)' }}>{displayList.length}</strong> of {artists.length}
+            {showOnlySelected && (
+              <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '0.72rem', background: 'rgba(212,175,55,0.15)', padding: '1px 6px', borderRadius: 4 }}>
+                Filtered to Selected
+              </span>
+            )}
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {selectedIds.size > 0 && (
+            <ABtn
+              variant={showOnlySelected ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setShowOnlySelected(s => !s)}
+              title={showOnlySelected ? 'Show all roster rows' : `View only the ${selectedIds.size} selected artists`}
+            >
+              <Eye size={13} />
+              {showOnlySelected ? 'Show All Roster' : `View Selected Only (${selectedIds.size})`}
+            </ABtn>
+          )}
           <ABtn
             variant={selectedIds.size > 0 ? 'secondary' : 'ghost'}
             size="sm"
@@ -2924,6 +3094,24 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
               >
                 Hide
               </ABtn>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => handleBatchArchive(true)}
+                title="Archive selected talent (marks inactive/on hold and hides from public roster)"
+              >
+                <Archive size={12} />Archive Selected
+              </ABtn>
+              <ABtn
+                size="sm"
+                variant="secondary"
+                disabled={batchBusy}
+                onClick={() => handleBatchArchive(false)}
+                title="Unarchive selected talent (restores to active roster)"
+              >
+                <ArchiveRestore size={12} />Unarchive
+              </ABtn>
               <ABtn size="sm" variant="secondary" disabled={batchBusy} onClick={handleBatchExportCsv}>
                 <Download size={12} />Export CSV
               </ABtn>
@@ -2953,9 +3141,12 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       {isMobile ? (
         /* ── Responsive Mobile Card List (320px–767px) ── */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-          {filtered.length === 0 ? (
+          {displayList.length === 0 ? (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-              <Empty icon={Music} msg="No artists found matching your criteria" />
+              <Empty
+                icon={Music}
+                msg={showOnlySelected ? "No selected artists match the current filter" : "No artists found matching your criteria"}
+              />
             </div>
           ) : (
             <>
@@ -2966,26 +3157,26 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 background: selectedInFilteredCount > 0 ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${selectedInFilteredCount > 0 ? 'rgba(212,175,55,0.45)' : 'var(--border-color)'}`,
               }}>
-                <label
-                  htmlFor="mobile-select-all-artists"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', minBlockSize: 28 }}
-                >
-                  <input
-                    ref={mobileMasterCheckboxRef}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <SelectCheckbox
                     id="mobile-select-all-artists"
-                    type="checkbox"
-                    className="artist-select-checkbox"
                     checked={allFilteredSelected}
+                    indeterminate={isIndeterminate}
                     onChange={toggleSelectAll}
+                    label="Select all visible artists"
+                    size={22}
                   />
-                  <span>
+                  <label
+                    htmlFor="mobile-select-all-artists"
+                    style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', userSelect: 'none' }}
+                  >
                     {allFilteredSelected
                       ? `All ${filtered.length} Visible Selected`
                       : selectedInFilteredCount > 0
                         ? `${selectedInFilteredCount} of ${filtered.length} Selected`
                         : `Select All (${filtered.length})`}
-                  </span>
-                </label>
+                  </label>
+                </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   {selectedIds.size > 0 && (
@@ -3007,7 +3198,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 </div>
               </div>
 
-              {filtered.map(a => {
+              {displayList.map(a => {
                 const est = getArtistEstimatedPricing(a);
                 const sel = selectedIds.has(a.id);
                 const checkboxId = `mobile-select-artist-${a.id}`;
@@ -3022,23 +3213,16 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                     >
                       {/* Top Row: Checkbox + Avatar with Selected Badge + Name & Category + Fee */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
-                        <label
-                          htmlFor={checkboxId}
-                          onClick={e => e.stopPropagation()}
-                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, margin: -4, cursor: 'pointer', flexShrink: 0 }}
-                        >
-                          <input
-                            id={checkboxId}
-                            type="checkbox"
-                            className="artist-select-checkbox"
-                            checked={sel}
-                            onChange={e => {
-                              const nativeEvt = e.nativeEvent as MouseEvent;
-                              toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
-                            }}
-                          />
-                          <span className="visually-hidden">Select {a.stage_name}</span>
-                        </label>
+                        <SelectCheckbox
+                          id={checkboxId}
+                          checked={sel}
+                          onChange={e => {
+                            const nativeEvt = e.nativeEvent as MouseEvent;
+                            toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
+                          }}
+                          label={`Select ${a.stage_name}`}
+                          size={22}
+                        />
 
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3192,6 +3376,23 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleArchiveToggle(a)}
+                          title={a.booking_status === 'Archived' || a.availability_status === 'Inactive' ? `Restore ${a.stage_name}` : `Archive ${a.stage_name}`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '6px 8px', minBlockSize: 34, borderRadius: 7,
+                            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                            color: 'var(--text-secondary)', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          {a.booking_status === 'Archived' || a.availability_status === 'Inactive' ? (
+                            <><ArchiveRestore size={13} color="var(--accent)" />Restore</>
+                          ) : (
+                            <><Archive size={13} />Archive</>
+                          )}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setConfirm(a.id)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -3213,31 +3414,33 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
       ) : (
       <Tbl>
         <TH cols={[
-          <label
-            key="select-all-label"
-            htmlFor="desktop-select-all-artists"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            title="Select or deselect all visible artists (Shift+Click rows for range selection)"
-          >
-            <input
-              ref={desktopMasterCheckboxRef}
+          <div key="desktop-master-cb" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SelectCheckbox
               id="desktop-select-all-artists"
-              type="checkbox"
-              className="artist-select-checkbox"
               checked={allFilteredSelected}
+              indeterminate={isIndeterminate}
               onChange={toggleSelectAll}
+              label="Select all visible artists"
+              size={18}
             />
-            <span className="visually-hidden">Select all visible artists</span>
-          </label>,
+          </div>,
           'Artist', 'Category', 'Genre', 'Est. Fee (USD)', 'Booking Status', 'Availability', 'Featured', 'Actions'
         ]} />
         <tbody>
-          {filtered.length === 0 ? (
-            <tr><td colSpan={9}><Empty icon={Music} msg="No artists found matching your criteria" /></td></tr>
-          ) : filtered.map(a => {
+          {displayList.length === 0 ? (
+            <tr>
+              <td colSpan={9}>
+                <Empty
+                  icon={Music}
+                  msg={showOnlySelected ? "No selected artists match the current filter" : "No artists found matching your criteria"}
+                />
+              </td>
+            </tr>
+          ) : displayList.map(a => {
             const est = getArtistEstimatedPricing(a);
             const sel = selectedIds.has(a.id);
             const checkboxId = `desktop-select-artist-${a.id}`;
+            const rowBg = sel ? 'rgba(212, 175, 55, 0.16)' : undefined;
             return (
             <tr
               key={a.id}
@@ -3249,28 +3452,25 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                 if (target.closest('button, a, input, label')) return;
                 toggleSelect(a.id, e.shiftKey);
               }}
-              style={{ cursor: 'pointer' }}
+              style={{
+                cursor: 'pointer',
+                background: rowBg,
+                transition: 'background 0.15s ease',
+              }}
             >
-              <TD>
-                <label
-                  htmlFor={checkboxId}
-                  onClick={e => e.stopPropagation()}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 4, margin: -4, cursor: 'pointer' }}
-                >
-                  <input
-                    id={checkboxId}
-                    type="checkbox"
-                    className="artist-select-checkbox"
-                    checked={sel}
-                    onChange={e => {
-                      const nativeEvt = e.nativeEvent as MouseEvent;
-                      toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
-                    }}
-                  />
-                  <span className="visually-hidden">Select {a.stage_name}</span>
-                </label>
+              <TD style={{ background: rowBg, borderLeft: sel ? '4px solid var(--accent)' : '4px solid transparent' }}>
+                <SelectCheckbox
+                  id={checkboxId}
+                  checked={sel}
+                  onChange={e => {
+                    const nativeEvt = e.nativeEvent as MouseEvent;
+                    toggleSelect(a.id, Boolean(nativeEvt?.shiftKey));
+                  }}
+                  label={`Select ${a.stage_name}`}
+                  size={19}
+                />
               </TD>
-              <TD>
+              <TD style={{ background: rowBg }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3316,9 +3516,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   </div>
                 </div>
               </TD>
-              <TD muted>{a.category}</TD>
-              <TD muted>{a.genre}</TD>
-              <TD>
+              <TD muted style={{ background: rowBg }}>{a.category}</TD>
+              <TD muted style={{ background: rowBg }}>{a.genre}</TD>
+              <TD style={{ background: rowBg }}>
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); openEdit(a, 'overview'); }}
@@ -3329,9 +3529,9 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   <Edit2 size={11} style={{ opacity: 0.7 }} />
                 </button>
               </TD>
-              <TD><StatusBadge status={a.booking_status} /></TD>
-              <TD><StatusBadge status={a.availability_status} /></TD>
-              <TD>
+              <TD style={{ background: rowBg }}><StatusBadge status={a.booking_status} /></TD>
+              <TD style={{ background: rowBg }}><StatusBadge status={a.availability_status} /></TD>
+              <TD style={{ background: rowBg }}>
                 {a.is_featured ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.2rem 0.5rem', borderRadius: 4, background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', fontSize: '0.7rem', fontWeight: 600 }}>
                     ★ Spotlight
@@ -3340,7 +3540,7 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Standard</span>
                 )}
               </TD>
-              <TD>
+              <TD style={{ background: rowBg }}>
                 <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                   <a
                     href={`/artist?id=${a.id}`}
@@ -3368,6 +3568,19 @@ function ArtistsSection({ artists, onRefresh, showToast }: {
                   </ABtn>
                   <ABtn variant="ghost" size="sm" onClick={() => openEdit(a, 'overview')} title={`Edit ${a.stage_name} Full Talent Profile`}>
                     <Edit2 size={12} /><span className="visually-hidden">Edit {a.stage_name}</span>
+                  </ABtn>
+                  <ABtn
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleArchiveToggle(a)}
+                    title={a.booking_status === 'Archived' || a.availability_status === 'Inactive' ? `Restore ${a.stage_name}` : `Archive ${a.stage_name}`}
+                  >
+                    {a.booking_status === 'Archived' || a.availability_status === 'Inactive' ? (
+                      <ArchiveRestore size={12} color="var(--accent)" />
+                    ) : (
+                      <Archive size={12} />
+                    )}
+                    <span className="visually-hidden">{a.booking_status === 'Archived' || a.availability_status === 'Inactive' ? 'Restore' : 'Archive'} {a.stage_name}</span>
                   </ABtn>
                   <ABtn variant="danger" size="sm" onClick={() => setConfirm(a.id)} title={`Delete ${a.stage_name}`}>
                     <Trash2 size={12} /><span className="visually-hidden">Delete {a.stage_name}</span>
