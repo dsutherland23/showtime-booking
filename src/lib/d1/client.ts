@@ -138,6 +138,54 @@ export const d1 = {
     return this.getArtistById(id);
   },
 
+  async createArtist(art: Record<string, any>) {
+    const id = art.id || 'art-' + Math.random().toString(36).substring(2, 9);
+    const now = new Date().toISOString().replace('T', ' ').replace('Z', '');
+    const serializeField = (v: any) => (v !== null && v !== undefined && typeof v === 'object') ? JSON.stringify(v) : (v ?? null);
+
+    const sql = `
+      INSERT INTO artists (
+        id, stage_name, legal_name, category, genre, bio, location,
+        profile_image, cover_image, cover_position, cover_zoom,
+        booking_status, availability_status, manager_id,
+        estimated_fee, price_tier, is_featured,
+        socials, media, showcase_tracks, featured_youtube_url,
+        blocked_dates, technical_rider, hospitality_rider, extra_json,
+        created_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `;
+    const params = [
+      id,
+      art.stage_name || '',
+      art.legal_name || art.stage_name || '',
+      art.category || 'Dancehall Artists',
+      art.genre || '',
+      art.bio || '',
+      art.location || 'Jamaica',
+      art.profile_image || '/images/artist_dancehall.jpg',
+      art.cover_image || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&q=80&w=1200',
+      art.cover_position || null,
+      art.cover_zoom !== undefined ? Number(art.cover_zoom) : null,
+      art.booking_status || 'Available',
+      art.availability_status || 'Active',
+      art.manager_id || null,
+      art.estimated_fee !== undefined ? Number(art.estimated_fee) : 50000,
+      art.price_tier || '$$$',
+      art.is_featured ? 1 : 0,
+      serializeField(art.socials || {}),
+      serializeField(art.media || []),
+      serializeField(art.showcase_tracks || []),
+      art.featured_youtube_url || '',
+      serializeField(art.blocked_dates || []),
+      art.technical_rider || '',
+      art.hospitality_rider || '',
+      art.extra_json ? serializeField(art.extra_json) : null,
+      now,
+    ];
+    await executeD1Query(sql, params);
+    return { ...art, id };
+  },
+
   async deleteArtist(id: string) {
     // Remove the canonical row from the artists table
     await executeD1Query('DELETE FROM artists WHERE id = ?', [id]);

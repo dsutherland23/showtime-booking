@@ -19,6 +19,10 @@ export async function POST(request: Request) {
         const artist = await d1.updateArtistProfile(payload.id, payload.updates);
         return NextResponse.json({ success: true, data: artist });
       }
+      case 'createArtist': {
+        const artist = await d1.createArtist(payload);
+        return NextResponse.json({ success: true, data: artist });
+      }
       case 'deleteArtist': {
         const ok = await d1.deleteArtist(payload.id);
         return NextResponse.json({ success: true, data: ok });

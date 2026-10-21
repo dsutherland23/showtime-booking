@@ -3448,13 +3448,48 @@ export const db = {
   },
 
   async createArtist(art: Omit<Artist, 'id'>): Promise<Artist> {
-    const artists = await this.getArtists();
     const newArt: Artist = {
       ...art,
       id: 'art-' + Math.random().toString(36).substr(2, 9)
     };
-    artists.push(newArt);
-    await persistRemoteStore('st_artists_v2', artists);
+
+    // 1. Persist canonical row to Cloudflare D1 artists table (globally replicated)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/d1', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'createArtist', payload: newArt }),
+          cache: 'no-store',
+        });
+        const jsonResp = await res.json().catch(() => null);
+        if (res.ok && jsonResp?.success && jsonResp.data) {
+          // Use the canonical ID returned by D1
+          Object.assign(newArt, jsonResp.data);
+        } else {
+          console.warn('[db.createArtist] D1 insert warning:', jsonResp?.error || res.status);
+        }
+      } catch (err) {
+        console.warn('[db.createArtist] D1 insert failed (local-only fallback):', err);
+      }
+    }
+
+    // 2. Also update local store + site_store so the new artist appears immediately on
+    //    this device before a full getArtists() refresh
+    const existing = await this.getArtists();
+    if (!existing.some(a => a.id === newArt.id)) {
+      existing.push(newArt);
+      setStoreValue('st_artists_v2', existing);
+      // Best-effort sync to site_store — do not await to keep UI responsive
+      persistRemoteStore('st_artists_v2', existing).catch(() => {});
+    }
+
+    // 3. Notify open tabs
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('st_artist_created', { detail: newArt }));
+      window.dispatchEvent(new Event('storage'));
+    }
+
     return newArt;
   },
 
