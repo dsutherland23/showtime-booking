@@ -383,7 +383,7 @@ export default function Home() {
                   </div>
 
                   <div className="mt-8 flex w-full sm:w-auto pointer-events-auto">
-                    <Link href="/book" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full hover:scale-105 transition duration-300 flex items-center gap-2" style={{ background: 'var(--accent-gradient)', color: '#07050e', boxShadow: 'var(--glow-gold)' }}>
+                    <Link href="/booking" className="btn pointer-events-auto w-full sm:w-auto text-center justify-center font-semibold py-3.5 px-8 rounded-full hover:scale-105 transition duration-300 flex items-center gap-2" style={{ background: 'var(--accent-gradient)', color: '#07050e', boxShadow: 'var(--glow-gold)' }}>
                       Reserve Artist <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
@@ -702,7 +702,7 @@ export default function Home() {
           <h2 className="cta-headline">Ready to book your headliner?</h2>
           <p className="cta-body">Submit a formal inquiry and our team will match the perfect artist to your event, budget, and capacity.</p>
           <div className="cta-actions">
-            <Link href="/book" className="cta-btn-primary">Book Talent</Link>
+            <Link href="/booking" className="cta-btn-primary">Book Talent</Link>
             <Link href="/contact" className="cta-btn-secondary">Contact Us</Link>
           </div>
         </div>

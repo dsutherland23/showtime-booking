@@ -43,7 +43,7 @@ const TEXT_PHASES: TextPhase[] = [
     headline: 'Book The\nExperience.',
     sub: 'Premium entertainment. Exceptional talent.',
     ctas: [
-      { label: 'Book An Artist', href: '/book', primary: true },
+      { label: 'Book An Artist', href: '/booking', primary: true },
       { label: 'Explore Talent', href: '/talent' },
     ],
   },

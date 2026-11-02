@@ -56,6 +56,13 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  async redirects() {
+    return [
+      // Legacy booking URL → new canonical /booking (query strings preserved)
+      { source: '/book', destination: '/booking', permanent: true },
+    ];
+  },
+
   webpack: (config) => {
     config.cache = false;
     return config;

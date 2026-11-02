@@ -5,7 +5,7 @@ Allow: /services
 Allow: /events
 Allow: /about
 Allow: /contact
-Allow: /book
+Allow: /booking
 Allow: /ai-assistant
 
 # Block internal portals and auth from crawlers

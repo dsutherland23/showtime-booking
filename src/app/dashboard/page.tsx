@@ -4992,7 +4992,7 @@ function CustomersSection({ customers, onRefresh, showToast }: {
               <TD>
                 <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                   <a
-                    href={`/book?clientName=${encodeURIComponent(c.name)}&clientEmail=${encodeURIComponent(c.email)}`}
+                    href={`/booking?clientName=${encodeURIComponent(c.name)}&clientEmail=${encodeURIComponent(c.email)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Initiate Booking Inquiry for this Buyer"
@@ -8335,7 +8335,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
     order: 1,
     turnaround: '24-48h Response',
     action_label: 'Book Roster Talent',
-    action_url: '/book'
+    action_url: '/booking'
   };
   const [serviceForm, setServiceForm] = useState(blankService);
   const [serviceConfirmDelete, setServiceConfirmDelete] = useState<string | null>(null);
@@ -9736,7 +9736,7 @@ function ContentSection({ sections, onRefresh, showToast, initialSubTab }: {
                   <FInput
                     value={serviceForm.action_url}
                     onChange={v => setServiceForm(f => ({ ...f, action_url: v }))}
-                    placeholder="e.g. /book or /contact"
+                    placeholder="e.g. /booking or /contact"
                   />
                 </Field>
 
@@ -12526,7 +12526,7 @@ const HELP_SITE_MAP = [
   { path: '/', label: 'Homepage', desc: 'Hero, featured talent and announcements. Edited in Content CMS.' },
   { path: '/talent', label: 'Talent', desc: 'Public artist roster. Edited in Artists.' },
   { path: '/events', label: 'Events', desc: 'Published events. Edited in Events.' },
-  { path: '/book', label: 'Book', desc: 'Booking request form. Submissions land in Bookings.' },
+  { path: '/booking', label: 'Booking', desc: 'Booking request form. Submissions land in Bookings.' },
   { path: '/services', label: 'Services', desc: 'Agency services overview.' },
   { path: '/about', label: 'About', desc: 'Company story.' },
   { path: '/contact', label: 'Contact', desc: 'Contact form for general inquiries.' },

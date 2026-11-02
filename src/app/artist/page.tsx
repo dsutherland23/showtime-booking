@@ -1405,7 +1405,7 @@ function ArtistProfile() {
             <div className="luxury-card sidebar-action-card">
               <h3>Secure Booking Slot</h3>
               <p>Inquire regarding availability, routing options, and estimated production costs for this artist.</p>
-              <Link href={`/book?artistId=${artist.id}`} className="btn btn-primary btn-full-sidebar">
+              <Link href={`/booking?artistId=${artist.id}`} className="btn btn-primary btn-full-sidebar">
                 Book {artist.stage_name}
               </Link>
             </div>

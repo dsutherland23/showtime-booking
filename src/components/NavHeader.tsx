@@ -140,7 +140,7 @@ export function NavHeader() {
             /* Guest actions */
             <div className="portal-buttons-group hidden md:flex">
               <Link href="/auth/login" className="btn btn-secondary btn-sm-padding">Sign In</Link>
-              <Link href="/book" className="btn btn-primary btn-sm-padding">Book Now</Link>
+              <Link href="/booking" className="btn btn-primary btn-sm-padding">Book Now</Link>
             </div>
           )}
 
@@ -183,7 +183,7 @@ export function NavHeader() {
           ) : (
             <>
               <Link href="/auth/login" className="btn btn-secondary w-full text-center" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
-              <Link href="/book" className="btn btn-primary w-full text-center" onClick={() => setMobileMenuOpen(false)}>Book Now</Link>
+              <Link href="/booking" className="btn btn-primary w-full text-center" onClick={() => setMobileMenuOpen(false)}>Book Now</Link>
             </>
           )}
         </div>

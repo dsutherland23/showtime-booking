@@ -41,7 +41,7 @@ export function StickyCTA() {
           <span className="sticky-cta-pulse" aria-hidden="true" />
           <span className="sticky-cta-label">Ready to book a headliner?</span>
         </div>
-        <Link href="/book" className="sticky-cta-btn" data-cursor="Book">
+        <Link href="/booking" className="sticky-cta-btn" data-cursor="Book">
           Reserve an Artist
           <ArrowRight className="w-4 h-4" />
         </Link>

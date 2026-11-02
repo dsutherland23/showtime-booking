@@ -101,7 +101,7 @@ export default function Services() {
                   <ArrowRight size={13} />
                 </Link>
               ) : (
-                <Link href="/book" className="service-link">
+                <Link href="/booking" className="service-link">
                   <span>Inquire</span>
                   <ArrowRight size={13} />
                 </Link>
@@ -117,7 +117,7 @@ export default function Services() {
           <h3>Need a Custom Logistics Blueprint?</h3>
           <p>Consult with our lead logistics agents or submit event details to obtain travel and permit estimations.</p>
           <div className="cta-buttons">
-            <Link href="/book" className="btn btn-primary">Book Roster Talent</Link>
+            <Link href="/booking" className="btn btn-primary">Book Roster Talent</Link>
             <Link href="/contact" className="btn btn-secondary">Contact Our Team</Link>
           </div>
         </div>

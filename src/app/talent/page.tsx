@@ -466,7 +466,7 @@ const TalentDirectoryContent = () => {
                       View Profile & Riders
                     </Link>
                     <Link 
-                      href={`/book?artistId=${artist.id}`} 
+                      href={`/booking?artistId=${artist.id}`} 
                       className="btn btn-primary btn-full"
                     >
                       Book Artist

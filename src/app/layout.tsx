@@ -145,7 +145,7 @@ export default function RootLayout({
                     <Link href="/portal/artist">Artist Hub</Link>
                     <Link href="/admin">Admin Portal</Link>
                     <Link href="/about">About Us</Link>
-                    <Link href="/book">Book an Artist</Link>
+                    <Link href="/booking">Book an Artist</Link>
                   </div>
 
                   <div className="footer-links-col">

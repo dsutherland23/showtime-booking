@@ -197,7 +197,7 @@ export default function Events() {
                         </a>
                       ) : (
                         <Link
-                          href={`/book?eventTitle=${encodeURIComponent(evt.title)}&venue=${encodeURIComponent(evt.venue)}&city=${encodeURIComponent(evt.city)}&date=${encodeURIComponent(evt.date)}`}
+                          href={`/booking?eventTitle=${encodeURIComponent(evt.title)}&venue=${encodeURIComponent(evt.venue)}&city=${encodeURIComponent(evt.city)}&date=${encodeURIComponent(evt.date)}`}
                           className="btn-ticket"
                           title="Inquire with booking concierge"
                         >
@@ -223,7 +223,7 @@ export default function Events() {
             Showtime Entertainment manages contracting, talent routing, and full technical rider execution for arenas and festivals across North America, Europe, and the Caribbean.
           </p>
         </div>
-        <Link href="/book" className="btn btn-primary callout-btn">
+        <Link href="/booking" className="btn btn-primary callout-btn">
           <span>Inquire With Concierge</span>
           <ArrowRight size={16} />
         </Link>

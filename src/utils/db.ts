@@ -1974,7 +1974,7 @@ export const SEED_SERVICES: AgencyService[] = [
     order: 1,
     turnaround: '24-48h Response',
     action_label: 'Book Roster Talent',
-    action_url: '/book'
+    action_url: '/booking'
   },
   {
     id: 'srv-artist-rep',
@@ -2034,7 +2034,7 @@ export const SEED_SERVICES: AgencyService[] = [
     order: 6,
     turnaround: '24/7 Operations',
     action_label: 'Plan Event',
-    action_url: '/book'
+    action_url: '/booking'
   },
   {
     id: 'srv-pr-press',

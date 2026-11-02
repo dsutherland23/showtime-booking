@@ -226,7 +226,7 @@ export default function AIAssistant() {
                           <Link href={`/artist?id=${encodeURIComponent(a.id)}`} className="btn btn-secondary btn-tiny">
                             View Roster
                           </Link>
-                          <Link href={`/book?artistId=${a.id}`} className="btn btn-primary btn-tiny">
+                          <Link href={`/booking?artistId=${a.id}`} className="btn btn-primary btn-tiny">
                             Book Now
                           </Link>
                         </div>
@@ -238,7 +238,7 @@ export default function AIAssistant() {
                   {m.prefills && (
                     <div className="chat-action-button-row">
                       <Link 
-                        href={`/book?artistId=${m.prefills.artistId}&budget=${m.prefills.budget}`}
+                        href={`/booking?artistId=${m.prefills.artistId}&budget=${m.prefills.budget}`}
                         className="btn btn-primary btn-sm-padding btn-glow"
                       >
                         Auto Fill Booking Request Form
